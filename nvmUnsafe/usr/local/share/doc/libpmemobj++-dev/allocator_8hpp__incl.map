@@ -1,0 +1,12 @@
+<map id="pmdk&#45;1.4.2/src/include/libpmemobj++/allocator.hpp" name="pmdk&#45;1.4.2/src/include/libpmemobj++/allocator.hpp">
+<area shape="rect" id="node2" href="$common_8hpp.html" title="Commonly used functionality. " alt="" coords="979,348,1117,389"/>
+<area shape="rect" id="node3" href="$pexceptions_8hpp.html" title="Custom exceptions. " alt="" coords="133,437,272,479"/>
+<area shape="rect" id="node8" href="$life_8hpp.html" title="Functions for destroying arrays. " alt="" coords="117,95,256,136"/>
+<area shape="rect" id="node12" href="$persistent__ptr_8hpp.html" title="Persistent smart pointer. " alt="" coords="772,95,937,136"/>
+<area shape="rect" id="node26" href="$pext_8hpp.html" title="Convenience extensions for the resides on pmem property template. " alt="" coords="1073,102,1231,129"/>
+<area shape="rect" id="node11" href="$array__traits_8hpp.html" title="Common array traits. " alt="" coords="171,184,309,225"/>
+<area shape="rect" id="node17" href="$persistent__ptr__base_8hpp_source.html" title="libpmemobj++/detail\l/persistent_ptr_base.hpp" alt="" coords="712,184,877,225"/>
+<area shape="rect" id="node19" href="$specialization_8hpp.html" title="Helper template for persistent ptr specialization. " alt="" coords="661,348,800,389"/>
+<area shape="rect" id="node21" href="$pool_8hpp.html" title="C++ pmemobj pool. " alt="" coords="333,191,491,218"/>
+<area shape="rect" id="node24" href="$p_8hpp.html" title="Resides on pmem property template. " alt="" coords="870,273,1010,300"/>
+</map>

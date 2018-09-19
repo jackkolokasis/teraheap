@@ -1,0 +1,18 @@
+<map id="pmdk&#45;1.4.2/src/include/libpmemobj++/detail/pexceptions.hpp" name="pmdk&#45;1.4.2/src/include/libpmemobj++/detail/pexceptions.hpp">
+<area shape="rect" id="node2" href="$allocator_8hpp.html" title="Persistent memory aware allocator. " alt="" coords="305,503,492,545"/>
+<area shape="rect" id="node3" href="$common_8hpp.html" title="Commonly used functionality. " alt="" coords="429,95,651,136"/>
+<area shape="rect" id="node7" href="$make__persistent_8hpp.html" title="Persistent_ptr transactional allocation functions for objects. " alt="" coords="238,607,471,649"/>
+<area shape="rect" id="node8" href="$make__persistent__array_8hpp.html" title="Persistent_ptr allocation functions for arrays. " alt="" coords="5,600,213,656"/>
+<area shape="rect" id="node9" href="$make__persistent__array__atomic_8hpp.html" title="Atomic persistent_ptr allocation functions for arrays. " alt="" coords="535,600,743,656"/>
+<area shape="rect" id="node10" href="$make__persistent__atomic_8hpp.html" title="Persistent_ptr atomic allocation functions for objects. " alt="" coords="767,600,975,656"/>
+<area shape="rect" id="node11" href="$utils_8hpp.html" title="Libpmemobj C++ utils. " alt="" coords="954,503,1115,545"/>
+<area shape="rect" id="node14" href="$pool_8hpp.html" title="C++ pmemobj pool. " alt="" coords="858,295,1019,337"/>
+<area shape="rect" id="node15" href="$transaction_8hpp.html" title="C++ pmemobj transactions. " alt="" coords="909,399,1110,441"/>
+<area shape="rect" id="node16" href="$mutex_8hpp.html" title="Pmem&#45;resident mutex. " alt="" coords="1287,95,1460,136"/>
+<area shape="rect" id="node4" href="$persistent__ptr__base_8hpp_source.html" title="pmdk&#45;1.4.2/src/include\l/libpmemobj++/detail/persistent\l_ptr_base.hpp" alt="" coords="375,288,579,344"/>
+<area shape="rect" id="node5" href="$persistent__ptr_8hpp.html" title="Persistent smart pointer. " alt="" coords="562,392,731,448"/>
+<area shape="rect" id="node12" href="$p_8hpp.html" title="Resides on pmem property template. " alt="" coords="577,191,732,233"/>
+<area shape="rect" id="node6" href="$check__persistent__ptr__array_8hpp.html" title="Compile time type check for make_persistent. " alt="" coords="547,496,730,552"/>
+<area shape="rect" id="node13" href="$pext_8hpp.html" title="Convenience extensions for the resides on pmem property template. " alt="" coords="375,399,537,441"/>
+<area shape="rect" id="node17" href="$condition__variable_8hpp.html" title="Pmem&#45;resident condition variable. " alt="" coords="1291,184,1455,240"/>
+</map>

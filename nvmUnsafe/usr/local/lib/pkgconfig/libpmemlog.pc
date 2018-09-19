@@ -1,0 +1,12 @@
+version=1.4.2
+libdir=/usr/local/lib
+prefix=/usr/local
+includedir=${prefix}/include
+
+Name: libpmemlog
+Description: libpmemlog library from PMDK project
+Version: ${version}
+URL: http://pmem.io/pmdk
+Requires.private: libpmem
+Libs: -L${libdir} -lpmemlog
+Cflags: -I${includedir}

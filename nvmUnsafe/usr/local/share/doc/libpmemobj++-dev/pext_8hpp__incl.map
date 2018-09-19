@@ -1,0 +1,6 @@
+<map id="pmdk&#45;1.4.2/src/include/libpmemobj++/pext.hpp" name="pmdk&#45;1.4.2/src/include/libpmemobj++/pext.hpp">
+<area shape="rect" id="node2" href="$p_8hpp.html" title="Resides on pmem property template. " alt="" coords="77,95,217,121"/>
+<area shape="rect" id="node4" href="$common_8hpp.html" title="Commonly used functionality. " alt="" coords="253,169,392,211"/>
+<area shape="rect" id="node10" href="$specialization_8hpp.html" title="Helper template for persistent ptr specialization. " alt="" coords="77,169,216,211"/>
+<area shape="rect" id="node5" href="$pexceptions_8hpp.html" title="Custom exceptions. " alt="" coords="99,259,237,300"/>
+</map>

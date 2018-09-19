@@ -1,0 +1,9 @@
+<map id="pmdk&#45;1.4.2/src/include/libpmemobj++/detail/array_traits.hpp" name="pmdk&#45;1.4.2/src/include/libpmemobj++/detail/array_traits.hpp">
+<area shape="rect" id="node2" href="$life_8hpp.html" title="Functions for destroying arrays. " alt="" coords="456,109,645,151"/>
+<area shape="rect" id="node4" href="$make__atomic__impl_8hpp.html" title="Implementation details of atomic allocation and construction. " alt="" coords="20,199,199,255"/>
+<area shape="rect" id="node5" href="$make__persistent__array__atomic_8hpp.html" title="Atomic persistent_ptr allocation functions for arrays. " alt="" coords="535,303,743,359"/>
+<area shape="rect" id="node8" href="$make__persistent__array_8hpp.html" title="Persistent_ptr allocation functions for arrays. " alt="" coords="692,199,900,255"/>
+<area shape="rect" id="node3" href="$allocator_8hpp.html" title="Persistent memory aware allocator. " alt="" coords="223,206,409,247"/>
+<area shape="rect" id="node7" href="$make__persistent_8hpp.html" title="Persistent_ptr transactional allocation functions for objects. " alt="" coords="434,206,667,247"/>
+<area shape="rect" id="node6" href="$make__persistent__atomic_8hpp.html" title="Persistent_ptr atomic allocation functions for objects. " alt="" coords="5,303,213,359"/>
+</map>

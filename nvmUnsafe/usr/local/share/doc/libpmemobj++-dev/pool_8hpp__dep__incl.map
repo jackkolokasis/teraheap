@@ -1,0 +1,11 @@
+<map id="pmdk&#45;1.4.2/src/include/libpmemobj++/pool.hpp" name="pmdk&#45;1.4.2/src/include/libpmemobj++/pool.hpp">
+<area shape="rect" id="node2" href="$make__persistent__atomic_8hpp.html" title="Persistent_ptr atomic allocation functions for objects. " alt="" coords="5,303,213,359"/>
+<area shape="rect" id="node3" href="$persistent__ptr_8hpp.html" title="Persistent smart pointer. " alt="" coords="259,95,429,151"/>
+<area shape="rect" id="node10" href="$transaction_8hpp.html" title="C++ pmemobj transactions. " alt="" coords="453,102,654,143"/>
+<area shape="rect" id="node4" href="$allocator_8hpp.html" title="Persistent memory aware allocator. " alt="" coords="147,206,333,247"/>
+<area shape="rect" id="node5" href="$check__persistent__ptr__array_8hpp.html" title="Compile time type check for make_persistent. " alt="" coords="358,199,541,255"/>
+<area shape="rect" id="node9" href="$utils_8hpp.html" title="Libpmemobj C++ utils. " alt="" coords="565,206,726,247"/>
+<area shape="rect" id="node6" href="$make__persistent_8hpp.html" title="Persistent_ptr transactional allocation functions for objects. " alt="" coords="238,310,471,351"/>
+<area shape="rect" id="node7" href="$make__persistent__array_8hpp.html" title="Persistent_ptr allocation functions for arrays. " alt="" coords="496,303,704,359"/>
+<area shape="rect" id="node8" href="$make__persistent__array__atomic_8hpp.html" title="Atomic persistent_ptr allocation functions for arrays. " alt="" coords="728,303,936,359"/>
+</map>

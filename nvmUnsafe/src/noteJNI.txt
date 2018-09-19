@@ -1,0 +1,218 @@
+This file contains notes about JNI Interface :
+----------------------------------------------
+
+Convert jstring to a C-style string
+-----------------------------------
+JNIEXPORT void JNICALL
+Java_MyJavaClass_printName(JNIEnv *env, jobject obj, jstring name)
+{
+	const char *str= (*env)->GetStringUTFChars(env,name,0);
+	printf("%s", str);
+	
+    //need to release this string when done with it in order to
+	//avoid memory leak
+	(*env)->ReleaseStringUTFChars(env, name, str);
+}
+
+C-style string to jstring
+-------------------------
+JNIEXPORT jstring JNICALL
+Java_MyJavaClass_getName(JNIEnv *env, jobject obj)
+{
+    return (*env)->NewStringUTF(env, "Jack Kolokasis");
+}
+
+
+
+pmp pointer //Have to save it internally
+
+/* PassObject.java */
+package recipeNo020;
+
+public class PassObject {
+
+    /* This is the native method we want to call */
+    public static native void displayObject(Object obj);
+
+    /* Inside static block we will load shared library */
+    static {
+            System.loadLibrary("PassObject");
+    }
+
+    public static void main(String[] args) {
+    /* This message will help you determine whether
+        LD_LIBRARY_PATH is correctly set
+    */
+    System.out.println("library: "
+        + System.getProperty("java.library.path"));
+
+    /* Create object to pass */
+    CustomClass cc = new CustomClass();
+    cc.iVal = 1;
+    cc.dVal = 1.1;
+    cc.cVal = 'a';
+    cc.bVal = true;
+    cc.sVal = "Hello from the CustomClass";
+    cc.oVal = new OtherClass();
+    cc.oVal.sVal = "Hello from the OtherClass";
+
+    /* Call to shared library */
+        PassObject.displayObject(cc);
+  }
+}
+
+/* CustomClass.java */
+package recipeNo020;
+
+public class CustomClass {
+    public int iVal;
+    public double dVal;
+    public char cVal;
+    public boolean bVal;
+    public OtherClass oVal;
+    public String sVal;
+}
+
+/* OtherClass.java */
+package recipeNo020;
+
+public class OtherClass {
+    public String sVal;
+}
+
+/* recipeNo020_PassObject.c */
+
+#include <stdio.h>
+#include "jni.h"
+#include "recipeNo020_PassObject.h"
+
+JNIEXPORT void JNICALL Java_recipeNo020_PassObject_displayObject
+  (JNIEnv *env, jclass obj, jobject objarg) {
+
+    /* Get objarg's class - objarg is the one we pass from
+       Java */
+    jclass cls = (*env)->GetObjectClass(env, objarg);
+
+    /* For accessing primitive types from class use
+           following field descriptors
+
+           +---+---------+
+           | Z | boolean |
+           | B | byte    |
+           | C | char    |
+           | S | short   |
+           | I | int     |
+           | J | long    |
+           | F | float   |
+           | D | double  |
+           +-------------+
+    */
+
+    /* Get int field
+
+       Take a look here, we are passing char* with
+           field descriptor - e.g. "I" => int
+        */
+    jfieldID fidInt = (*env)->GetFieldID(env, cls, "iVal", "I");
+    jint iVal = (*env)->GetIntField(env, objarg, fidInt);
+    printf("iVal: %d\n", iVal);
+
+    /* Get double field */
+    jfieldID fidDouble = (*env)->GetFieldID(env, cls, "dVal", "D");
+    jdouble dVal = (*env)->GetIntField(env, objarg, fidDouble);
+    printf("dVal: %f\n", dVal);
+
+    /* Get boolean field */
+    jfieldID fidBoolean = (*env)->GetFieldID(env, cls, "bVal", "Z");
+    jboolean bVal = (*env)->GetIntField(env, objarg, fidBoolean);
+    printf("bVal: %d\n", bVal);
+
+    /* Get character field */
+    jfieldID fidChar = (*env)->GetFieldID(env, cls, "cVal", "C");
+    jboolean cVal = (*env)->GetIntField(env, objarg, fidChar);
+    printf("cVal: %c\n", cVal);
+
+    /* Get String field */
+    jfieldID fidString = (*env)->GetFieldID(env, cls, "sVal", "Ljava/lang/String;");
+    jobject sVal = (*env)->GetObjectField(env, objarg, fidString);
+
+    // we have to get string bytes into C string
+    const char *c_str;
+    c_str = (*env)->GetStringUTFChars(env, sVal, NULL);
+    if(c_str == NULL) {
+            return;
+    }
+
+    printf("sVal: %s\n", c_str);
+
+    // after using it, remember to release the memory
+    (*env)->ReleaseStringUTFChars(env, sVal, c_str);
+
+    /* Get OtherClass */
+    jfieldID fidOtherClass = (*env)->GetFieldID(env, cls, "oVal", "LrecipeNo020/OtherClass;");
+    jobject oVal = (*env)->GetObjectField(env, objarg, fidOtherClass);
+
+    jclass clsOtherClass = (*env)->GetObjectClass(env, oVal);
+
+    /* Once we have OtherClass class and OtherClass object
+       we can access OtherClass'es components
+    */
+
+    /* Get String field from OtherClass */
+    jfieldID fidStringOtherClass = (*env)->GetFieldID(env, clsOtherClass, "sVal", "Ljava/lang/String;");
+    jobject sValOtherClass = (*env)->GetObjectField(env, oVal, fidStringOtherClass);
+
+    // we have to get string bytes into C string
+    const char *c_str_oc;
+    c_str_oc = (*env)->GetStringUTFChars(env, sValOtherClass, NULL);
+    if(c_str_oc == NULL) {
+        return;
+    }
+
+    printf("OtherClass.sVal: %s\n", c_str_oc);
+
+    // after using it, remember to release the memory
+    (*env)->ReleaseStringUTFChars(env, sValOtherClass, c_str_oc);
+}
+
+/* Make file */
+
+include ../Makefile.common
+
+all: compilejava compilec
+
+compilec:
+    cc -g -shared -fpic -I${JAVA_HOME}/include -I${JAVA_HOME}/include/$(ARCH) c/recipeNo020_PassObject.c -o lib/libPassObject.$(EXT)
+
+
+compilejava:
+    $(JAVA_HOME)/bin/javac -cp target -d target java/recipeNo020/OtherClass.java
+    $(JAVA_HOME)/bin/javac -cp target -d target java/recipeNo020/CustomClass.java
+    $(JAVA_HOME)/bin/javac -cp target -d target java/recipeNo020/PassObject.java
+    $(JAVA_HOME)/bin/javah -jni -d c -cp target recipeNo020.PassObject
+
+test:
+    $(JAVA_HOME)/bin/java -Djava.library.path=$(LD_LIBRARY_PATH):./lib -cp target recipeNo020.PassObject
+
+.PHONY: clean
+clean:
+    -rm -rfv target/*
+    -rm c/recipeNo020_PassObject.h
+    -rm -rfv lib/*
+
+/* directory structure */
+.
+├── Makefile
+├── c
+│   └── recipeNo020_PassObject.c
+├── java
+│   └── recipeNo020
+│       ├── CustomClass.java
+│       ├── OtherClass.java
+│       └── PassObject.java
+├── lib
+└── target
+
+/* execution */
+make
+make test
