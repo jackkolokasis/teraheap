@@ -12,8 +12,11 @@
 #
 ###################################################
 
-#Count the number of  emulated persistent memory devices we have
-numEmulatedPmem=$(lsblk | grep "pmem" | wc -l)
+# Count the number of  emulated persistent memory devices we have
+numEmulatedPmem=`lsblk | grep "pmem" | wc -l`
+
+# User login
+user=`whoami`
 
 for ((i=0; i<${numEmulatedPmem}; i++))
 do
@@ -24,5 +27,5 @@ do
     sudo mount -o dax /dev/pmem${i} /mnt/pmem${i}
     
     # Change permission owner
-    sudo chown kolokasis:kolokasis -R /mnt/pmem
+    sudo chown ${user}:${user} -R /mnt/pmem${i}
 done
