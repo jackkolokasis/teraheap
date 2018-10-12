@@ -31,9 +31,9 @@ Set the dynamic library path
 $ export LD_LIBRARY_PATH = /usr/local/lib
 ```
 
-## Example usage:
-Inside the nvmUnsafe directory there is a test file to check if the building of the library succeed.
-
+## Example usage
+Inside the nvmUnsafe directory there is a test file to check if the
+building of the library succeed.
 ```
 $ javac -cp ../../nvmUnsafe/NVMUnsafe.jar Example.java
 $ java -cp .:../../nvmUnsafe/NVMUnsafe.jar Example
