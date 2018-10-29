@@ -270,6 +270,21 @@
       <artifactId>unused</artifactId>
       <version>1.0.0</version>
     </dependency>
+
+    <!--
+         Jack Kolokasis
+         Start Insert here my depedency
+     -->
+    <dependency>
+      <groupId>NVMUnsafePath</groupId>
+      <artifactId>nvmUnsafe</artifactId>
+      <version>1.0</version>
+    </dependency>
+    <!--
+         Jack Kolokasis
+         End of Insert here my depedency
+     -->
+
     <!--
          This is needed by the scalatest plugin, and so is declared here to be available in
          all child modules, just as scalatest is run in all children

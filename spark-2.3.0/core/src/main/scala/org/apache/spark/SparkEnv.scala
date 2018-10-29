@@ -288,13 +288,20 @@ object SparkEnv extends Logging {
 
     val closureSerializer = new JavaSerializer(conf)
 
+    // If the current application is the Driver, create a BlockManagerMasterEndpoint and register it
+    // with RpcEnv
+    // If the current application is an Executor, find a reference to BlockManagerMasterEndpoint
+    // from RpcEnv
     def registerOrLookupEndpoint(
         name: String, endpointCreator: => RpcEndpoint):
       RpcEndpointRef = {
+      println("SparkEnv::registerOrLookupEndpoint::" + name)
       if (isDriver) {
         logInfo("Registering " + name)
+        println("SparkEnv::registerOrLookupEndpoint::Driver")
         rpcEnv.setupEndpoint(name, endpointCreator)
       } else {
+        println("SparkEnv::registerOrLookupEndpoint::Executor")
         RpcUtils.makeDriverRef(name, conf, rpcEnv)
       }
     }
@@ -334,14 +341,18 @@ object SparkEnv extends Logging {
       }
 
     val blockManagerPort = if (isDriver) {
+      println("SparkEnv::blockManagerPort::Driver")
       conf.get(DRIVER_BLOCK_MANAGER_PORT)
     } else {
+      println("SparkEnv::blockManagerPort::worker")
       conf.get(BLOCK_MANAGER_PORT)
     }
 
-    val blockTransferService =
+    val blockTransferService = {
+      println("SparkEnv::blockTransferService")
       new NettyBlockTransferService(conf, securityManager, bindAddress, advertiseAddress,
         blockManagerPort, numUsableCores)
+    }
 
     val blockManagerMaster = new BlockManagerMaster(registerOrLookupEndpoint(
       BlockManagerMaster.DRIVER_ENDPOINT_NAME,
@@ -362,6 +373,7 @@ object SparkEnv extends Logging {
       // We need to set the executor ID before the MetricsSystem is created because sources and
       // sinks specified in the metrics configuration file will want to incorporate this executor's
       // ID into the metrics they report.
+      /** Jack Kolokasis */
       conf.set("spark.executor.id", executorId)
       val ms = MetricsSystem.createMetricsSystem("executor", conf, securityManager)
       ms.start()

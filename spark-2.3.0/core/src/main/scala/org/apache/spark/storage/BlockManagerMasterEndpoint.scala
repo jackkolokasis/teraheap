@@ -71,6 +71,10 @@ class BlockManagerMasterEndpoint(
 
   logInfo("BlockManagerMasterEndpoint up")
 
+  // Used to receive remote calls and reply, use the reply method of RpcCallContext to reply the
+  // method, which is definitely involved in various encoding conversion, serialization,
+  // transmission and other operations, but this is done to the rpc framework to complete,
+  // press not to
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
     case RegisterBlockManager(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint) =>
       context.reply(register(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint))
@@ -159,6 +163,9 @@ class BlockManagerMasterEndpoint(
 
     // Ask the slaves to remove the RDD, and put the result in a sequence of Futures.
     // The dispatcher is used as an implicit argument into the Future sequence construction.
+    // Invoke slaves to rdd delete operation, and call the BlockManager's ask to return
+    // Generate a message body of Remove RDD according to RDDId, distribute it to each
+    // BlockManagerSlave to delete the corresponding block, and the final result returns a Future.
     val removeMsg = RemoveRdd(rddId)
 
     val futures = blockManagerInfo.values.map { bm =>
@@ -427,6 +434,8 @@ class BlockManagerMasterEndpoint(
     true
   }
 
+  // This method is relatively simple, which is to find the corresponding HashSet[BlockManagerId] in
+  // blockLocations according to blockId, and return Empty if is not found.
   private def getLocations(blockId: BlockId): Seq[BlockManagerId] = {
     if (blockLocations.containsKey(blockId)) blockLocations.get(blockId).toSeq else Seq.empty
   }

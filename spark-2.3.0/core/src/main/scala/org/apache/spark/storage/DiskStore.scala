@@ -56,6 +56,7 @@ private[spark] class DiskStore(
    * @throws IllegalStateException if the block already exists in the disk store.
    */
   def put(blockId: BlockId)(writeFunc: WritableByteChannel => Unit): Unit = {
+    println("DiskStore::put")
     if (contains(blockId)) {
       throw new IllegalStateException(s"Block $blockId is already present in the disk store")
     }
@@ -91,12 +92,14 @@ private[spark] class DiskStore(
   }
 
   def putBytes(blockId: BlockId, bytes: ChunkedByteBuffer): Unit = {
+    println("DiskStore::putBytes")
     put(blockId) { channel =>
       bytes.writeFully(channel)
     }
   }
 
   def getBytes(blockId: BlockId): BlockData = {
+    println("DiskStore::getBytes")
     val file = diskManager.getFile(blockId.name)
     val blockSize = getSize(blockId)
 
@@ -112,6 +115,7 @@ private[spark] class DiskStore(
   }
 
   def remove(blockId: BlockId): Boolean = {
+    println("DiskStore::remove")
     blockSizes.remove(blockId)
     val file = diskManager.getFile(blockId.name)
     if (file.exists()) {
@@ -126,11 +130,13 @@ private[spark] class DiskStore(
   }
 
   def contains(blockId: BlockId): Boolean = {
+    println("DiskStore::contains")
     val file = diskManager.getFile(blockId.name)
     file.exists()
   }
 
   private def openForWrite(file: File): WritableByteChannel = {
+    println("DiskStore::openForWrite")
     val out = new FileOutputStream(file).getChannel()
     try {
       securityManager.getIOEncryptionKey().map { key =>

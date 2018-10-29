@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+// scalastyle:off
+
 package org.apache.spark.memory
 
 import javax.annotation.concurrent.GuardedBy
@@ -36,6 +38,7 @@ private[memory] abstract class MemoryPool(lock: Object) {
    * Returns the current size of the pool, in bytes.
    */
   final def poolSize: Long = lock.synchronized {
+    println("MemoryPool::poolSize")
     _poolSize
   }
 
@@ -43,6 +46,7 @@ private[memory] abstract class MemoryPool(lock: Object) {
    * Returns the amount of free memory in the pool, in bytes.
    */
   final def memoryFree: Long = lock.synchronized {
+    println("MemoryPool::memoryFree")
     _poolSize - memoryUsed
   }
 
@@ -51,6 +55,7 @@ private[memory] abstract class MemoryPool(lock: Object) {
    */
   final def incrementPoolSize(delta: Long): Unit = lock.synchronized {
     require(delta >= 0)
+    println("MemoryPool::incrementPoolSize")
     _poolSize += delta
   }
 
@@ -61,6 +66,7 @@ private[memory] abstract class MemoryPool(lock: Object) {
     require(delta >= 0)
     require(delta <= _poolSize)
     require(_poolSize - delta >= memoryUsed)
+    println("MemoryPool::decrementPoolSize")
     _poolSize -= delta
   }
 
@@ -69,3 +75,4 @@ private[memory] abstract class MemoryPool(lock: Object) {
    */
   def memoryUsed: Long
 }
+// scalastyle:on

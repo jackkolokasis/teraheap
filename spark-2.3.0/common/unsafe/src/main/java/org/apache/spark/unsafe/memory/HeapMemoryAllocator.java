@@ -26,7 +26,8 @@ import java.util.Map;
 import org.apache.spark.unsafe.Platform;
 
 /**
- * A simple {@link MemoryAllocator} that can allocate up to 16GB using a JVM long primitive array.
+ * A simple {@link MemoryAllocator} that can allocate up to 16GB using
+ * a JVM long primitive array.
  */
 public class HeapMemoryAllocator implements MemoryAllocator {
 
@@ -36,16 +37,18 @@ public class HeapMemoryAllocator implements MemoryAllocator {
   private static final int POOLING_THRESHOLD_BYTES = 1024 * 1024;
 
   /**
-   * Returns true if allocations of the given size should go through the pooling mechanism and
-   * false otherwise.
+   * Returns true if allocations of the given size should go through
+   * the pooling mechanism and false otherwise.
    */
   private boolean shouldPool(long size) {
+      System.out.println("HeapMemoryAllcator::shouldPool()");
     // Very small allocations are less likely to benefit from pooling.
     return size >= POOLING_THRESHOLD_BYTES;
   }
 
   @Override
   public MemoryBlock allocate(long size) throws OutOfMemoryError {
+      System.out.println("HeapMemoryAllcator::allocate()");
     if (shouldPool(size)) {
       synchronized (this) {
         final LinkedList<WeakReference<long[]>> pool = bufferPoolsBySize.get(size);
@@ -76,6 +79,7 @@ public class HeapMemoryAllocator implements MemoryAllocator {
 
   @Override
   public void free(MemoryBlock memory) {
+      System.out.println("HeapMemoryAllcator::free()");
     assert (memory.obj != null) :
       "baseObject was null; are you trying to use the on-heap allocator to free off-heap memory?";
     assert (memory.pageNumber != MemoryBlock.FREED_IN_ALLOCATOR_PAGE_NUMBER) :

@@ -22,12 +22,12 @@ import org.apache.spark.unsafe.Platform;
 /**
  * A simple {@link MemoryAllocator} that uses {@code Unsafe} to allocate off-heap memory.
  */
-public class UnsafeMemoryAllocator implements MemoryAllocator {
+public class UnsafeNVMAllocator implements MemoryAllocator {
 
   @Override
   public MemoryBlock allocate(long size) throws OutOfMemoryError {
-      System.out.println("UnsafeMemoryAllocator::allocate");
-    long address = Platform.allocateMemory(size);
+      System.out.println("UnsafeNVMAllocator::allocate");
+    long address = Platform.nvmAllocateMemory(size);
     MemoryBlock memory = new MemoryBlock(null, address, size);
     if (MemoryAllocator.MEMORY_DEBUG_FILL_ENABLED) {
       memory.fill(MemoryAllocator.MEMORY_DEBUG_FILL_CLEAN_VALUE);
@@ -48,7 +48,7 @@ public class UnsafeMemoryAllocator implements MemoryAllocator {
     if (MemoryAllocator.MEMORY_DEBUG_FILL_ENABLED) {
       memory.fill(MemoryAllocator.MEMORY_DEBUG_FILL_FREED_VALUE);
     }
-    Platform.freeMemory(memory.offset);
+    Platform.nvmFreeMemory(memory.offset);
     // As an additional layer of defense against use-after-free bugs, we mutate the
     // MemoryBlock to reset its pointer.
     memory.offset = 0;

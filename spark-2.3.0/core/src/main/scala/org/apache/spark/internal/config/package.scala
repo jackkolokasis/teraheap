@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// scalastyle:off
 
 package org.apache.spark.internal
 
@@ -109,6 +110,33 @@ package object config {
       "accordingly. This must be set to a positive value when spark.memory.offHeap.enabled=true.")
     .bytesConf(ByteUnit.BYTE)
     .checkValue(_ >= 0, "The off-heap memory size must not be negative")
+    .createWithDefault(0)
+
+  /**
+   * Jack Kolokasis (02/10/18)
+   *
+   * Create Config builders for the PMEM_OFFHEAP_ENABLED
+   */
+  private[spark] val PMEM_OFFHEAP_ENABLED = ConfigBuilder("spark.pmem.offHeap.enabled")
+    .doc("If true, Spark will attempt to use persistent off-heap memory for certain operations. " +
+      "If persistent off-heap memory use is enabled, " +
+      "then spark.memory.pmem.offHeap.size must be positive.")
+    .withAlternative("spark.unsafe.pmem.offHeap")
+    .booleanConf
+    .createWithDefault(false)
+
+  /**
+   * Jack Kolokasis (02/10/18)
+   *
+   * Create Config builders for the PMEM_OFFHEAP_SIZE
+   */
+  private[spark] val PMEM_OFFHEAP_SIZE = ConfigBuilder("spark.pmem.offHeap.size")
+    .doc("The absolute amount of memory in bytes which can be used for off-heap allocation. " +
+      "This setting has no impact on heap memory usage, so if your executors' total memory " +
+      "consumption must fit within some hard limit then be sure to shrink your JVM heap size " +
+      "accordingly. This must be set to a positive value when spark.pmem.offHeap.enabled=true.")
+    .bytesConf(ByteUnit.BYTE)
+    .checkValue(_ >= 0, "The persistent off-heap memory size must not be negative")
     .createWithDefault(0)
 
   private[spark] val IS_PYTHON_APP = ConfigBuilder("spark.yarn.isPython").internal()
@@ -521,3 +549,4 @@ package object config {
       .createWithDefault(10000000)
 
 }
+// scalastyle:on
