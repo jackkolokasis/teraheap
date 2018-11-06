@@ -1,3 +1,16 @@
+/**************************************************
+ *
+ * file: com_nvmUnsafe_NVMUnsafe.c
+ *
+ * @Author:   Iacovos G. Kolokasis
+ * @Version:  19-10-2018
+ * @email:    kolokasis@ics.forth.gr
+ *
+ * Implementation of NVMUnsafe.java native functions
+ *
+ ***************************************************
+ */
+
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +44,20 @@ jlong addr_to_java(void* p)
 {
   assert(p == (void*)(uintptr_t)p);
   return (uintptr_t)p;
+}
+
+
+jlong 
+Unsafe_field_offset_to_byte_offset(jlong field_offset)
+{
+    return field_offset;
+}
+
+
+jlong 
+Unsafe_field_offset_from_byte_offset(jlong byte_offset)
+{
+    return byte_offset;
 }
 
 /**
@@ -422,7 +449,6 @@ Java_com_nvmUnsafe_NVMUnsafe_putFloat (JNIEnv *env, jobject nvmUnsafe,
 
     memcpy(PMEM(address, allocationAddr), &value, sizeof(jfloat));
 }
- 
 
 /**
  * @desc Free memory
@@ -444,6 +470,60 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmFreeMemory (JNIEnv *env, jobject nvmUnsafe,
     allocationAddr = addr_from_java(offset);
 
     pmemalloc_free(address, PMEM(address, allocationAddr));
+}
+
+/**
+ * @desc Put a double in persistent memory pool
+ *
+ * @param env       JNI Enviroment interface pointer
+ * @param nvmUnsafe Refer to current object itself
+ * @param value     Value for allocation
+ * @param pmp       Start address of the memory pool
+ * @param offset    Allocation address
+ *
+ */
+JNIEXPORT void JNICALL 
+Java_com_nvmUnsafe_NVMUnsafe_putDouble (JNIEnv *env, jobject nvmUnsafe, 
+        jdouble value, jlong pmp, jlong offset)
+{
+    void* address;                      /* Memory Pool initial address        */
+    void* allocationAddr;               /* Allocation address                 */
+
+    address = addr_from_java(pmp);
+    allocationAddr = addr_from_java(offset);
+
+    assert(address != NULL);
+    assert(allocationAddr != NULL);
+
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jdouble));
+}
+ 
+/**
+ * @desc Get a double from persistent memory pool
+ *
+ * @param env       JNI Enviroment interface pointer
+ * @param nvmUnsafe Refer to current object itself
+ * @param pmp       Start address of the memory pool
+ * @param offset    Allocation address
+ *
+ */
+JNIEXPORT jdouble JNICALL 
+Java_com_nvmUnsafe_NVMUnsafe_getDouble (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
+{
+    void* address;                      /* Memory Pool initial address        */
+    void* allocationAddr;               /* Allocation address                 */
+    jdouble retrieveValue;              /* Value retrieve from memory         */
+
+    address = addr_from_java(pmp);
+    allocationAddr = addr_from_java(offset);
+
+    assert(address != NULL);
+    assert(allocationAddr != NULL);
+
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jdouble));
+
+    return retrieveValue;
 }
 
 //JNIEXPORT void JNICALL 
