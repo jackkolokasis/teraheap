@@ -1,16 +1,28 @@
-import com.nvmUnsafe.NVMUnsafe;
+import com.nvmUnsafe.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
 
 public class Example {
+    
 
     public static void main (String[] args) {
-        NVMUnsafe tmp = new NVMUnsafe();
+        com.nvmUnsafe.NVMUnsafe tmp;
+
+        try {
+            Field nvmUnsafeField = NVMUnsafe.class.getDeclaredField("theNVMUnsafe");
+            nvmUnsafeField.setAccessible(true);
+            tmp = (com.nvmUnsafe.NVMUnsafe) nvmUnsafeField.get(null);
+        } catch (Throwable cause) {
+            tmp = null;
+        }
 
         int i = 12345;
         int retVal;
         long address;
         long allocAddr;
 
-        address = tmp.nvmInitialPool("/mnt/pmem/file", 1024 * 1024);
+        address = tmp.nvmInitialPool("/mnt/pmemdir/file", 1024 * 1024);
         System.out.println("Initial Address " + address);
 
         allocAddr = tmp.nvmAllocateMemory(address, 4);

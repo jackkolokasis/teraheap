@@ -9,7 +9,7 @@ public final class NVMUnsafe {
    static {
       System.loadLibrary("NVMUnsafe");      /* Load native library at runtime */
                                             /* libNVMUnsafe.so (Unix)         */
-      sun.reflect.Reflection.registerMethodsToFilter(NVMUnsafe.class, "getNVMUnafe");
+      sun.reflect.Reflection.registerMethodsToFilter(NVMUnsafe.class, "getNVMUnsafe");
    }
 
    private NVMUnsafe() {}

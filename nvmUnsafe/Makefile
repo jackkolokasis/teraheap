@@ -17,7 +17,7 @@ CC			  = gcc
 JAVAC		  = javac
 JAVAH		  = javah
 
-JAVA_PATH	  = /usr/lib/jvm/java-8-oracle
+JAVA_PATH	  = /usr/lib/jvm/java-1.8.0-openjdk
 CLASS_PATH    = com.nvmUnsafe
 LIB_PATH  	  = libpmemmalloc/lib
 CLASSES       = classes
@@ -69,18 +69,26 @@ $(TARGET).class:
 
 
 $(JAR_TARGET):
-	echo Manifest-Version: 1.0 > MANIFEST.MF
-	echo Class-Path: classes/ >> MANIFEST.MF
-	jar cvfm $@ MANIFEST.MF $(CLASSES)/
-	rm MANIFEST.MF
+	cd $(CLASSES) && \
+	echo Manifest-Version: 1.0 > MANIFEST.MF && \
+	echo Created-By: Iacovos G. Kolokasis >> MANIFEST.MF &&\
+	echo Class-Path: com >> MANIFEST.MF &&\
+	jar cvfm $@ MANIFEST.MF com/nvmUnsafe/NVMUnsafe.class &&\
+	rm MANIFEST.MF &&\
+	mv $@ ../ &&\
+	cd - &&\
 	chmod +x $@
-
 
 install:	## Install the shared libraries (*.so)
 	install -D $(LIB_TARGET) $(PREFIX)/lib/
 	install -D $(H_TARGET) $(PREFIX)/include/
 	install -D $(LIB_PATH)/libpmemalloc.so $(PREFIX)/lib
 
+
+uninstall:	## Uninstall the shared libraries (*.so)
+	rm $(PREFIX)/lib/$(LIB_TARGET)
+	rm $(PREFIX)/include/$(H_TARGET) 
+	rm $(PREFIX)/lib/libpmemalloc.so
 
 clean:		## Delete all intermediate files
 	rm -rf $(H_TARGET) $(OBJ_DIR) 
@@ -89,3 +97,7 @@ clean:		## Delete all intermediate files
 distclean:	## Delete all executable files (*.class, etc)
 	rm -rf $(LIB_DIR) $(JAR_TARGET) $(CLASSES)
 	$(MAKE) distclean -C libpmemmalloc
+	$(MAKE) clean -C tests
+
+test:		## Test the NVMUnsafe.jar library works properly
+	$(MAKE) all -C tests
