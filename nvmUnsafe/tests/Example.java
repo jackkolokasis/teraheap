@@ -22,7 +22,7 @@ public class Example {
         long address;
         long allocAddr;
 
-        address = tmp.nvmInitialPool("/mnt/pmemdir/file", 1024 * 1024);
+        address = tmp.nvmInitialPool("/mnt/pmemdir/file", 1073741824);
         System.out.println("Initial Address " + address);
 
         allocAddr = tmp.nvmAllocateMemory(address, 4);
@@ -33,5 +33,9 @@ public class Example {
         retVal = tmp.getInt(address, allocAddr);
 
         System.out.println("Number is " + retVal);
+
+        tmp.nvmFreeMemory(address, allocAddr);
+        
+        System.out.println("Free Memory");
     }
 }

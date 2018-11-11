@@ -469,7 +469,7 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmFreeMemory (JNIEnv *env, jobject nvmUnsafe,
     address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
-    pmemalloc_free(address, PMEM(address, allocationAddr));
+    pmemalloc_free(address, allocationAddr);
 }
 
 /**
@@ -526,17 +526,28 @@ Java_com_nvmUnsafe_NVMUnsafe_getDouble (JNIEnv *env, jobject nvmUnsafe,
     return retrieveValue;
 }
 
-//JNIEXPORT void JNICALL 
-//Java_NVMUnsafe_setObject (JNIEnv *env, jobject nvmUnsafe, jobject obj, 
-//        jlong pmp, jlong offset)
-//{
-//
-//    void* address;                      /* Memory Pool initial address      */
-//    void* allocationAddr;               /* Allocation address               */
-//
-//    assert(address != NULL);
-//    assert(allocationAddr != NULL);
-//
-//    jclass cls = (*env)->GetObjectClass(env, obj);
-//    memcpy(
-//}
+/**
+ * @desc Given a relative pointer, add in the base associated with the
+ * given Persistent Memory Pool (pmp).
+ *
+ * @param env       JNI Enviroment interface pointer
+ * @param nvmUnsafe Refer to current object itself
+ * @param pmp       Start address of the memory pool
+ * @param offset    Allocation address
+ *
+ */
+JNIEXPORT jlong JNICALL 
+Java_com_nvmUnsafe_NVMUnsafe_getPmemAddress (JNIEnv *env, jobject obj, jlong pmp,
+        jlong offset)
+{
+    void* address;                      /* Memory Pool initial address        */
+    void* allocationAddr;               /* Allocation address                 */
+    
+    address = addr_from_java(pmp);
+    allocationAddr = addr_from_java(offset);
+    
+    assert(address != NULL);
+    assert(allocationAddr != NULL);
+
+    return addr_to_java(PMEM(address, allocationAddr));
+}

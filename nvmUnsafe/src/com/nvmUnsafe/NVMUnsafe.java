@@ -215,5 +215,14 @@ public final class NVMUnsafe {
     *
     */
    public native void    nvmFreeMemory(long pmp, long offset);
+   
+   /**
+    * @desc Get translated pmem address
+    *
+    * @param pmp       Start address of the memory pool
+    * @param offset    Allocation address
+    *
+    */
+   public native long getPmemAddress(long pmp, long offset);
     
 }
