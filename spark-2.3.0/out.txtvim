@@ -1,9 +1,0 @@
-3:common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java:34:  public static final int BOOLEAN_ARRAY_OFFSET;
-4:common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java:57://  public static final int PMEM_BOOLEAN_ARRAY_OFFSET;
-5:common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java:319:      BOOLEAN_ARRAY_OFFSET  = _UNSAFE.arrayBaseOffset(boolean[].class);
-6:common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java:329://      PMEM_BOOLEAN_ARRAY_OFFSET = 0; // _NVM_UNSAFE.arrayBaseOffset(boolean[].class);
-7:common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java:340:      BOOLEAN_ARRAY_OFFSET      = 0;
-8:common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java:348://      PMEM_BOOLEAN_ARRAY_OFFSET = 0;
-9:sql/catalyst/src/main/java/org/apache/spark/sql/catalyst/expressions/UnsafeArrayData.java:389:      baseObject, elementOffset, values, Platform.BOOLEAN_ARRAY_OFFSET, numElements);
-10:sql/catalyst/src/main/java/org/apache/spark/sql/catalyst/expressions/UnsafeArrayData.java:463:    return fromPrimitiveArray(arr, Platform.BOOLEAN_ARRAY_OFFSET, arr.length, 1);
-11:tags:198:BOOLEAN_ARRAY_OFFSET	common/unsafe/src/main/java/org/apache/spark/unsafe/Platform.java	/^  public static final int BOOLEAN_ARRAY_OFFSET;$/;"	f	class:Platform
