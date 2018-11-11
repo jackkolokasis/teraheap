@@ -154,6 +154,7 @@ private[spark] class BlockManager(
   // to revisit whether reporting this value as the "max" is intuitive to the user.
   private val maxOnHeapMemory = memoryManager.maxOnHeapStorageMemory
   private val maxOffHeapMemory = memoryManager.maxOffHeapStorageMemory
+  private val maxPmemOffHeapMemory = memoryManager.maxPmemOffHeapStorageMemory
 
   // Port used by the external shuffle service. In Yarn mode, this may be already be
   // set through the Hadoop configuration as the server is launched in the Yarn NM.
@@ -245,6 +246,7 @@ private[spark] class BlockManager(
       id,
       maxOnHeapMemory,
       maxOffHeapMemory,
+      maxPmemOffHeapMemory,
       slaveEndpoint)
 
     blockManagerId = if (idFromMaster != null) idFromMaster else id
@@ -336,7 +338,7 @@ private[spark] class BlockManager(
     println("BlockManager::reregister")
     // TODO: We might need to rate limit re-registering.
     logInfo(s"BlockManager $blockManagerId re-registering with master")
-    master.registerBlockManager(blockManagerId, maxOnHeapMemory, maxOffHeapMemory, slaveEndpoint)
+    master.registerBlockManager(blockManagerId, maxOnHeapMemory, maxOffHeapMemory, maxPmemOffHeapMemory, slaveEndpoint)
     reportAllBlocks()
   }
 
@@ -498,6 +500,7 @@ private[spark] class BlockManager(
             useDisk = onDisk,
             useMemory = inMem,
             useOffHeap = level.useOffHeap,
+            usePmemOffHeap = level.usePmemOffHeap,
             deserialized = deserialized,
             replication = replication)
           val memSize = if (inMem) memoryStore.getSize(blockId) else 0L
@@ -1324,6 +1327,7 @@ private[spark] class BlockManager(
         useDisk = info.level.useDisk,
         useMemory = info.level.useMemory,
         useOffHeap = info.level.useOffHeap,
+        usePmemOffHeap = info.level.usePmemOffHeap,
         deserialized = info.level.deserialized,
         replication = maxReplicas)
       // we know we are called as a result of an executor removal, so we refresh peer cache
@@ -1355,6 +1359,7 @@ private[spark] class BlockManager(
       useDisk = level.useDisk,
       useMemory = level.useMemory,
       useOffHeap = level.useOffHeap,
+      usePmemOffHeap = level.usePmemOffHeap,
       deserialized = level.deserialized,
       replication = 1)
 

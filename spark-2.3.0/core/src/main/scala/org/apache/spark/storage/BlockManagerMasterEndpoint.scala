@@ -76,8 +76,8 @@ class BlockManagerMasterEndpoint(
   // transmission and other operations, but this is done to the rpc framework to complete,
   // press not to
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
-    case RegisterBlockManager(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint) =>
-      context.reply(register(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint))
+    case RegisterBlockManager(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, pmemMaxOffHeapMemory, slaveEndpoint) =>
+      context.reply(register(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, pmemMaxOffHeapMemory, slaveEndpoint))
 
     case _updateBlockInfo @
         UpdateBlockInfo(blockManagerId, blockId, storageLevel, deserializedSize, size) =>
@@ -293,7 +293,7 @@ class BlockManagerMasterEndpoint(
   private def storageStatus: Array[StorageStatus] = {
     blockManagerInfo.map { case (blockManagerId, info) =>
       new StorageStatus(blockManagerId, info.maxMem, Some(info.maxOnHeapMem),
-        Some(info.maxOffHeapMem), info.blocks.asScala)
+        Some(info.maxOffHeapMem), Some(info.pmemMaxOffHeapMem), info.blocks.asScala)
     }.toArray
   }
 
@@ -357,6 +357,7 @@ class BlockManagerMasterEndpoint(
       idWithoutTopologyInfo: BlockManagerId,
       maxOnHeapMemSize: Long,
       maxOffHeapMemSize: Long,
+      maxPmemOffHeapMemSize: Long,        /** Persistent Memory */
       slaveEndpoint: RpcEndpointRef): BlockManagerId = {
     // the dummy id is not expected to contain the topology information.
     // we get that info here and respond back with a more fleshed out block manager id
@@ -377,15 +378,15 @@ class BlockManagerMasterEndpoint(
         case None =>
       }
       logInfo("Registering block manager %s with %s RAM, %s".format(
-        id.hostPort, Utils.bytesToString(maxOnHeapMemSize + maxOffHeapMemSize), id))
+        id.hostPort, Utils.bytesToString(maxOnHeapMemSize + maxOffHeapMemSize + maxPmemOffHeapMemSize), id))
 
       blockManagerIdByExecutor(id.executorId) = id
 
       blockManagerInfo(id) = new BlockManagerInfo(
-        id, System.currentTimeMillis(), maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint)
+        id, System.currentTimeMillis(), maxOnHeapMemSize, maxOffHeapMemSize, maxPmemOffHeapMemSize, slaveEndpoint)
     }
-    listenerBus.post(SparkListenerBlockManagerAdded(time, id, maxOnHeapMemSize + maxOffHeapMemSize,
-        Some(maxOnHeapMemSize), Some(maxOffHeapMemSize)))
+    listenerBus.post(SparkListenerBlockManagerAdded(time, id, maxOnHeapMemSize + maxOffHeapMemSize + maxPmemOffHeapMemSize,
+        Some(maxOnHeapMemSize), Some(maxOffHeapMemSize), Some(maxPmemOffHeapMemSize)))
     id
   }
 
@@ -498,10 +499,11 @@ private[spark] class BlockManagerInfo(
     timeMs: Long,
     val maxOnHeapMem: Long,
     val maxOffHeapMem: Long,
+    val pmemMaxOffHeapMem: Long,      /** Persistent Memory support */
     val slaveEndpoint: RpcEndpointRef)
   extends Logging {
 
-  val maxMem = maxOnHeapMem + maxOffHeapMem
+  val maxMem = maxOnHeapMem + maxOffHeapMem + pmemMaxOffHeapMem
 
   private var _lastSeenMs: Long = timeMs
   private var _remainingMem: Long = maxMem

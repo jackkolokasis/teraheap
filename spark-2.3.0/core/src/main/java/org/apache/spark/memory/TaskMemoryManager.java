@@ -112,6 +112,11 @@ public class TaskMemoryManager {
    * without doing any masking or lookups. Since this branching should be well-predicted by the JIT,
    * this extra layer of indirection / abstraction hopefully shouldn't be too expensive.
    */
+
+  /**
+   * After enable pmem off heap -- use to track weather you are in
+   * persistent memory off heap
+   */
   final MemoryMode tungstenMemoryMode;
 
   /**

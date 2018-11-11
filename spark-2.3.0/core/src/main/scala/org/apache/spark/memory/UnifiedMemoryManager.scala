@@ -66,7 +66,9 @@ private[spark] class UnifiedMemoryManager private[memory] (
     assert(onHeapExecutionMemoryPool.poolSize + onHeapStorageMemoryPool.poolSize == maxHeapMemory)
     assert(
       offHeapExecutionMemoryPool.poolSize + offHeapStorageMemoryPool.poolSize == maxOffHeapMemory)
-    //TODO : Put here an assertion
+    assert(
+      pmemOffHeapExecutionMemoryPool.poolSize + pmemOffHeapStorageMemoryPool.poolSize == 
+        maxPmemOffHeapMemory)
   }
 
   assertInvariants()

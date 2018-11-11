@@ -397,6 +397,8 @@ private[spark] class MemoryStore(
     } else {
       initialMemoryThreshold.toInt
     }
+    // Byte Buffer Output stream
+    // bbos: ChuckedByteBufferOutputStream
     val bbos = new ChunkedByteBufferOutputStream(chunkSize, allocator)
     redirectableStream.setOutputStream(bbos)
     val serializationStream: SerializationStream = {
@@ -533,6 +535,7 @@ private[spark] class MemoryStore(
     }
     onHeapUnrollMemoryMap.clear()
     offHeapUnrollMemoryMap.clear()
+    offHeapPmemUnrollMemoryMap.clear()
     memoryManager.releaseAllStorageMemory()
     logInfo("MemoryStore cleared")
   }
@@ -702,6 +705,7 @@ private[spark] class MemoryStore(
       val success = memoryManager.acquireUnrollMemory(blockId, memory, memoryMode)
       if (success) {
         val taskAttemptId = currentTaskAttemptId()
+        println("MemoryStore::currentTaskAttemptId=" + taskAttemptId)
         val unrollMemoryMap = memoryMode match {
           case MemoryMode.ON_HEAP => onHeapUnrollMemoryMap
           case MemoryMode.OFF_HEAP => offHeapUnrollMemoryMap
@@ -743,8 +747,9 @@ private[spark] class MemoryStore(
    * Return the amount of memory currently occupied for unrolling blocks across all tasks.
    */
   def currentUnrollMemory: Long = memoryManager.synchronized {
-        println("MemoryStore::currentUnrollMemory")
-    onHeapUnrollMemoryMap.values.sum + offHeapUnrollMemoryMap.values.sum
+    println("MemoryStore::currentUnrollMemory")
+    onHeapUnrollMemoryMap.values.sum + offHeapUnrollMemoryMap.values.sum + 
+      offHeapPmemUnrollMemoryMap.values.sum
   }
 
   /**
@@ -753,22 +758,24 @@ private[spark] class MemoryStore(
   def currentUnrollMemoryForThisTask: Long = memoryManager.synchronized {
         println("MemoryStore::currentUnrollMemoryForThisTask")
     onHeapUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L) +
-      offHeapUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L)
+      offHeapUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L) +
+        offHeapPmemUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L)
   }
 
   /**
    * Return the number of tasks currently unrolling blocks.
    */
   private def numTasksUnrolling: Int = memoryManager.synchronized {
-        println("MemoryStore::numTasksUnrolling")
-    (onHeapUnrollMemoryMap.keys ++ offHeapUnrollMemoryMap.keys).toSet.size
+    println("MemoryStore::numTasksUnrolling")
+    (onHeapUnrollMemoryMap.keys ++ offHeapUnrollMemoryMap.keys ++ offHeapPmemUnrollMemoryMap.keys)
+      .toSet.size
   }
 
   /**
    * Log information about current memory usage.
    */
   private def logMemoryUsage(): Unit = {
-        println("MemoryStore::logMemoryUsage")
+    println("MemoryStore::logMemoryUsage")
     logInfo(
       s"Memory use = ${Utils.bytesToString(blocksMemoryUsed)} (blocks) + " +
       s"${Utils.bytesToString(currentUnrollMemory)} (scratch space shared across " +
@@ -852,12 +859,31 @@ private[storage] class PartiallyUnrolledIterator[T](
  */
 private[storage] class RedirectableOutputStream extends OutputStream {
   private[this] var os: OutputStream = _
-  def setOutputStream(s: OutputStream): Unit = { os = s }
-  override def write(b: Int): Unit = os.write(b)
-  override def write(b: Array[Byte]): Unit = os.write(b)
-  override def write(b: Array[Byte], off: Int, len: Int): Unit = os.write(b, off, len)
-  override def flush(): Unit = os.flush()
-  override def close(): Unit = os.close()
+  def setOutputStream(s: OutputStream): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::setOutputStream")
+    // s = bbos = ChunkedByteBufferOutputStream type
+    os = s 
+  }
+  override def write(b: Int): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::write(b:Int)")
+    os.write(b)
+  }
+  override def write(b: Array[Byte]): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::write(b: Array[Byte])")
+    os.write(b)
+  }
+  override def write(b: Array[Byte], off: Int, len: Int): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::write(b: Array[Byte], off, len)")
+    os.write(b, off, len)
+  }
+  override def flush(): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::flush")
+    os.flush()
+  }
+  override def close(): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::close")
+    os.close()
+  }
 }
 
 /**
