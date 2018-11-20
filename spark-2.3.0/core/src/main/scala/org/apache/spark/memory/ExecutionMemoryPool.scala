@@ -48,6 +48,7 @@ private[memory] class ExecutionMemoryPool(
   private[this] val poolName: String = memoryMode match {
     case MemoryMode.ON_HEAP => "on-heap execution"
     case MemoryMode.OFF_HEAP => "off-heap execution"
+    case MemoryMode.PMEM_OFF_HEAP => "pmem off-heap execution"
   }
 
   /**
@@ -57,6 +58,7 @@ private[memory] class ExecutionMemoryPool(
   private val memoryForTask = new mutable.HashMap[Long, Long]()
 
   override def memoryUsed: Long = lock.synchronized {
+    println("ExecutionMemoryPool::memoryUsed")
     memoryForTask.values.sum
   }
 
@@ -64,6 +66,7 @@ private[memory] class ExecutionMemoryPool(
    * Returns the memory consumption, in bytes, for the given task.
    */
   def getMemoryUsageForTask(taskAttemptId: Long): Long = lock.synchronized {
+    println("ExecutionMemoryPool::getMemoryUsageForTask")
     memoryForTask.getOrElse(taskAttemptId, 0L)
   }
 
@@ -94,101 +97,112 @@ private[memory] class ExecutionMemoryPool(
       taskAttemptId: Long,
       maybeGrowPool: Long => Unit = (additionalSpaceNeeded: Long) => Unit,
       computeMaxPoolSize: () => Long = () => poolSize): Long = lock.synchronized {
+    println("ExecutionMemoryPool::acquireMemory")
     assert(numBytes > 0, s"invalid number of bytes requested: $numBytes")
 
     // TODO: clean up this clunky method signature
 
-    // Add this task to the taskMemory map just so we can keep an
-    // accurate count of the number of active tasks, to let other
-    // tasks ramp down their memory in calls to `acquireMemory`
-
-    // JK: Execution Memory Pool internally maintains a
-    // HashMap<TaskAttemptID, memory occupied byte>
+    /**
+     * Add this task to the taskMemory map just so we can keep an accurate count of the number of
+     * active tasks, to let other tasks ramp down their memory in calls to `acquireMemory`
+     *
+     * Execution Memory Pool internally maintains a HashMap <TaskAttemptID, memory occupied byte>
+     */
     if (!memoryForTask.contains(taskAttemptId)) {
       memoryForTask(taskAttemptId) = 0L
-      // This will later cause waiting tasks to wake up and check numTasks again
+      /** This will later cause waiting tasks to wake up and check numTasks again */
       lock.notifyAll()
     }
 
-    // Keep looping until we're either sure that we don't want to
-    // grant this request (because this task would have more than 1 /
-    // numActiveTasks of the memory) or we have enough free memory to
-    // give it (we always let each task get at least 1 / (2 *
-    // numActiveTasks)).
-    // TODO: simplify this to limit each task to its own slot
+    /**
+     * Keep looping until we're either sure that we don't want to grant this request (because this
+     * task would have more than 1 / numActiveTasks of the memory) or we have enough free memory to
+     * give it (we always let each task get at least 1 / (2 * numActiveTasks)).
+     *
+     * TODO: simplify this to limit each task to its own slot
+     */
     while (true) {
-      // JK: Number of currently active Tasks
+      /** Number of currently active Tasks */
       val numActiveTasks = memoryForTask.keys.size
-      // JK: The amount of memory used by the current Task
+
+      /** The amount of memory used by the current Task */
       val curMem = memoryForTask(taskAttemptId)
-      // In every iteration of this loop, we should first try to
-      // reclaim any borrowed execution space from storage. This is
-      // necessary because of the potential race condition where new
-      // storage blocks may steal the free execution memory that this
-      // task was waiting for.
-      //
-      // JK:  If necessary, increase the memory size of the Execution
-      // memory area through the pool memory corresponding to the
-      // Shrink Storage memory area.
+
+      /**
+       * In every iteration of this loop, we should first try to reclaim any borrowed execution
+       * space from storage. This is necessary because of the potential race condition where new
+       * storage blocks may steal the free execution memory that this task was waiting for.
+       *
+       * If necessary, increase the memory size of the Execution memory area through the pool memory
+       * corresponding to the Shrink Storage memory area.
+       */
       maybeGrowPool(numBytes - memoryFree)
 
-      // Maximum size the pool would have after potentially growing
-      // the pool.  This is used to compute the upper bound of how
-      // much memory each task can occupy. This must take into account
-      // potential free memory as well as the amount this pool
-      // currently occupies. Otherwise, we may run into SPARK-12155
-      // where, in unified memory management, we did not take into
-      // account space that could have been freed by evicting cached
-      // blocks.
+      /**
+       * Maximum size the pool would have after potentially growing the pool.  This is used to
+       * compute the upper bound of how much memory each task can occupy. This must take into
+       * account potential free memory as well as the amount this pool currently occupies.
+       * Otherwise, we may run into SPARK-12155 where, in unified memory management, we did not take
+       * into account space that could have been freed by evicting cached blocks.
+       */
 
-      // JK: Calculate the size of the current Execution memory area corresponding to the pool
+      /** Calculate the size of the current Execution memory area corresponding to the pool */
       val maxPoolSize = computeMaxPoolSize()
 
-      // JK: Calculate 1/N : the current Execution memory area
-      // corresponding to the size of the pool, evenly distributed to
-      // all active Tasks, get the maximum memory size that each Task
-      // can get.
+      /**
+       * Calculate 1/N : the current Execution memory area corresponding to the size of the pool,
+       * evenly distributed to all active Tasks, get the maximum memory size that each Task can get.
+       */
       val maxMemoryPerTask = maxPoolSize / numActiveTasks
 
-      // JK: Calculate 1/2N: The minimum memory size that each Task
-      // can get
+      /**
+       * Calculate 1/2N: The minimum memory size that each Task can get
+       */
       val minMemoryPerTask = poolSize / (2 * numActiveTasks)
 
-      // How much we can grant this task; keep its share within 0 <= X <= 1 / numActiveTasks
-      // JK: Allow the current Task to get the maximum memory
-      // (range: 0 <= X <= 1 / numActiveTasks)
+      /**
+       * How much we can grant this task; keep its share within
+       * 0 <= X <= 1 / numActiveTasks
+       *
+       * Allow the current Task to get the maximum memory (range: 0 <= X <= 1 / numActiveTasks)
+       */
       val maxToGrant = math.min(numBytes, math.max(0, maxMemoryPerTask - curMem))
 
-      // Only give it as much memory as is free, which might be none if it reached 1 / numTasks
-      // JK: Calculate the amount of memory that can be allocated to the
-      // current task
+      /**
+       * Only give it as much memory as is free, which might be none if it reached 1 / numTasks
+       * Calculate the amount of memory that can be allocated to the current task
+       */
       val toGrant = math.min(maxToGrant, memoryFree)
 
-      // We want to let each task get at least 1 / (2 * numActiveTasks) before blocking;
-      // if we can't give it this much now, wait for other tasks to free up memory
-      // (this happens if older tasks allocated lots of memory before N grew)
+      /**
+       * We want to let each task get at least 1 / (2 * numActiveTasks) before blocking; if we can't
+       * give it this much now, wait for other tasks to free up memory (this happens if older tasks
+       * allocated lots of memory before N grew)
+       */
       if ((toGrant < numBytes) && (curMem + toGrant < minMemoryPerTask)) {
         logInfo(s"TID $taskAttemptId waiting for at least 1/2N of $poolName pool to be free")
 
-        // JK: In the ExecutionMemoryPool.releaseMemory() method will
-        // notify other applications to request memory and wait on the
-        // lock Task, until the memory has been released.
+        /**
+         * In the ExecutionMemoryPool.releaseMemory() method will notify other applications to
+         * request memory and wait on the lock Task, until the memory has been released.
+         */
         lock.wait()
       }
       else {
-        // JK: The current task gets the memory and needs to be
-        // registered in the memoryForTask table
+        /** The current task gets the memory and needs to be registered in the memoryForTask table
+         */
         memoryForTask(taskAttemptId) += toGrant
         return toGrant
       }
     }
-    0L  // Never reached
+    0L  /* Never reached */
   }
 
   /**
    * Release `numBytes` of memory acquired by the given task.
    */
   def releaseMemory(numBytes: Long, taskAttemptId: Long): Unit = lock.synchronized {
+    println("ExecutionMemoryPool::releaseMemory")
     val curMem = memoryForTask.getOrElse(taskAttemptId, 0L)
     // JK: Calculate the size of the released memory
     var memoryToFree = if (curMem < numBytes) {
@@ -217,6 +231,7 @@ private[memory] class ExecutionMemoryPool(
    * @return the number of bytes freed.
    */
   def releaseAllMemoryForTask(taskAttemptId: Long): Long = lock.synchronized {
+    println("ExecutionMemoryPool::releaseAllMemoryForTask")
     val numBytesToFree = getMemoryUsageForTask(taskAttemptId)
     releaseMemory(numBytesToFree, taskAttemptId)
     numBytesToFree

@@ -27,7 +27,7 @@ class StorageSuite extends SparkFunSuite {
 
   // For testing add, update, and remove (for non-RDD blocks)
   private def storageStatus1: StorageStatus = {
-    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 1000L, Some(1000L), Some(0L))
+    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 1000L, Some(1000L), Some(0L), Some(0L))
     assert(status.blocks.isEmpty)
     assert(status.rddBlocks.isEmpty)
     assert(status.memUsed === 0L)
@@ -74,7 +74,7 @@ class StorageSuite extends SparkFunSuite {
 
   // For testing add, update, remove, get, and contains etc. for both RDD and non-RDD blocks
   private def storageStatus2: StorageStatus = {
-    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 1000L, Some(1000L), Some(0L))
+    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 1000L, Some(1000L), Some(0L), Some(0L))
     assert(status.rddBlocks.isEmpty)
     status.addBlock(TestBlockId("dan"), BlockStatus(memAndDisk, 10L, 20L))
     status.addBlock(TestBlockId("man"), BlockStatus(memAndDisk, 10L, 20L))
@@ -252,9 +252,9 @@ class StorageSuite extends SparkFunSuite {
 
   // For testing StorageUtils.updateRddInfo and StorageUtils.getRddBlockLocations
   private def stockStorageStatuses: Seq[StorageStatus] = {
-    val status1 = new StorageStatus(BlockManagerId("big", "dog", 1), 1000L, Some(1000L), Some(0L))
-    val status2 = new StorageStatus(BlockManagerId("fat", "duck", 2), 2000L, Some(2000L), Some(0L))
-    val status3 = new StorageStatus(BlockManagerId("fat", "cat", 3), 3000L, Some(3000L), Some(0L))
+    val status1 = new StorageStatus(BlockManagerId("big", "dog", 1), 1000L, Some(1000L), Some(0L), Some(0L))
+    val status2 = new StorageStatus(BlockManagerId("fat", "duck", 2), 2000L, Some(2000L), Some(0L), Some(0L))
+    val status3 = new StorageStatus(BlockManagerId("fat", "cat", 3), 3000L, Some(3000L), Some(0L), Some(0L))
     status1.addBlock(RDDBlockId(0, 0), BlockStatus(memAndDisk, 1L, 2L))
     status1.addBlock(RDDBlockId(0, 1), BlockStatus(memAndDisk, 1L, 2L))
     status2.addBlock(RDDBlockId(0, 2), BlockStatus(memAndDisk, 1L, 2L))
@@ -336,7 +336,7 @@ class StorageSuite extends SparkFunSuite {
   // For testing add, update, remove, get, and contains etc. for both RDD and non-RDD onheap
   // and offheap blocks
   private def storageStatus3: StorageStatus = {
-    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 2000L, Some(1000L), Some(1000L))
+    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 2000L, Some(1000L), Some(1000L), Some(0L))
     assert(status.rddBlocks.isEmpty)
     status.addBlock(TestBlockId("dan"), BlockStatus(memAndDisk, 10L, 20L))
     status.addBlock(TestBlockId("man"), BlockStatus(offheap, 10L, 0L))
@@ -391,7 +391,7 @@ class StorageSuite extends SparkFunSuite {
   }
 
   private def storageStatus4: StorageStatus = {
-    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 2000L, None, None)
+    val status = new StorageStatus(BlockManagerId("big", "dog", 1), 2000L, None, None, None)
     status
   }
   test("old SparkListenerBlockManagerAdded event compatible") {

@@ -11,8 +11,9 @@ For more information see:
 https://github.com/pmem/pmdk
 
 ```
-$ git clone https://github.com/pmem/pmdk
-$ cd pmdk
+$ wget https://github.com/pmem/pmdk/archive/1.4.zip
+$ unzip 1.4.zip
+$ cd pmdk-1.4
 $ make
 $ sudo make install prefix=/usr/local
 ```

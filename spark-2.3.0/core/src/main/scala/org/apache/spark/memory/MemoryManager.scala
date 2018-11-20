@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+// scalastyle:off
 package org.apache.spark.memory
 
 import javax.annotation.concurrent.GuardedBy
@@ -29,11 +30,14 @@ import org.apache.spark.unsafe.array.ByteArrayMethods
 import org.apache.spark.unsafe.memory.MemoryAllocator
 
 /**
- * An abstract memory manager that enforces how memory is shared between execution and storage.
+ * An abstract memory manager that enforces how memory is shared
+ * between execution and storage.
  *
- * In this context, execution memory refers to that used for computation in shuffles, joins,
- * sorts and aggregations, while storage memory refers to that used for caching and propagating
- * internal data across the cluster. There exists one MemoryManager per JVM.
+ * In this context, execution memory refers to that used for
+ * computation in shuffles, joins, sorts and aggregations, while
+ * storage memory refers to that used for caching and propagating
+ * internal data across the cluster. There exists one MemoryManager
+ * per JVM.
  */
 private[spark] abstract class MemoryManager(
     conf: SparkConf,
@@ -52,6 +56,18 @@ private[spark] abstract class MemoryManager(
   @GuardedBy("this")
   protected val offHeapExecutionMemoryPool = new ExecutionMemoryPool(this, MemoryMode.OFF_HEAP)
 
+  /**
+   * Jack Kolokasis (02/10/18)
+   *
+   * Implement the same bookkeping and memory allocation objects as as
+   * it happens for the in memory allocations to the emulated
+   * Persistent memory.
+   */
+  @GuardedBy("this")
+  protected val pmemOffHeapStorageMemoryPool = new StorageMemoryPool(this, MemoryMode.PMEM_OFF_HEAP)
+  @GuardedBy("this")
+  protected val pmemOffHeapExecutionMemoryPool = new ExecutionMemoryPool(this, MemoryMode.PMEM_OFF_HEAP)
+
   onHeapStorageMemoryPool.incrementPoolSize(onHeapStorageMemory)
   onHeapExecutionMemoryPool.incrementPoolSize(onHeapExecutionMemory)
 
@@ -63,56 +79,110 @@ private[spark] abstract class MemoryManager(
   offHeapStorageMemoryPool.incrementPoolSize(offHeapStorageMemory)
 
   /**
-   * Total available on heap memory for storage, in bytes. This amount can vary over time,
-   * depending on the MemoryManager implementation.
-   * In this model, this is equivalent to the amount of memory not occupied by execution.
+   * Jack Kolokasis (03/10/18)
+   * 
+   * Calculate the max persistent offHeap Memory by read
+   */
+  protected[this] val maxPmemOffHeapMemory = conf.get(PMEM_OFFHEAP_SIZE)
+
+  /**
+   * Jack Kolokasis (03/10/18)
+   * 
+   * Calculate the persistent offHeap storage memory.
+   */
+
+  protected[this] val pmemOffHeapStorageMemory =
+      (maxPmemOffHeapMemory * conf.getDouble("spark.memory.storageFraction", 0.5)).toLong
+
+  /**
+   * Jack Kolokasis (05/10/18)
+   * 
+   * Increment the pool size of the persistent off-Heap Execution
+   * memoyry pool
+   */
+  pmemOffHeapExecutionMemoryPool.incrementPoolSize(maxPmemOffHeapMemory -
+      pmemOffHeapStorageMemory)
+  /**
+   * Jack Kolokasis (05/10/18)
+   * 
+   * Increment the pool size of the persistent off-Heap Storage memory
+   * pool
+   */
+  pmemOffHeapStorageMemoryPool.incrementPoolSize(pmemOffHeapStorageMemory)
+
+  /**
+   * Total available on heap memory for storage, in bytes. This amount
+   * can vary over time, depending on the MemoryManager
+   * implementation.  In this model, this is equivalent to the amount
+   * of memory not occupied by execution.
    */
   def maxOnHeapStorageMemory: Long
 
   /**
-   * Total available off heap memory for storage, in bytes. This amount can vary over time,
-   * depending on the MemoryManager implementation.
+   * Total available off heap memory for storage, in bytes. This
+   * amount can vary over time, depending on the MemoryManager
+   * implementation.
    */
   def maxOffHeapStorageMemory: Long
 
   /**
-   * Set the [[MemoryStore]] used by this manager to evict cached blocks.
-   * This must be set after construction due to initialization ordering constraints.
+   * Jack Kolokasis
+   *
+   * Total available persistent off heap memory for storage, in bytes.
+   * This amount can vary over time, depending on the MemoryManager
+   * implementation.
+   */
+   def maxPmemOffHeapStorageMemory: Long
+
+  /**
+   * Set the [[MemoryStore]] used by this manager to evict cached
+   * blocks.  This must be set after construction due to
+   * initialization ordering constraints.
    */
   final def setMemoryStore(store: MemoryStore): Unit = synchronized {
+    println("MemoryManager::setMemoryStore")
     onHeapStorageMemoryPool.setMemoryStore(store)
     offHeapStorageMemoryPool.setMemoryStore(store)
+    /** Jack Kolokasis added */
+    pmemOffHeapStorageMemoryPool.setMemoryStore(store)
   }
 
   // JK: Following methods need to specify its memory mode (Memory
   // Mode), this parameter determines whether to complete this
   // operation in heap or outside the heap
   /**
-   * Acquire N bytes of memory to cache the given block, evicting existing ones if necessary.
+   * Acquire N bytes of memory to cache the given block, evicting
+   * existing ones if necessary.
    *
    * @return whether all N bytes were successfully granted.
    */
   def acquireStorageMemory(blockId: BlockId, numBytes: Long, memoryMode: MemoryMode): Boolean
 
   /**
-   * Acquire N bytes of memory to unroll the given block, evicting existing ones if necessary.
+   * Acquire N bytes of memory to unroll the given block, evicting
+   * existing ones if necessary.
    *
-   * This extra method allows subclasses to differentiate behavior between acquiring storage
-   * memory and acquiring unroll memory. For instance, the memory management model in Spark
-   * 1.5 and before places a limit on the amount of space that can be freed from unrolling.
+   * This extra method allows subclasses to differentiate behavior
+   * between acquiring storage memory and acquiring unroll memory. For
+   * instance, the memory management model in Spark
+   * 1.5 and before places a limit on the amount of space that can be
+   *   freed from unrolling.
    *
    * @return whether all N bytes were successfully granted.
    */
   def acquireUnrollMemory(blockId: BlockId, numBytes: Long, memoryMode: MemoryMode): Boolean
 
   /**
-   * Try to acquire up to `numBytes` of execution memory for the current task and return the
-   * number of bytes obtained, or 0 if none can be allocated.
+   * Try to acquire up to `numBytes` of execution memory for the
+   * current task and return the number of bytes obtained, or 0 if
+   * none can be allocated.
    *
-   * This call may block until there is enough free memory in some situations, to make sure each
-   * task has a chance to ramp up to at least 1 / 2N of the total memory pool (where N is the # of
-   * active tasks) before it is forced to spill. This can happen if the number of tasks increase
-   * but an older task had a lot of memory already.
+   * This call may block until there is enough free memory in some
+   * situations, to make sure each task has a chance to ramp up to at
+   * least 1 / 2N of the total memory pool (where N is the # of active
+   * tasks) before it is forced to spill. This can happen if the
+   * number of tasks increase but an older task had a lot of memory
+   * already.
    */
   private[memory]
   def acquireExecutionMemory(
@@ -128,9 +198,11 @@ private[spark] abstract class MemoryManager(
       numBytes: Long,
       taskAttemptId: Long,
       memoryMode: MemoryMode): Unit = synchronized {
+    println("MemoryManager::releaseExecutionMemory")
     memoryMode match {
       case MemoryMode.ON_HEAP => onHeapExecutionMemoryPool.releaseMemory(numBytes, taskAttemptId)
       case MemoryMode.OFF_HEAP => offHeapExecutionMemoryPool.releaseMemory(numBytes, taskAttemptId)
+      case MemoryMode.PMEM_OFF_HEAP => pmemOffHeapExecutionMemoryPool.releaseMemory(numBytes, taskAttemptId)
     }
   }
 
@@ -140,17 +212,21 @@ private[spark] abstract class MemoryManager(
    * @return the number of bytes freed.
    */
   private[memory] def releaseAllExecutionMemoryForTask(taskAttemptId: Long): Long = synchronized {
+    println("MemoryManager::releaseAllExecutionMemoryForTask")
     onHeapExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId) +
-      offHeapExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId)
-  }
+      offHeapExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId) +
+        pmemOffHeapExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId)
+    }
 
   /**
    * Release N bytes of storage memory.
    */
   def releaseStorageMemory(numBytes: Long, memoryMode: MemoryMode): Unit = synchronized {
+    println("MemoryManager::releaseStorageMemory")
     memoryMode match {
       case MemoryMode.ON_HEAP => onHeapStorageMemoryPool.releaseMemory(numBytes)
       case MemoryMode.OFF_HEAP => offHeapStorageMemoryPool.releaseMemory(numBytes)
+      case MemoryMode.PMEM_OFF_HEAP => pmemOffHeapStorageMemoryPool.releaseMemory(numBytes)
     }
   }
 
@@ -158,14 +234,17 @@ private[spark] abstract class MemoryManager(
    * Release all storage memory acquired.
    */
   final def releaseAllStorageMemory(): Unit = synchronized {
+    println("MemoryManager::releaseAllStorageMemory")
     onHeapStorageMemoryPool.releaseAllMemory()
     offHeapStorageMemoryPool.releaseAllMemory()
+    pmemOffHeapStorageMemoryPool.releaseAllMemory()
   }
 
   /**
    * Release N bytes of unroll memory.
    */
   final def releaseUnrollMemory(numBytes: Long, memoryMode: MemoryMode): Unit = synchronized {
+    println("MemoryManager::releaseUnrollMemory")
     releaseStorageMemory(numBytes, memoryMode)
   }
 
@@ -173,22 +252,29 @@ private[spark] abstract class MemoryManager(
    * Execution memory currently in use, in bytes.
    */
   final def executionMemoryUsed: Long = synchronized {
-    onHeapExecutionMemoryPool.memoryUsed + offHeapExecutionMemoryPool.memoryUsed
+    println("MemoryManager::executionMemoryUsed")
+    onHeapExecutionMemoryPool.memoryUsed + offHeapExecutionMemoryPool.memoryUsed +
+      pmemOffHeapExecutionMemoryPool.memoryUsed
+
   }
 
   /**
    * Storage memory currently in use, in bytes.
    */
   final def storageMemoryUsed: Long = synchronized {
-    onHeapStorageMemoryPool.memoryUsed + offHeapStorageMemoryPool.memoryUsed
+    println("MemoryManager::storageMemoryUsed")
+    onHeapStorageMemoryPool.memoryUsed + offHeapStorageMemoryPool.memoryUsed + 
+      pmemOffHeapStorageMemoryPool.memoryUsed
   }
 
   /**
    * Returns the execution memory consumption, in bytes, for the given task.
    */
   private[memory] def getExecutionMemoryUsageForTask(taskAttemptId: Long): Long = synchronized {
+    println("MemoryManager::getExecutionMemoryUsageForTask")
     onHeapExecutionMemoryPool.getMemoryUsageForTask(taskAttemptId) +
-      offHeapExecutionMemoryPool.getMemoryUsageForTask(taskAttemptId)
+      offHeapExecutionMemoryPool.getMemoryUsageForTask(taskAttemptId) + 
+        pmemOffHeapExecutionMemoryPool.getMemoryUsageForTask(taskAttemptId)
   }
 
   // -- Fields related to Tungsten managed memory -------------------------------------------------
@@ -204,9 +290,32 @@ private[spark] abstract class MemoryManager(
       require(Platform.unaligned(),
         "No support for unaligned Unsafe. Set spark.memory.offHeap.enabled to false.")
       MemoryMode.OFF_HEAP
+
+    } else if (conf.get(PMEM_OFFHEAP_ENABLED)) {
+      require(conf.get(PMEM_OFFHEAP_SIZE) > 0,
+        "spark.memory.offHeap.size must be > 0 when spark.memory.offHeap.enabled == true")
+      MemoryMode.PMEM_OFF_HEAP
     } else {
       MemoryMode.ON_HEAP
     }
+  }
+  
+  /**
+   * Jack Kolokasis (02/10/18)
+   *
+   * Tracks whether memory will be allocated on the persistent
+   * off-heap memory using PMEM_Unsafe (a library manipulate
+   * Persistent memory by allocating off-heap objects implemented by
+   * Jack Kolokasis)
+   */
+  val pmemtesting: String = {
+      if (conf.get(PMEM_OFFHEAP_ENABLED)) {
+          require(conf.get(PMEM_OFFHEAP_SIZE) > 0,
+              "spark.memory.offHeap.size must be > 0 when spark.memory.offHeap.enabled == true")
+          "PMEM_OFF_HEAP"
+      } else {
+          "ON_HEAP"
+      }
   }
 
   /**
@@ -225,6 +334,7 @@ private[spark] abstract class MemoryManager(
     val maxTungstenMemory: Long = tungstenMemoryMode match {
       case MemoryMode.ON_HEAP => onHeapExecutionMemoryPool.poolSize
       case MemoryMode.OFF_HEAP => offHeapExecutionMemoryPool.poolSize
+      case MemoryMode.PMEM_OFF_HEAP => pmemOffHeapExecutionMemoryPool.poolSize
     }
     val size = ByteArrayMethods.nextPowerOf2(maxTungstenMemory / cores / safetyFactor)
     val default = math.min(maxPageSize, math.max(minPageSize, size))
@@ -235,10 +345,20 @@ private[spark] abstract class MemoryManager(
    * Allocates memory for use by Unsafe/Tungsten code.
    */
   private[memory] final val tungstenMemoryAllocator: MemoryAllocator = {
-      println("Call: tungstenMemoryAllocator")
+    println("MemoryManager::tungstenMemoryAllocator()")
     tungstenMemoryMode match {
+      case MemoryMode.ON_HEAP => println("tungstenMemoryAllocator::ON_HEAP")
+      case MemoryMode.OFF_HEAP => println("tungstenMemoryAllocator::OFF_HEAP")
+      case MemoryMode.PMEM_OFF_HEAP => println("tungstenMemoryAllcator::PMEM_OFF_HEAP")
+    }
+    tungstenMemoryMode match {
+      // JK: Create an object HeapMemoryAllocator
       case MemoryMode.ON_HEAP => MemoryAllocator.HEAP
+      // JK: Create an object UnsafeMemoryAllocator
       case MemoryMode.OFF_HEAP => MemoryAllocator.UNSAFE
+      // JK: Create an object on pmemUnsafeMemoryAllocator
+      case MemoryMode.PMEM_OFF_HEAP => MemoryAllocator.NVM_UNSAFE
     }
   }
 }
+// scalastyle:on

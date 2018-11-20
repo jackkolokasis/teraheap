@@ -56,15 +56,23 @@ class BlockManagerMaster(
    * BlockManagerId does not contain topology information. This
    * information is obtained from the master and we respond with an
    * updated BlockManagerId fleshed out with this information.
+   *
+   * The message body with BlockManagerSlaveEndpoint is to receive the message that
+   * BlockManagerMasterEndpoint replies. These messages are encapsulated in the RegisterBlockManager
+   * and sent out via the tell method.
+   * The RegisterBlockManger message will be matched by the receiveAndReply method of
+   * BlockManagerMasterEndpoint and the register method will be registered to register the
+   * BlockManager.
    */
   def registerBlockManager(
       blockManagerId: BlockManagerId,
       maxOnHeapMemSize: Long,
       maxOffHeapMemSize: Long,
+      maxPmemOffHeapMemSize: Long,
       slaveEndpoint: RpcEndpointRef): BlockManagerId = {
     logInfo(s"Registering BlockManager $blockManagerId")
     val updatedId = driverEndpoint.askSync[BlockManagerId](
-      RegisterBlockManager(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint))
+      RegisterBlockManager(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, maxPmemOffHeapMemSize, slaveEndpoint))
     logInfo(s"Registered BlockManager $updatedId")
     updatedId
   }

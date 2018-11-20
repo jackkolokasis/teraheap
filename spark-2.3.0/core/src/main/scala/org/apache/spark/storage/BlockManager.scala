@@ -104,7 +104,6 @@ private[spark] class ByteBufferBlockData(
       buffer.dispose()
     }
   }
-
 }
 
 /**
@@ -155,6 +154,7 @@ private[spark] class BlockManager(
   // to revisit whether reporting this value as the "max" is intuitive to the user.
   private val maxOnHeapMemory = memoryManager.maxOnHeapStorageMemory
   private val maxOffHeapMemory = memoryManager.maxOffHeapStorageMemory
+  private val maxPmemOffHeapMemory = memoryManager.maxPmemOffHeapStorageMemory
 
   // Port used by the external shuffle service. In Yarn mode, this may be already be
   // set through the Hadoop configuration as the server is launched in the Yarn NM.
@@ -214,15 +214,19 @@ private[spark] class BlockManager(
   private val maxRemoteBlockToMem = conf.get(config.MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM)
 
   /**
-   * Initializes the BlockManager with the given appId. This is not performed in the constructor as
-   * the appId may not be known at BlockManager instantiation time (in particular for the driver,
-   * where it is only learned after registration with the TaskScheduler).
+   * Initializes the BlockManager with the given appId. This is not
+   * performed in the constructor as the appId may not be known at
+   * BlockManager instantiation time (in particular for the driver,
+   * where it is only learned after registration with the
+   * TaskScheduler).
    *
-   * This method initializes the BlockTransferService and ShuffleClient, registers with the
-   * BlockManagerMaster, starts the BlockManagerWorker endpoint, and registers with a local shuffle
+   * This method initializes the BlockTransferService and
+   * ShuffleClient, registers with the BlockManagerMaster, starts the
+   * BlockManagerWorker endpoint, and registers with a local shuffle
    * service if configured.
    */
   def initialize(appId: String): Unit = {
+    println("BlockManager::initialize")
     blockTransferService.init(this)
     shuffleClient.init(appId)
 
@@ -242,6 +246,7 @@ private[spark] class BlockManager(
       id,
       maxOnHeapMemory,
       maxOffHeapMemory,
+      maxPmemOffHeapMemory,
       slaveEndpoint)
 
     blockManagerId = if (idFromMaster != null) idFromMaster else id
@@ -262,6 +267,7 @@ private[spark] class BlockManager(
   }
 
   def shuffleMetricsSource: Source = {
+    println("BlockManager::shuffleMetricsSource")
     import BlockManager._
 
     if (externalShuffleServiceEnabled) {
@@ -272,6 +278,7 @@ private[spark] class BlockManager(
   }
 
   private def registerWithExternalShuffleServer() {
+    println("BlockManager::registerWithExternalShuffleServer")
     logInfo("Registering executor with local external shuffle service.")
     val shuffleConfig = new ExecutorShuffleInfo(
       diskBlockManager.localDirs.map(_.toString),
@@ -310,6 +317,7 @@ private[spark] class BlockManager(
    * will be made then.
    */
   private def reportAllBlocks(): Unit = {
+    println("BlockManager::reportAllBlocks")
     logInfo(s"Reporting ${blockInfoManager.size} blocks to the master.")
     for ((blockId, info) <- blockInfoManager.entries) {
       val status = getCurrentBlockStatus(blockId, info)
@@ -327,9 +335,10 @@ private[spark] class BlockManager(
    * Note that this method must be called without any BlockInfo locks held.
    */
   def reregister(): Unit = {
+    println("BlockManager::reregister")
     // TODO: We might need to rate limit re-registering.
     logInfo(s"BlockManager $blockManagerId re-registering with master")
-    master.registerBlockManager(blockManagerId, maxOnHeapMemory, maxOffHeapMemory, slaveEndpoint)
+    master.registerBlockManager(blockManagerId, maxOnHeapMemory, maxOffHeapMemory, maxPmemOffHeapMemory, slaveEndpoint)
     reportAllBlocks()
   }
 
@@ -337,6 +346,7 @@ private[spark] class BlockManager(
    * Re-register with the master sometime soon.
    */
   private def asyncReregister(): Unit = {
+    println("BlockManager::asyncReregister")
     asyncReregisterLock.synchronized {
       if (asyncReregisterTask == null) {
         asyncReregisterTask = Future[Unit] {
@@ -355,6 +365,7 @@ private[spark] class BlockManager(
    * For testing. Wait for any pending asynchronous re-registration; otherwise, do nothing.
    */
   def waitForAsyncReregister(): Unit = {
+    println("BlockManager::waitForAsyncRerefister")
     val task = asyncReregisterTask
     if (task != null) {
       try {
@@ -371,6 +382,7 @@ private[spark] class BlockManager(
    * cannot be read successfully.
    */
   override def getBlockData(blockId: BlockId): ManagedBuffer = {
+    println("BlockManager::getBlockData")
     if (blockId.isShuffle) {
       shuffleManager.shuffleBlockResolver.getBlockData(blockId.asInstanceOf[ShuffleBlockId])
     } else {
@@ -406,6 +418,7 @@ private[spark] class BlockManager(
    * NOTE: This is mainly for testing.
    */
   def getStatus(blockId: BlockId): Option[BlockStatus] = {
+    println("BlockManager::getStatus")
     blockInfoManager.get(blockId).map { info =>
       val memSize = if (memoryStore.contains(blockId)) memoryStore.getSize(blockId) else 0L
       val diskSize = if (diskStore.contains(blockId)) diskStore.getSize(blockId) else 0L
@@ -419,6 +432,7 @@ private[spark] class BlockManager(
    * may not know of).
    */
   def getMatchingBlockIds(filter: BlockId => Boolean): Seq[BlockId] = {
+    println("BlockManager::getMachingBlockIds")
     // The `toArray` is necessary here in order to force the list to be materialized so that we
     // don't try to serialize a lazy iterator when responding to client requests.
     (blockInfoManager.entries.map(_._1) ++ diskBlockManager.getAllBlocks())
@@ -440,6 +454,7 @@ private[spark] class BlockManager(
       blockId: BlockId,
       status: BlockStatus,
       droppedMemorySize: Long = 0L): Unit = {
+    println("BlockManager::reportBlockStatus")
     val needReregister = !tryToReportBlockStatus(blockId, status, droppedMemorySize)
     if (needReregister) {
       logInfo(s"Got told to re-register updating block $blockId")
@@ -458,6 +473,7 @@ private[spark] class BlockManager(
       blockId: BlockId,
       status: BlockStatus,
       droppedMemorySize: Long = 0L): Boolean = {
+    println("BlockManager::tryToReportBlockStatus")
     val storageLevel = status.storageLevel
     val inMemSize = Math.max(status.memSize, droppedMemorySize)
     val onDiskSize = status.diskSize
@@ -470,6 +486,7 @@ private[spark] class BlockManager(
    * and the updated in-memory and on-disk sizes.
    */
   private def getCurrentBlockStatus(blockId: BlockId, info: BlockInfo): BlockStatus = {
+    println("BlockManager::getCurrentBlockStatus")
     info.synchronized {
       info.level match {
         case null =>
@@ -483,6 +500,7 @@ private[spark] class BlockManager(
             useDisk = onDisk,
             useMemory = inMem,
             useOffHeap = level.useOffHeap,
+            usePmemOffHeap = level.usePmemOffHeap,
             deserialized = deserialized,
             replication = replication)
           val memSize = if (inMem) memoryStore.getSize(blockId) else 0L
@@ -496,6 +514,7 @@ private[spark] class BlockManager(
    * Get locations of an array of blocks.
    */
   private def getLocationBlockIds(blockIds: Array[BlockId]): Array[Seq[BlockManagerId]] = {
+    println("BlockManager::getLocationBlockIds")
     val startTimeMs = System.currentTimeMillis
     val locations = master.getLocations(blockIds).toArray
     logDebug("Got multiple block location in %s".format(Utils.getUsedTimeMs(startTimeMs)))
@@ -507,6 +526,7 @@ private[spark] class BlockManager(
    * Must be called while holding a read lock on the block.
    */
   private def handleLocalReadFailure(blockId: BlockId): Nothing = {
+    println("BlockManager::handleLocalReadFailure")
     releaseLock(blockId)
     // Remove the missing block so that its unavailability is reported to the driver
     removeBlock(blockId)
@@ -517,6 +537,7 @@ private[spark] class BlockManager(
    * Get block from local block manager as an iterator of Java objects.
    */
   def getLocalValues(blockId: BlockId): Option[BlockResult] = {
+    println("BlockManager::getLocalValues")
     logDebug(s"Getting local block $blockId")
     blockInfoManager.lockForReading(blockId) match {
       case None =>
@@ -569,6 +590,7 @@ private[spark] class BlockManager(
    * Get block from the local block manager as serialized bytes.
    */
   def getLocalBytes(blockId: BlockId): Option[BlockData] = {
+    println("BlockManager::getLocalBytes")
     logDebug(s"Getting local block $blockId as bytes")
     // As an optimization for map output fetches, if the block is for a shuffle, return it
     // without acquiring a lock; the disk store never deletes (recent) items so this should work
@@ -591,6 +613,7 @@ private[spark] class BlockManager(
    * Releases the read lock upon exception; keeps the read lock upon successful return.
    */
   private def doGetLocalBytes(blockId: BlockId, info: BlockInfo): BlockData = {
+    println("BlockManager::doGetLocalBytes")
     val level = info.level
     logDebug(s"Level for block $blockId is $level")
     // In order, try to read the serialized bytes from memory, then from disk, then fall back to
@@ -630,6 +653,7 @@ private[spark] class BlockManager(
    * This does not acquire a lock on this block in this JVM.
    */
   private def getRemoteValues[T: ClassTag](blockId: BlockId): Option[BlockResult] = {
+    println("BlockManager::getRemoteValues")
     val ct = implicitly[ClassTag[T]]
     getRemoteBytes(blockId).map { data =>
       val values =
@@ -643,6 +667,7 @@ private[spark] class BlockManager(
    * multiple block managers can share the same host, followed by hosts on the same rack.
    */
   private def sortLocations(locations: Seq[BlockManagerId]): Seq[BlockManagerId] = {
+    println("BlockManager::getRemoteValues")
     val locs = Random.shuffle(locations)
     val (preferredLocs, otherLocs) = locs.partition { loc => blockManagerId.host == loc.host }
     blockManagerId.topologyInfo match {
@@ -659,6 +684,7 @@ private[spark] class BlockManager(
    * Get block from remote block managers as serialized bytes.
    */
   def getRemoteBytes(blockId: BlockId): Option[ChunkedByteBuffer] = {
+    println("BlockManager::getRemoteBytes")
     logDebug(s"Getting remote block $blockId")
     require(blockId != null, "BlockId is null")
     var runningFailureCount = 0
@@ -739,6 +765,7 @@ private[spark] class BlockManager(
    * automatically be freed once the result's `data` iterator is fully consumed.
    */
   def get[T: ClassTag](blockId: BlockId): Option[BlockResult] = {
+    println("BlockManager::get")
     val local = getLocalValues(blockId)
     if (local.isDefined) {
       logInfo(s"Found block $blockId locally")
@@ -756,6 +783,7 @@ private[spark] class BlockManager(
    * Downgrades an exclusive write lock to a shared read lock.
    */
   def downgradeLock(blockId: BlockId): Unit = {
+    println("BlockManager::downgradeLock")
     blockInfoManager.downgradeLock(blockId)
   }
 
@@ -766,6 +794,7 @@ private[spark] class BlockManager(
    * thread.
    */
   def releaseLock(blockId: BlockId, taskAttemptId: Option[Long] = None): Unit = {
+    println("BlockManager::releaseLock")
     blockInfoManager.unlock(blockId, taskAttemptId)
   }
 
@@ -773,6 +802,7 @@ private[spark] class BlockManager(
    * Registers a task with the BlockManager in order to initialize per-task bookkeeping structures.
    */
   def registerTask(taskAttemptId: Long): Unit = {
+    println("BlockManager::registerTask")
     blockInfoManager.registerTask(taskAttemptId)
   }
 
@@ -782,6 +812,7 @@ private[spark] class BlockManager(
    * @return the blocks whose locks were released.
    */
   def releaseAllLocksForTask(taskAttemptId: Long): Seq[BlockId] = {
+    println("BlockManager::releaseAllLocksForTask")
     blockInfoManager.releaseAllLocksForTask(taskAttemptId)
   }
 
@@ -797,6 +828,7 @@ private[spark] class BlockManager(
       level: StorageLevel,
       classTag: ClassTag[T],
       makeIterator: () => Iterator[T]): Either[BlockResult, Iterator[T]] = {
+    println("BlockManager::getOrElseUpdate")
     // Attempt to read the block from local or remote storage. If it's present, then we don't need
     // to go through the local-get-or-put path.
     get[T](blockId)(classTag) match {
@@ -837,6 +869,7 @@ private[spark] class BlockManager(
       values: Iterator[T],
       level: StorageLevel,
       tellMaster: Boolean = true): Boolean = {
+    println("BlockManager::putIterator")
     require(values != null, "Values is null")
     doPutIterator(blockId, () => values, level, implicitly[ClassTag[T]], tellMaster) match {
       case None =>
@@ -860,6 +893,7 @@ private[spark] class BlockManager(
       serializerInstance: SerializerInstance,
       bufferSize: Int,
       writeMetrics: ShuffleWriteMetrics): DiskBlockObjectWriter = {
+    println("BlockManager::getDiskWriter")
     val syncWrites = conf.getBoolean("spark.shuffle.sync", false)
     new DiskBlockObjectWriter(file, serializerManager, serializerInstance, bufferSize,
       syncWrites, writeMetrics, blockId)
@@ -878,6 +912,7 @@ private[spark] class BlockManager(
       bytes: ChunkedByteBuffer,
       level: StorageLevel,
       tellMaster: Boolean = true): Boolean = {
+    println("BlockManager::getDiskWriter")
     require(bytes != null, "Bytes is null")
     doPutBytes(blockId, bytes, level, implicitly[ClassTag[T]], tellMaster)
   }
@@ -903,6 +938,7 @@ private[spark] class BlockManager(
       classTag: ClassTag[T],
       tellMaster: Boolean = true,
       keepReadLock: Boolean = false): Boolean = {
+    println("BlockManager::doPutBytes")
     doPut(blockId, level, classTag, tellMaster = tellMaster, keepReadLock = keepReadLock) { info =>
       val startTimeMs = System.currentTimeMillis
       // Since we're storing bytes, initiate the replication before storing them locally.
@@ -994,6 +1030,7 @@ private[spark] class BlockManager(
       classTag: ClassTag[_],
       tellMaster: Boolean,
       keepReadLock: Boolean)(putBody: BlockInfo => Option[T]): Option[T] = {
+    println("BlockManager::doPut")
 
     require(blockId != null, "BlockId is null")
     require(level != null && level.isValid, "StorageLevel is null or invalid")
@@ -1080,6 +1117,7 @@ private[spark] class BlockManager(
       classTag: ClassTag[T],
       tellMaster: Boolean = true,
       keepReadLock: Boolean = false): Option[PartiallyUnrolledIterator[T]] = {
+    println("BlockManager::doPutIterator")
     doPut(blockId, level, classTag, tellMaster = tellMaster, keepReadLock = keepReadLock) { info =>
       val startTimeMs = System.currentTimeMillis
       var iteratorFromFailedMemoryStorePut: Option[PartiallyUnrolledIterator[T]] = None
@@ -1181,6 +1219,7 @@ private[spark] class BlockManager(
       blockId: BlockId,
       level: StorageLevel,
       diskData: BlockData): Option[ChunkedByteBuffer] = {
+    println("BlockManager::maybeCacheDiskBytesInMemory")
     require(!level.deserialized)
     if (level.useMemory) {
       // Synchronize on blockInfo to guard against a race condition where two readers both try to
@@ -1226,6 +1265,7 @@ private[spark] class BlockManager(
       blockId: BlockId,
       level: StorageLevel,
       diskIterator: Iterator[T]): Iterator[T] = {
+    println("BlockManager::maybeCacheDiskValuesInMemory")
     require(level.deserialized)
     val classTag = blockInfo.classTag.asInstanceOf[ClassTag[T]]
     if (level.useMemory) {
@@ -1255,6 +1295,7 @@ private[spark] class BlockManager(
    * Get peer block managers in the system.
    */
   private def getPeers(forceFetch: Boolean): Seq[BlockManagerId] = {
+    println("BlockManager::getPeers")
     peerFetchLock.synchronized {
       val cachedPeersTtl = conf.getInt("spark.storage.cachedPeersTtl", 60 * 1000) // milliseconds
       val timeout = System.currentTimeMillis - lastPeerFetchTime > cachedPeersTtl
@@ -1278,6 +1319,7 @@ private[spark] class BlockManager(
       blockId: BlockId,
       existingReplicas: Set[BlockManagerId],
       maxReplicas: Int): Unit = {
+    println("BlockManager::replicateBlock")
     logInfo(s"Using $blockManagerId to pro-actively replicate $blockId")
     blockInfoManager.lockForReading(blockId).foreach { info =>
       val data = doGetLocalBytes(blockId, info)
@@ -1285,6 +1327,7 @@ private[spark] class BlockManager(
         useDisk = info.level.useDisk,
         useMemory = info.level.useMemory,
         useOffHeap = info.level.useOffHeap,
+        usePmemOffHeap = info.level.usePmemOffHeap,
         deserialized = info.level.deserialized,
         replication = maxReplicas)
       // we know we are called as a result of an executor removal, so we refresh peer cache
@@ -1309,12 +1352,14 @@ private[spark] class BlockManager(
       level: StorageLevel,
       classTag: ClassTag[_],
       existingReplicas: Set[BlockManagerId] = Set.empty): Unit = {
+    println("BlockManager::replicate")
 
     val maxReplicationFailures = conf.getInt("spark.storage.maxReplicationFailures", 1)
     val tLevel = StorageLevel(
       useDisk = level.useDisk,
       useMemory = level.useMemory,
       useOffHeap = level.useOffHeap,
+      usePmemOffHeap = level.usePmemOffHeap,
       deserialized = level.deserialized,
       replication = 1)
 
@@ -1387,6 +1432,7 @@ private[spark] class BlockManager(
    * Read a block consisting of a single object.
    */
   def getSingle[T: ClassTag](blockId: BlockId): Option[T] = {
+    println("BlockManager::getSingle")
     get[T](blockId).map(_.data.next().asInstanceOf[T])
   }
 
@@ -1401,6 +1447,7 @@ private[spark] class BlockManager(
       value: T,
       level: StorageLevel,
       tellMaster: Boolean = true): Boolean = {
+    println("BlockManager::putSingle")
     putIterator(blockId, Iterator(value), level, tellMaster)
   }
 
@@ -1418,6 +1465,7 @@ private[spark] class BlockManager(
   private[storage] override def dropFromMemory[T: ClassTag](
       blockId: BlockId,
       data: () => Either[Array[T], ChunkedByteBuffer]): StorageLevel = {
+    println("BlockManager::dropFromMemory")
     logInfo(s"Dropping block $blockId from memory")
     val info = blockInfoManager.assertBlockIsLockedForWriting(blockId)
     var blockIsUpdated = false
@@ -1468,6 +1516,7 @@ private[spark] class BlockManager(
    */
   def removeRdd(rddId: Int): Int = {
     // TODO: Avoid a linear scan by creating another mapping of RDD.id to blocks.
+    println("BlockManager::removeRdd")
     logInfo(s"Removing RDD $rddId")
     val blocksToRemove = blockInfoManager.entries.flatMap(_._1.asRDDId).filter(_.rddId == rddId)
     blocksToRemove.foreach { blockId => removeBlock(blockId, tellMaster = false) }
@@ -1478,6 +1527,7 @@ private[spark] class BlockManager(
    * Remove all blocks belonging to the given broadcast.
    */
   def removeBroadcast(broadcastId: Long, tellMaster: Boolean): Int = {
+    println("BlockManager::removeBroadcast")
     logDebug(s"Removing broadcast $broadcastId")
     val blocksToRemove = blockInfoManager.entries.map(_._1).collect {
       case bid @ BroadcastBlockId(`broadcastId`, _) => bid
@@ -1490,6 +1540,7 @@ private[spark] class BlockManager(
    * Remove a block from both memory and disk.
    */
   def removeBlock(blockId: BlockId, tellMaster: Boolean = true): Unit = {
+    println("BlockManager::removeBlock")
     logDebug(s"Removing block $blockId")
     blockInfoManager.lockForWriting(blockId) match {
       case None =>
@@ -1506,6 +1557,7 @@ private[spark] class BlockManager(
    * lock on the block.
    */
   private def removeBlockInternal(blockId: BlockId, tellMaster: Boolean): Unit = {
+    println("BlockManager::removeBlockInternal")
     // Removals are idempotent in disk store and memory store. At worst, we get a warning.
     val removedFromMemory = memoryStore.remove(blockId)
     val removedFromDisk = diskStore.remove(blockId)
@@ -1519,6 +1571,7 @@ private[spark] class BlockManager(
   }
 
   private def addUpdatedBlockStatusToTaskMetrics(blockId: BlockId, status: BlockStatus): Unit = {
+    println("BlockManager::addUpdatedBlockStatusToTaskMetrics")
     if (conf.get(config.TASK_METRICS_TRACK_UPDATED_BLOCK_STATUSES)) {
       Option(TaskContext.get()).foreach { c =>
         c.taskMetrics().incUpdatedBlockStatuses(blockId -> status)
@@ -1530,11 +1583,13 @@ private[spark] class BlockManager(
       blockId: BlockId,
       data: BlockData,
       taskAttemptId: Option[Long] = None): Unit = {
+    println("BlockManager::releaseLockAndDispose")
     releaseLock(blockId, taskAttemptId)
     data.dispose()
   }
 
   def stop(): Unit = {
+    println("BlockManager::stop")
     blockTransferService.close()
     if (shuffleClient ne blockTransferService) {
       // Closing should be idempotent, but maybe not for the NioBlockTransferService.

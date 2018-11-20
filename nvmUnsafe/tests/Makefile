@@ -6,22 +6,21 @@
 # @Version:  09-10-2018
 # @email:    kolokasis@ics.forth.gr
 #
-# Makefile build the example
+# Makefile build the example for the test
 #
 ####################################################
 
-JAVAC=javac
-JAVA=java
-OUT_DIR=../src/lib
-FLAGS=-Djava.library.path=$(OUT_DIR)
-_LD_LIBRARY_PATH=../libpmemmalloc/lib
+JAVAC		= javac
+JAVA		= java
+JAR			= NVMUnsafe.jar
+CLASSPATH 	= ".:../NVMUnsafe.jar"
 
 all: Example.class
-	export LD_LIBRARY_PATH=$(_LD_LIBRARY_PATH);\
-	echo $$LD_LIBRARY_PATH
-	$(JAVA) $(FLAGS) $*
+	$(JAVA) -cp $(CLASSPATH) Example
 
 Example.class: Example.java
-	$(JAVAC) $<
+	$(JAVAC) -cp $(CLASSPATH) $<
 
+clean:
+	rm -rf Example.class
 

@@ -40,7 +40,8 @@ class StorageStatus(
     val blockManagerId: BlockManagerId,
     val maxMemory: Long,
     val maxOnHeapMem: Option[Long],
-    val maxOffHeapMem: Option[Long]) {
+    val maxOffHeapMem: Option[Long],
+    val pmemMaxOffHeapMem: Option[Long]) {
 
   /**
    * Internal representation of the blocks stored in this block manager.
@@ -55,8 +56,8 @@ class StorageStatus(
   private val _rddStorageInfo = new mutable.HashMap[Int, RddStorageInfo]
 
   private case class NonRddStorageInfo(var onHeapUsage: Long, var offHeapUsage: Long,
-      var diskUsage: Long)
-  private val _nonRddStorageInfo = NonRddStorageInfo(0L, 0L, 0L)
+      var diskUsage: Long, var pmemOffHeapUsage: Long)
+  private val _nonRddStorageInfo = NonRddStorageInfo(0L, 0L, 0L, 0L)
 
   /** Create a storage status with an initial set of blocks, leaving the source unmodified. */
   def this(
@@ -64,8 +65,9 @@ class StorageStatus(
       maxMemory: Long,
       maxOnHeapMem: Option[Long],
       maxOffHeapMem: Option[Long],
+      pmemMaxOffHeapMem: Option[Long],
       initialBlocks: Map[BlockId, BlockStatus]) {
-    this(bmid, maxMemory, maxOnHeapMem, maxOffHeapMem)
+    this(bmid, maxMemory, maxOnHeapMem, maxOffHeapMem, pmemMaxOffHeapMem)
     initialBlocks.foreach { case (bid, bstatus) => addBlock(bid, bstatus) }
   }
 
@@ -216,6 +218,16 @@ class StorageStatus(
       case (_, storageInfo) if storageInfo.level.useOffHeap => storageInfo.memoryUsage
     }.sum
   }
+  
+  /** 
+   *  Jack Kolokasis (31/10/2018)
+   *  Return the memory used by persistent memory off-heap caching RDDs.
+   */
+  def pmemOffHeapCacheSize: Option[Long] = pmemMaxOffHeapMem.map { _ =>
+    _rddStorageInfo.collect {
+      case (_, storageInfo) if storageInfo.level.usePmemOffHeap => storageInfo.memoryUsage
+    }.sum
+  }
 
   /** Return the disk space used by this block manager. */
   def diskUsed: Long = _nonRddStorageInfo.diskUsage + _rddBlocks.keys.toSeq.map(diskUsedByRdd).sum
@@ -248,6 +260,9 @@ class StorageStatus(
         (_nonRddStorageInfo.onHeapUsage, _nonRddStorageInfo.diskUsage)
       case _ if level.useOffHeap =>
         (_nonRddStorageInfo.offHeapUsage, _nonRddStorageInfo.diskUsage)
+      // Added by Jack Kolokasis (31/10/2018)
+      case _ if level.usePmemOffHeap =>
+        (_nonRddStorageInfo.pmemOffHeapUsage, _nonRddStorageInfo.diskUsage)
     }
     val newMem = math.max(oldMem + changeInMem, 0L)
     val newDisk = math.max(oldDisk + changeInDisk, 0L)
@@ -262,11 +277,25 @@ class StorageStatus(
           _rddStorageInfo(rddId) = RddStorageInfo(newMem, newDisk, level)
         }
       case _ =>
-        if (!level.useOffHeap) {
-          _nonRddStorageInfo.onHeapUsage = newMem
-        } else {
+        if (level.useOffHeap) {
           _nonRddStorageInfo.offHeapUsage = newMem
         }
+        else if (level.usePmemOffHeap) {
+          _nonRddStorageInfo.pmemOffHeapUsage = newMem
+        }
+        else {
+          _nonRddStorageInfo.onHeapUsage = newMem
+        }
+
+        // Comment Jack Kolokasis
+        // This code was there before .....
+        // I just change the if statements to support pmem off heap
+        // if (!level.useOffHeap) {
+        //   _nonRddStorageInfo.onHeapUsage = newMem
+        // } else {
+        //   _nonRddStorageInfo.offHeapUsage = newMem
+        // }
+
         _nonRddStorageInfo.diskUsage = newDisk
     }
   }

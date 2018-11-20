@@ -21,6 +21,7 @@ import org.apache.spark.annotation.Private;
 
 @Private
 public enum MemoryMode {
-  ON_HEAP,
-  OFF_HEAP
+  ON_HEAP,       /* Memory mode on heap                    */
+  OFF_HEAP,      /* Memory mode off heap                   */
+  PMEM_OFF_HEAP  /* Memory mode persistent memory off heap */
 }

@@ -60,6 +60,7 @@ private[spark] object BlockManagerMessages {
       blockManagerId: BlockManagerId,
       maxOnHeapMemSize: Long,
       maxOffHeapMemSize: Long,
+      pmemMaxOffHeapMemSize: Long,    /** Persistent Memory */
       sender: RpcEndpointRef)
     extends ToBlockManagerMaster
 

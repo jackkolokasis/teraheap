@@ -57,6 +57,12 @@ class TestMemoryManager(conf: SparkConf)
   override def maxOnHeapStorageMemory: Long = Long.MaxValue
 
   override def maxOffHeapStorageMemory: Long = 0L
+ 
+  /** 
+   *  Jack Koloaksis (24/10/2018)
+   *  I put thid to pass the test in compilation !!!
+   */
+  override def maxPmemOffHeapStorageMemory: Long = 0L
 
   private var consequentOOM = 0
   private var available = Long.MaxValue

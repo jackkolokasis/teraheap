@@ -6,7 +6,7 @@
 #include "../util.h"
 
 #define MY_POOL_SIZE (1024 * 1024)
-#define PATH "/mnt/mem/file"
+#define PATH "/mnt/pmemdir/file"
 #define NPTRS 2
 
 void

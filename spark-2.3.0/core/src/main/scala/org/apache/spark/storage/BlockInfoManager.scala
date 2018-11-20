@@ -47,6 +47,10 @@ private[storage] class BlockInfo(
     val classTag: ClassTag[_],
     val tellMaster: Boolean) {
 
+  private[this] var _size: Long = 0
+  private[this] var _readerCount: Int = 0
+  private[this] var _writerTask: Long = BlockInfo.NO_WRITER
+
   /**
    * The size of the block (in bytes)
    */
@@ -55,7 +59,6 @@ private[storage] class BlockInfo(
     _size = s
     checkInvariants()
   }
-  private[this] var _size: Long = 0
 
   /**
    * The number of times that this block has been locked for reading.
@@ -65,7 +68,6 @@ private[storage] class BlockInfo(
     _readerCount = c
     checkInvariants()
   }
-  private[this] var _readerCount: Int = 0
 
   /**
    * The task attempt id of the task which currently holds the write lock for this block, or
@@ -77,12 +79,11 @@ private[storage] class BlockInfo(
     _writerTask = t
     checkInvariants()
   }
-  private[this] var _writerTask: Long = BlockInfo.NO_WRITER
 
   private def checkInvariants(): Unit = {
-    // A block's reader count must be non-negative:
+    /** A block's reader count must be non-negative: */
     assert(_readerCount >= 0)
-    // A block is either locked for reading or for writing, but not for both at the same time:
+    /** A block is either locked for reading or for writing, but not for both at the same time: */
     assert(_readerCount == 0 || _writerTask == BlockInfo.NO_WRITER)
   }
 
@@ -97,8 +98,8 @@ private[storage] object BlockInfo {
   val NO_WRITER: Long = -1
 
   /**
-   * Special task attempt id constant used to mark a block's write lock as being held by
-   * a non-task thread (e.g. by a driver thread or by unit test code).
+   * Special task attempt id constant used to mark a block's write lock as being held by a non-task
+   * thread (e.g. by a driver thread or by unit test code).
    */
   val NON_TASK_WRITER: Long = -1024
 }
@@ -152,6 +153,7 @@ private[storage] class BlockInfoManager extends Logging {
    * This must be called prior to calling any other BlockInfoManager methods from that task.
    */
   def registerTask(taskAttemptId: TaskAttemptId): Unit = synchronized {
+    println("BlockInfoManager::registerTask")
     require(!readLocksByTask.contains(taskAttemptId),
       s"Task attempt $taskAttemptId is already registered")
     readLocksByTask(taskAttemptId) = ConcurrentHashMultiset.create()
@@ -221,6 +223,7 @@ private[storage] class BlockInfoManager extends Logging {
       blockId: BlockId,
       blocking: Boolean = true): Option[BlockInfo] = synchronized {
     logTrace(s"Task $currentTaskAttemptId trying to acquire write lock for $blockId")
+    println("BlockInfoManager::lockForWriting")
     do {
       infos.get(blockId) match {
         case None => return None
@@ -228,6 +231,8 @@ private[storage] class BlockInfoManager extends Logging {
           if (info.writerTask == BlockInfo.NO_WRITER && info.readerCount == 0) {
             info.writerTask = currentTaskAttemptId
             writeLocksByTask.addBinding(currentTaskAttemptId, blockId)
+            println("BlockInfoManager::lockForWriting::currentTaskAttemptId = "
+              + currentTaskAttemptId)
             logTrace(s"Task $currentTaskAttemptId acquired write lock for $blockId")
             return Some(info)
           }
@@ -287,6 +292,7 @@ private[storage] class BlockInfoManager extends Logging {
    * See SPARK-18406 for more discussion of this issue.
    */
   def unlock(blockId: BlockId, taskAttemptId: Option[TaskAttemptId] = None): Unit = synchronized {
+    println("BlockInfoManager::unlock")
     val taskId = taskAttemptId.getOrElse(currentTaskAttemptId)
     logTrace(s"Task $taskId releasing lock for $blockId")
     val info = get(blockId).getOrElse {
@@ -411,6 +417,7 @@ private[storage] class BlockInfoManager extends Logging {
    */
   def removeBlock(blockId: BlockId): Unit = synchronized {
     logTrace(s"Task $currentTaskAttemptId trying to remove block $blockId")
+    println("BlockInfoManager::removeBlock")
     infos.get(blockId) match {
       case Some(blockInfo) =>
         if (blockInfo.writerTask != currentTaskAttemptId) {

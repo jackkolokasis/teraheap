@@ -41,13 +41,13 @@ import org.apache.spark.util.Utils
  * For unit tests, you can also call `new SparkConf(false)` to skip loading external settings and
  * get the same configuration no matter what the system properties are.
  *
- * All setter methods in this class support chaining. For example, you can write
- * `new SparkConf().setMaster("local").setAppName("My app")`.
+ * All setter methods in this class support chaining. For example, you can write `new
+ * SparkConf().setMaster("local").setAppName("My app")`.
  *
  * @param loadDefaults whether to also load values from Java system properties
  *
- * @note Once a SparkConf object is passed to Spark, it is cloned and can no longer be modified
- * by the user. Spark does not support modifying the configuration at runtime.
+ * @note Once a SparkConf object is passed to Spark, it is cloned and can no longer be modified by
+ * the user. Spark does not support modifying the configuration at runtime.
  */
 class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Serializable {
 
@@ -108,8 +108,8 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Seria
   }
 
   /**
-   * The master URL to connect to, such as "local" to run locally with one thread, "local[4]" to
-   * run locally with 4 cores, or "spark://master:7077" to run on a Spark standalone cluster.
+   * The master URL to connect to, such as "local" to run locally with one thread, "local[4]" to run
+   * locally with 4 cores, or "spark://master:7077" to run on a Spark standalone cluster.
    */
   def setMaster(master: String): SparkConf = {
     set("spark.master", master)
@@ -132,18 +132,18 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Seria
   }
 
   /**
-   * Set an environment variable to be used when launching executors for this application.
-   * These variables are stored as properties of the form spark.executorEnv.VAR_NAME
-   * (for example spark.executorEnv.PATH) but this method makes them easier to set.
+   * Set an environment variable to be used when launching executors for this application.  These
+   * variables are stored as properties of the form spark.executorEnv.VAR_NAME (for example
+   * spark.executorEnv.PATH) but this method makes them easier to set.
    */
   def setExecutorEnv(variable: String, value: String): SparkConf = {
     set("spark.executorEnv." + variable, value)
   }
 
   /**
-   * Set multiple environment variables to be used when launching executors.
-   * These variables are stored as properties of the form spark.executorEnv.VAR_NAME
-   * (for example spark.executorEnv.PATH) but this method makes them easier to set.
+   * Set multiple environment variables to be used when launching executors.  These variables are
+   * stored as properties of the form spark.executorEnv.VAR_NAME (for example
+   * spark.executorEnv.PATH) but this method makes them easier to set.
    */
   def setExecutorEnv(variables: Seq[(String, String)]): SparkConf = {
     for ((k, v) <- variables) {
@@ -160,9 +160,7 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Seria
     setExecutorEnv(variables.toSeq)
   }
 
-  /**
-   * Set the location where Spark is installed on worker nodes.
-   */
+  /** Set the location where Spark is installed on worker nodes. */
   def setSparkHome(home: String): SparkConf = {
     set("spark.home", home)
   }
@@ -453,6 +451,7 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Seria
    * idempotent - may mutate this conf object to convert deprecated settings to supported ones.
    */
   private[spark] def validateSettings() {
+    val cloned = new SparkConf(false)
     if (contains("spark.local.dir")) {
       val msg = "In Spark 1.0 and later spark.local.dir will be overridden by the value set by " +
         "the cluster manager (via SPARK_LOCAL_DIRS in mesos/standalone and LOCAL_DIRS in YARN)."

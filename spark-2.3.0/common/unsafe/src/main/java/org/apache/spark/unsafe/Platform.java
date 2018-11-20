@@ -25,6 +25,8 @@ import java.nio.ByteBuffer;
 import sun.misc.Cleaner;
 import sun.misc.Unsafe;
 
+import com.nvmUnsafe.*;
+
 public final class Platform {
 
   private static final Unsafe _UNSAFE;
@@ -44,7 +46,34 @@ public final class Platform {
   public static final int DOUBLE_ARRAY_OFFSET;
 
   private static final boolean unaligned;
+
+
+  /* Non-Volatile Unsafe Object         */
+  private static final NVMUnsafe _NVM_UNSAFE;
+
+  /* Non-Volatile address allocation    */
+  private static long PMEM_ADDR;
+ 
+  // TODO:
+  // This fields are might for sql support. 
+  // At this time is not urgent to be developed
+  //  public static final int PMEM_BOOLEAN_ARRAY_OFFSET;
+  //
+  //  public static final int PMEM_BYTE_ARRAY_OFFSET;
+  //
+  //  public static final int PMEM_SHORT_ARRAY_OFFSET;
+  //
+  //  public static final int PMEM_INT_ARRAY_OFFSET;
+  //
+  //  public static final int PMEM_LONG_ARRAY_OFFSET;
+  //
+  //  public static final int PMEM_FLOAT_ARRAY_OFFSET;
+  //
+  //  public static final int PMEM_DOUBLE_ARRAY_OFFSET;
+  //
+
   static {
+    System.out.println("Platform::static");
     boolean _unaligned;
     String arch = System.getProperty("os.arch", "");
     if (arch.equals("ppc64le") || arch.equals("ppc64")) {
@@ -72,86 +101,132 @@ public final class Platform {
    *         system having unaligned-access capability.
    */
   public static boolean unaligned() {
+    System.out.println("Platform::unaligned");
     return unaligned;
   }
 
   public static int getInt(Object object, long offset) {
+    System.out.println("Platform::getInt");
     return _UNSAFE.getInt(object, offset);
   }
 
   public static void putInt(Object object, long offset, int value) {
+    System.out.println("Platform::putInt");
     _UNSAFE.putInt(object, offset, value);
   }
 
   public static boolean getBoolean(Object object, long offset) {
+    System.out.println("Platform::getBoolean");
     return _UNSAFE.getBoolean(object, offset);
   }
 
   public static void putBoolean(Object object, long offset, boolean value) {
+    System.out.println("Platform::putBoolean");
     _UNSAFE.putBoolean(object, offset, value);
   }
 
   public static byte getByte(Object object, long offset) {
+    System.out.println("Platform::getByte");
     return _UNSAFE.getByte(object, offset);
   }
 
   public static void putByte(Object object, long offset, byte value) {
+    System.out.println("Platform::putByte");
     _UNSAFE.putByte(object, offset, value);
   }
 
   public static short getShort(Object object, long offset) {
+    System.out.println("Platform::getShort");
     return _UNSAFE.getShort(object, offset);
   }
 
   public static void putShort(Object object, long offset, short value) {
+    System.out.println("Platform::putShort");
     _UNSAFE.putShort(object, offset, value);
   }
 
   public static long getLong(Object object, long offset) {
+    System.out.println("Platform::getLong");
     return _UNSAFE.getLong(object, offset);
   }
 
   public static void putLong(Object object, long offset, long value) {
+    System.out.println("Platform::putLong");
     _UNSAFE.putLong(object, offset, value);
   }
 
   public static float getFloat(Object object, long offset) {
+    System.out.println("Platform::getFloat");
     return _UNSAFE.getFloat(object, offset);
   }
 
   public static void putFloat(Object object, long offset, float value) {
+    System.out.println("Platform::putFloat");
     _UNSAFE.putFloat(object, offset, value);
   }
 
   public static double getDouble(Object object, long offset) {
+    System.out.println("Platform::getDouble");
     return _UNSAFE.getDouble(object, offset);
   }
 
   public static void putDouble(Object object, long offset, double value) {
+    System.out.println("Platform::putDouble");
     _UNSAFE.putDouble(object, offset, value);
   }
 
   public static Object getObjectVolatile(Object object, long offset) {
+    System.out.println("Platform::getObjectVolatile");
     return _UNSAFE.getObjectVolatile(object, offset);
   }
 
   public static void putObjectVolatile(Object object, long offset, Object value) {
+    System.out.println("Platform::putObjectVolatile");
     _UNSAFE.putObjectVolatile(object, offset, value);
   }
 
   public static long allocateMemory(long size) {
+    System.out.println("Platform::allocateMemory::" + size);
     return _UNSAFE.allocateMemory(size);
   }
 
   public static void freeMemory(long address) {
+    System.out.println("Platform::freeMemory");
     _UNSAFE.freeMemory(address);
   }
-
+  
   public static long reallocateMemory(long address, long oldSize, long newSize) {
+    System.out.println("Platform::reallocateMemory");
     long newMemory = _UNSAFE.allocateMemory(newSize);
     copyMemory(null, address, null, newMemory, oldSize);
     freeMemory(address);
     return newMemory;
+  }
+ 
+  ////////////////////////////// NVM UNSAFE FUNCTIONS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+  public static long nvmInitializeMemory(String path, long size) {
+    System.out.println("Platform::nvmInitializeMemory");
+    path = "/mnt/pmemdir/executor";
+    return _NVM_UNSAFE.nvmInitialPool(path, size);
+  }
+
+  public static long nvmAllocateMemory(long size) {
+    System.out.println("Platform::nvmAllocateMemory");
+    if (PMEM_ADDR == 0)
+        PMEM_ADDR = nvmInitializeMemory("/mnt/pmemdir/executor", 1073741824);
+    System.out.println("Platform::PMEM_ADDR=" + PMEM_ADDR);
+    return _NVM_UNSAFE.nvmAllocateMemory(PMEM_ADDR, size);
+  }
+  
+  public static long nvmGetAddress(long address) {
+    System.out.println("Platform::nvmGetAddress");
+    return _NVM_UNSAFE.getPmemAddress(PMEM_ADDR, address);
+  }
+  
+  public static void nvmFreeMemory(long address) {
+    System.out.println("Platform::nvmFreeMemory");
+    _NVM_UNSAFE.nvmFreeMemory(PMEM_ADDR, address);
   }
 
   /**
@@ -161,6 +236,7 @@ public final class Platform {
    */
   @SuppressWarnings("unchecked")
   public static ByteBuffer allocateDirectBuffer(int size) {
+    System.out.println("Platform.java::allocateDirectBuffer::size=" + size);
     try {
       Class<?> cls = Class.forName("java.nio.DirectByteBuffer");
       Constructor<?> constructor = cls.getDeclaredConstructor(Long.TYPE, Integer.TYPE);
@@ -178,12 +254,55 @@ public final class Platform {
     throw new IllegalStateException("unreachable");
   }
 
+  /**
+   * This function allocate a direct buffer on the persistent memory Uses internal JDK APIs to
+   * allocate a DirectByteBuffer while ignoring the JVM's MaxDirectMemorySize limit (the default
+   * limit is too low and we do not want to require users to increase it).
+   * 
+   * @param     size    The size of the direct buffer
+   * @return            The allocated ByteBuffer
+   *
+   * @author Jack Kolokasis (08/10/18)
+   */
+  public static ByteBuffer allocatePmemDirectBuffer(int size) {
+    try {
+      System.out.println("Platform::allocatePmemDirectBuffer::size=" + size);
+      Class<?> cls = Class.forName("java.nio.DirectByteBuffer");
+      Constructor<?> constructor = cls.getDeclaredConstructor(Long.TYPE, Integer.TYPE); 
+      constructor.setAccessible(true);
+      Field cleanerField = cls.getDeclaredField("cleaner");
+      cleanerField.setAccessible(true);
+
+      /** Allocate persistent memory */
+      long nvMemory = nvmAllocateMemory(size);
+      System.out.println("Platform.java::allocatePmemDirectBuffer::nvMemory=" + nvMemory);
+
+      /** Construct a byte buffer instance using the address on the allocated persistent memory and
+       * the size
+       */
+      ByteBuffer buffer = (ByteBuffer) constructor.newInstance(nvmGetAddress(nvMemory), size);
+      /** 
+       * Create a cleaner manager for the object. The cleaner manager use pmemFreeMemory function to
+       * clean the object and produce the deallocation operation
+       */
+      Cleaner cleaner = Cleaner.create(buffer, () -> nvmFreeMemory(nvMemory));
+
+      /** Assign the cleaner manager to the object */
+      cleanerField.set(buffer, cleaner);
+      
+      return buffer;
+
+    } catch (Exception e) { 
+        throwException(e);
+    }
+    throw new IllegalStateException("unreachable");
+  }
+
   public static void setMemory(Object object, long offset, long size, byte value) {
     _UNSAFE.setMemory(object, offset, size, value);
   }
 
   public static void setMemory(long address, byte value, long size) {
-    _UNSAFE.setMemory(address, size, value);
   }
 
   public static void copyMemory(
@@ -208,7 +327,6 @@ public final class Platform {
         _UNSAFE.copyMemory(src, srcOffset, dst, dstOffset, size);
         length -= size;
       }
-
     }
   }
 
@@ -227,6 +345,8 @@ public final class Platform {
 
   static {
     sun.misc.Unsafe unsafe;
+    com.nvmUnsafe.NVMUnsafe nvmUnsafe;
+
     try {
       Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
       unsafeField.setAccessible(true);
@@ -236,22 +356,57 @@ public final class Platform {
     }
     _UNSAFE = unsafe;
 
+    try {
+        Field nvmUnsafeField = NVMUnsafe.class.getDeclaredField("theNVMUnsafe");
+        nvmUnsafeField.setAccessible(true);
+        nvmUnsafe = (com.nvmUnsafe.NVMUnsafe) nvmUnsafeField.get(null);
+    } catch (Throwable cause) {
+        nvmUnsafe = null;
+    }
+
+    _NVM_UNSAFE = nvmUnsafe;
+
     if (_UNSAFE != null) {
-      BOOLEAN_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(boolean[].class);
-      BYTE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(byte[].class);
-      SHORT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(short[].class);
-      INT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(int[].class);
-      LONG_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(long[].class);
-      FLOAT_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(float[].class);
-      DOUBLE_ARRAY_OFFSET = _UNSAFE.arrayBaseOffset(double[].class);
-    } else {
-      BOOLEAN_ARRAY_OFFSET = 0;
-      BYTE_ARRAY_OFFSET = 0;
-      SHORT_ARRAY_OFFSET = 0;
-      INT_ARRAY_OFFSET = 0;
-      LONG_ARRAY_OFFSET = 0;
-      FLOAT_ARRAY_OFFSET = 0;
-      DOUBLE_ARRAY_OFFSET = 0;
+      BOOLEAN_ARRAY_OFFSET  = _UNSAFE.arrayBaseOffset(boolean[].class);
+      BYTE_ARRAY_OFFSET     = _UNSAFE.arrayBaseOffset(byte[].class);
+      SHORT_ARRAY_OFFSET    = _UNSAFE.arrayBaseOffset(short[].class);
+      INT_ARRAY_OFFSET      = _UNSAFE.arrayBaseOffset(int[].class);
+      LONG_ARRAY_OFFSET     = _UNSAFE.arrayBaseOffset(long[].class);
+      FLOAT_ARRAY_OFFSET    = _UNSAFE.arrayBaseOffset(float[].class);
+      DOUBLE_ARRAY_OFFSET   = _UNSAFE.arrayBaseOffset(double[].class);
+      PMEM_ADDR             = 0;
+    } 
+
+    else if (_NVM_UNSAFE != null){
+      BOOLEAN_ARRAY_OFFSET  = 0;
+      BYTE_ARRAY_OFFSET     = 0;
+      SHORT_ARRAY_OFFSET    = 0;
+      INT_ARRAY_OFFSET      = 0;
+      LONG_ARRAY_OFFSET     = 0;
+      FLOAT_ARRAY_OFFSET    = 0;
+      DOUBLE_ARRAY_OFFSET   = 0;
+
+      /** Allocate space for 1GB */
+      PMEM_ADDR = 0;
+
+      // PMEM_BOOLEAN_ARRAY_OFFSET = 0; // _NVM_UNSAFE.arrayBaseOffset(boolean[].class);
+      // PMEM_BYTE_ARRAY_OFFSET    = 0; // _NVM_UNSAFE.arrayBaseOffset(byte[].class);
+      // PMEM_SHORT_ARRAY_OFFSET   = 0; // _NVM_UNSAFE.arrayBaseOffset(short[].class);
+      // PMEM_INT_ARRAY_OFFSET     = 0; // _NVM_UNSAFE.arrayBaseOffset(int[].class);
+      // PMEM_LONG_ARRAY_OFFSET    = 0; // _NVM_UNSAFE.arrayBaseOffset(long[].class);
+      // PMEM_FLOAT_ARRAY_OFFSET   = 0; // _NVM_UNSAFE.arrayBaseOffset(float[].class);
+      // PMEM_DOUBLE_ARRAY_OFFSET  = 0; // _NVM_UNSAFE.arrayBaseOffset(double[].class);
+    }
+    else {
+      BOOLEAN_ARRAY_OFFSET      = 0;
+      BYTE_ARRAY_OFFSET         = 0;
+      SHORT_ARRAY_OFFSET        = 0;
+      INT_ARRAY_OFFSET          = 0;
+      LONG_ARRAY_OFFSET         = 0;
+      FLOAT_ARRAY_OFFSET        = 0;
+      DOUBLE_ARRAY_OFFSET       = 0;
+      PMEM_ADDR                 = 0;
+      //PMEM_PATH = "/mnt/pmemdir/executor";
     }
   }
 }

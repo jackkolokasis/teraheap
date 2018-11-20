@@ -112,6 +112,11 @@ public class TaskMemoryManager {
    * without doing any masking or lookups. Since this branching should be well-predicted by the JIT,
    * this extra layer of indirection / abstraction hopefully shouldn't be too expensive.
    */
+
+  /**
+   * After enable pmem off heap -- use to track weather you are in
+   * persistent memory off heap
+   */
   final MemoryMode tungstenMemoryMode;
 
   /**
@@ -272,15 +277,18 @@ public class TaskMemoryManager {
   }
 
   /**
-   * Allocate a block of memory that will be tracked in the MemoryManager's page table; this is
-   * intended for allocating large blocks of Tungsten memory that will be shared between operators.
+   * Allocate a block of memory that will be tracked in the
+   * MemoryManager's page table; this is intended for allocating large
+   * blocks of Tungsten memory that will be shared between operators.
    *
-   * Returns `null` if there was not enough memory to allocate the page. May return a page that
-   * contains fewer bytes than requested, so callers should verify the size of returned pages.
+   * Returns `null` if there was not enough memory to allocate the
+   * page. May return a page that contains fewer bytes than requested,
+   * so callers should verify the size of returned pages.
    *
    * @throws TooLargePageException
    */
   public MemoryBlock allocatePage(long size, MemoryConsumer consumer) {
+    System.out.println("TaskMemoryManager::allocatePage");
     assert(consumer != null);
     assert(consumer.getMode() == tungstenMemoryMode);
     if (size > MAXIMUM_PAGE_SIZE_BYTES) {
@@ -304,22 +312,23 @@ public class TaskMemoryManager {
     }
     MemoryBlock page = null;
     try {
-      page = memoryManager.tungstenMemoryAllocator().allocate(acquired);
+        page = memoryManager.tungstenMemoryAllocator().allocate(acquired);
     } catch (OutOfMemoryError e) {
-      logger.warn("Failed to allocate a page ({} bytes), try again.", acquired);
-      // there is no enough memory actually, it means the actual free memory is smaller than
-      // MemoryManager thought, we should keep the acquired memory.
-      synchronized (this) {
-        acquiredButNotUsed += acquired;
-        allocatedPages.clear(pageNumber);
-      }
-      // this could trigger spilling to free some pages.
-      return allocatePage(size, consumer);
+        logger.warn("Failed to allocate a page ({} bytes), try again.", acquired);
+        // there is no enough memory actually, it means the actual
+        // free memory is smaller than MemoryManager thought, we
+        // should keep the acquired memory.
+        synchronized (this) {
+            acquiredButNotUsed += acquired;
+            allocatedPages.clear(pageNumber);
+        }
+        // this could trigger spilling to free some pages.
+        return allocatePage(size, consumer);
     }
     page.pageNumber = pageNumber;
     pageTable[pageNumber] = page;
     if (logger.isTraceEnabled()) {
-      logger.trace("Allocate page number {} ({} bytes)", pageNumber, acquired);
+        logger.trace("Allocate page number {} ({} bytes)", pageNumber, acquired);
     }
     return page;
   }
@@ -347,7 +356,9 @@ public class TaskMemoryManager {
     // Doing this allows the MemoryAllocator to detect when a TaskMemoryManager-managed
     // page has been inappropriately directly freed without calling TMM.freePage().
     page.pageNumber = MemoryBlock.FREED_IN_TMM_PAGE_NUMBER;
+    System.out.println("TaskMemoryManager::freePage()::memoryManager.tungstenMemoryAllocator().free(page)");
     memoryManager.tungstenMemoryAllocator().free(page);
+    System.out.println("TaskMemoryManager::freePage()::releaseExecutionMemory");
     releaseExecutionMemory(pageSize, consumer);
   }
 
@@ -440,6 +451,8 @@ public class TaskMemoryManager {
         if (page != null) {
           logger.debug("unreleased page: " + page + " in task " + taskAttemptId);
           page.pageNumber = MemoryBlock.FREED_IN_TMM_PAGE_NUMBER;
+          System.out.println("TaskMemoryManager::cleanUpAllAllocatedMemroy::"+
+                  "memoryManager.tungstenMemoryAllocator().free(page)");
           memoryManager.tungstenMemoryAllocator().free(page);
         }
       }

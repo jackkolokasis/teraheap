@@ -95,7 +95,9 @@ case class SparkListenerBlockManagerAdded(
     blockManagerId: BlockManagerId,
     maxMem: Long,
     maxOnHeapMem: Option[Long] = None,
-    maxOffHeapMem: Option[Long] = None) extends SparkListenerEvent {
+    maxOffHeapMem: Option[Long] = None,
+    // Jack Kolokasis (30/10/2018)
+    pmemMaxOffHeapMem: Option[Long] = None) extends SparkListenerEvent {
 }
 
 @DeveloperApi

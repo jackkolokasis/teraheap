@@ -92,7 +92,7 @@ private[spark] class MemoryStore(
   // evicting blocks, and acquiring or releasing unroll memory, must
   // be synchronized on `memoryManager`!
 
-  // LinkedHashMap[BlockId as Key, MemoryEntryp[_] as Value
+  // JK: LinkedHashMap[BlockId as Key, MemoryEntryp[_] as Value
   // Initial Capacity = 32
   // loadFactor = 0.75f
   // accessOrder : Ordering mode - true to access-order, false for insertion-order
@@ -102,9 +102,14 @@ private[spark] class MemoryStore(
   // unrolling a block (in bytes) All accesses of this map are assumed
   // to have manually synchronized on `memoryManager`
   private val onHeapUnrollMemoryMap = mutable.HashMap[Long, Long]()
+
   // Note: off-heap unroll memory is only used in putIteratorAsBytes()
   // because off-heap caching always stores serialized values.
   private val offHeapUnrollMemoryMap = mutable.HashMap[Long, Long]()
+  
+  // Note: pmem off-heap unroll memory is only used in putIteratorAsBytes()
+  // because off-heap caching always stores serialized values.
+  private val offHeapPmemUnrollMemoryMap = mutable.HashMap[Long, Long]()
 
   // Initial memory to request before unrolling any block
   private val unrollMemoryThreshold: Long =
@@ -112,6 +117,7 @@ private[spark] class MemoryStore(
 
   /** Total amount of memory available for storage, in bytes. */
   private def maxMemory: Long = {
+    println("MemoryStore::maxMemory")
     memoryManager.maxOnHeapStorageMemory + memoryManager.maxOffHeapStorageMemory
   }
 
@@ -124,17 +130,22 @@ private[spark] class MemoryStore(
   logInfo("MemoryStore started with capacity %s".format(Utils.bytesToString(maxMemory)))
 
   /** Total storage memory used including unroll memory, in bytes. */
-  private def memoryUsed: Long = memoryManager.storageMemoryUsed
+  private def memoryUsed: Long = {
+    println("MemoryStore::memoryUsed")
+    memoryManager.storageMemoryUsed
+  }
 
   /**
    * Amount of storage memory, in bytes, used for caching blocks.
    * This does not include memory used for unrolling.
    */
   private def blocksMemoryUsed: Long = memoryManager.synchronized {
+    println("MemoryStore::blocksMemoryUsed")
     memoryUsed - currentUnrollMemory
   }
 
   def getSize(blockId: BlockId): Long = {
+    println("MemoryStore::getSize")
     entries.synchronized {
       entries.get(blockId).size
     }
@@ -155,6 +166,7 @@ private[spark] class MemoryStore(
       size: Long,
       memoryMode: MemoryMode,
       _bytes: () => ChunkedByteBuffer): Boolean = {
+    println("MemoryStore::putBytes")
     require(!contains(blockId), s"Block $blockId is already present in the MemoryStore")
     if (memoryManager.acquireStorageMemory(blockId, size, memoryMode)) {
       // We acquired enough memory for the block, so go ahead and put it
@@ -204,6 +216,7 @@ private[spark] class MemoryStore(
       values: Iterator[T],
       classTag: ClassTag[T]): Either[PartiallyUnrolledIterator[T], Long] = {
 
+    println("MemoryStore::putIteratorAsValues")
     require(!contains(blockId), s"Block $blockId is already present in the MemoryStore")
 
     // Number of elements unrolled so far
@@ -349,14 +362,17 @@ private[spark] class MemoryStore(
       classTag: ClassTag[T],
       memoryMode: MemoryMode): Either[PartiallySerializedBlock[T], Long] = {
 
+    println("MemoryStore::putIteratorAsBytes")
     require(!contains(blockId), s"Block $blockId is already present in the MemoryStore")
 
-    // JK: Critical
-    // According memoryMode do the proper allocation
-    //
+    /**
+     * JK: Critical !!!
+     * Based on the memoryMode do the proper allocation
+     */
     val allocator = memoryMode match {
       case MemoryMode.ON_HEAP => ByteBuffer.allocate _
       case MemoryMode.OFF_HEAP => Platform.allocateDirectBuffer _
+      case MemoryMode.PMEM_OFF_HEAP => Platform.allocatePmemDirectBuffer _
     }
 
     // Whether there is still enough memory for us to continue unrolling this block
@@ -381,6 +397,8 @@ private[spark] class MemoryStore(
     } else {
       initialMemoryThreshold.toInt
     }
+    // Byte Buffer Output stream
+    // bbos: ChuckedByteBufferOutputStream
     val bbos = new ChunkedByteBufferOutputStream(chunkSize, allocator)
     redirectableStream.setOutputStream(bbos)
     val serializationStream: SerializationStream = {
@@ -400,6 +418,7 @@ private[spark] class MemoryStore(
     }
 
     def reserveAdditionalMemoryIfNecessary(): Unit = {
+    println("MemoryStore::reserveAdditionalMemoryIfNecessary")
       if (bbos.size > unrollMemoryUsedByThisBlock) {
         val amountToRequest = (bbos.size * memoryGrowthFactor - unrollMemoryUsedByThisBlock).toLong
         keepUnrolling = reserveUnrollMemoryForThisTask(blockId, amountToRequest, memoryMode)
@@ -466,6 +485,7 @@ private[spark] class MemoryStore(
   }
 
   def getBytes(blockId: BlockId): Option[ChunkedByteBuffer] = {
+    println("MemoryStore::getBytes")
     val entry = entries.synchronized { entries.get(blockId) }
     entry match {
       case null => None
@@ -476,6 +496,7 @@ private[spark] class MemoryStore(
   }
 
   def getValues(blockId: BlockId): Option[Iterator[_]] = {
+    println("MemoryStore::getValues")
     // JK: Read Memory data block
     val entry = entries.synchronized { entries.get(blockId) }
     entry match {
@@ -489,6 +510,7 @@ private[spark] class MemoryStore(
   }
 
   def remove(blockId: BlockId): Boolean = memoryManager.synchronized {
+    println("MemoryStore::remove")
     val entry = entries.synchronized {
       entries.remove(blockId)
     }
@@ -507,11 +529,13 @@ private[spark] class MemoryStore(
   }
 
   def clear(): Unit = memoryManager.synchronized {
+    println("MemoryStore::clear")
     entries.synchronized {
       entries.clear()
     }
     onHeapUnrollMemoryMap.clear()
     offHeapUnrollMemoryMap.clear()
+    offHeapPmemUnrollMemoryMap.clear()
     memoryManager.releaseAllStorageMemory()
     logInfo("MemoryStore cleared")
   }
@@ -520,6 +544,7 @@ private[spark] class MemoryStore(
    * Return the RDD ID that a given block ID is from, or None if it is not an RDD block.
    */
   private def getRddId(blockId: BlockId): Option[Int] = {
+    println("MemoryStore::getRddId")
     blockId.asRDDId.map(_.rddId)
   }
 
@@ -540,27 +565,40 @@ private[spark] class MemoryStore(
       memoryMode: MemoryMode): Long = {
     assert(space > 0)
     memoryManager.synchronized {
+    println("MemoryStore::evictBlocksToFreeSpace")
       var freedMemory = 0L
       val rddToAdd = blockId.flatMap(getRddId)
       val selectedBlocks = new ArrayBuffer[BlockId]
+
       def blockIsEvictable(blockId: BlockId, entry: MemoryEntry[_]): Boolean = {
+        /** Check  !!!! */
         entry.memoryMode == memoryMode && (rddToAdd.isEmpty || rddToAdd != getRddId(blockId))
       }
-      // This is synchronized to ensure that the set of entries is not changed
-      // (because of getValue or getBytes) while traversing the iterator, as that
-      // can lead to exceptions.
+
+      /**
+       * This is synchronized to ensure that the set of entries is not changed
+       * (because of getValue or getBytes) while traversing the iterator, as that
+       * can lead to exceptions.
+       */
       entries.synchronized {
         val iterator = entries.entrySet().iterator()
         while (freedMemory < space && iterator.hasNext) {
           val pair = iterator.next()
           val blockId = pair.getKey
           val entry = pair.getValue
+
           if (blockIsEvictable(blockId, entry)) {
-            // We don't want to evict blocks which are currently being read, so we need to obtain
-            // an exclusive write lock on blocks which are candidates for eviction. We perform a
-            // non-blocking "tryLock" here in order to ignore blocks which are locked for reading:
+            /**
+             * We don't want to evict blocks which are currently being read, so we need to obtain an
+             * exclusive write lock on blocks which are candidates for eviction. We perform a
+             * non-blocking "tryLock" here in order to ignore blocks which are locked for reading:
+             */
             if (blockInfoManager.lockForWriting(blockId, blocking = false).isDefined) {
               selectedBlocks += blockId
+              /**
+               * This might rewritten as :
+               * freedMemory += entry.size
+               */
               freedMemory += pair.getValue.size
             }
           }
@@ -568,19 +606,27 @@ private[spark] class MemoryStore(
       }
 
       def dropBlock[T](blockId: BlockId, entry: MemoryEntry[T]): Unit = {
+        println("MemoryStore::dropBlock")
         val data = entry match {
+          /** Return deserialized values */
           case DeserializedMemoryEntry(values, _, _) => Left(values)
+          /** Return serialized buffer */
           case SerializedMemoryEntry(buffer, _, _) => Right(buffer)
         }
+
         val newEffectiveStorageLevel =
           blockEvictionHandler.dropFromMemory(blockId, () => data)(entry.classTag)
         if (newEffectiveStorageLevel.isValid) {
-          // The block is still present in at least one store, so release the lock
-          // but don't delete the block info
+          /**
+           * The block is still present in at least one store, so release the lock
+           * but don't delete the block info
+           */
           blockInfoManager.unlock(blockId)
         } else {
-          // The block isn't present in any store, so delete the block info so that the
-          // block can be stored again
+          /**
+           * The block isn't present in any store, so delete the block info so that the block can be
+           * stored again
+           */
           blockInfoManager.removeBlock(blockId)
         }
       }
@@ -595,9 +641,10 @@ private[spark] class MemoryStore(
             val entry = entries.synchronized {
               entries.get(blockId)
             }
-            // This should never be null as only one task should be dropping
-            // blocks and removing entries. However the check is still here for
-            // future safety.
+            /**
+             * This should never be null as only one task should be dropping blocks and removing
+             * entries. However the check is still here for future safety.
+             */
             if (entry != null) {
               dropBlock(blockId, entry)
               afterDropAction(blockId)
@@ -634,10 +681,12 @@ private[spark] class MemoryStore(
   protected def afterDropAction(blockId: BlockId): Unit = {}
 
   def contains(blockId: BlockId): Boolean = {
+        println("MemoryStore::contains")
     entries.synchronized { entries.containsKey(blockId) }
   }
 
   private def currentTaskAttemptId(): Long = {
+        println("MemoryStore::currentTaskAttemptId")
     // In case this is called on the driver, return an invalid task attempt id.
     Option(TaskContext.get()).map(_.taskAttemptId()).getOrElse(-1L)
   }
@@ -651,13 +700,16 @@ private[spark] class MemoryStore(
       blockId: BlockId,
       memory: Long,
       memoryMode: MemoryMode): Boolean = {
+        println("MemoryStore::reserveUnrollMemoryForThisTask")
     memoryManager.synchronized {
       val success = memoryManager.acquireUnrollMemory(blockId, memory, memoryMode)
       if (success) {
         val taskAttemptId = currentTaskAttemptId()
+        println("MemoryStore::currentTaskAttemptId=" + taskAttemptId)
         val unrollMemoryMap = memoryMode match {
           case MemoryMode.ON_HEAP => onHeapUnrollMemoryMap
           case MemoryMode.OFF_HEAP => offHeapUnrollMemoryMap
+          case MemoryMode.PMEM_OFF_HEAP => offHeapPmemUnrollMemoryMap
         }
         unrollMemoryMap(taskAttemptId) = unrollMemoryMap.getOrElse(taskAttemptId, 0L) + memory
       }
@@ -670,11 +722,13 @@ private[spark] class MemoryStore(
    * If the amount is not specified, remove the current task's allocation altogether.
    */
   def releaseUnrollMemoryForThisTask(memoryMode: MemoryMode, memory: Long = Long.MaxValue): Unit = {
+        println("MemoryStore::releaseUnrollMemoryForThisTask")
     val taskAttemptId = currentTaskAttemptId()
     memoryManager.synchronized {
       val unrollMemoryMap = memoryMode match {
         case MemoryMode.ON_HEAP => onHeapUnrollMemoryMap
         case MemoryMode.OFF_HEAP => offHeapUnrollMemoryMap
+        case MemoryMode.PMEM_OFF_HEAP => offHeapPmemUnrollMemoryMap
       }
       if (unrollMemoryMap.contains(taskAttemptId)) {
         val memoryToRelease = math.min(memory, unrollMemoryMap(taskAttemptId))
@@ -693,28 +747,35 @@ private[spark] class MemoryStore(
    * Return the amount of memory currently occupied for unrolling blocks across all tasks.
    */
   def currentUnrollMemory: Long = memoryManager.synchronized {
-    onHeapUnrollMemoryMap.values.sum + offHeapUnrollMemoryMap.values.sum
+    println("MemoryStore::currentUnrollMemory")
+    onHeapUnrollMemoryMap.values.sum + offHeapUnrollMemoryMap.values.sum + 
+      offHeapPmemUnrollMemoryMap.values.sum
   }
 
   /**
    * Return the amount of memory currently occupied for unrolling blocks by this task.
    */
   def currentUnrollMemoryForThisTask: Long = memoryManager.synchronized {
+        println("MemoryStore::currentUnrollMemoryForThisTask")
     onHeapUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L) +
-      offHeapUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L)
+      offHeapUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L) +
+        offHeapPmemUnrollMemoryMap.getOrElse(currentTaskAttemptId(), 0L)
   }
 
   /**
    * Return the number of tasks currently unrolling blocks.
    */
   private def numTasksUnrolling: Int = memoryManager.synchronized {
-    (onHeapUnrollMemoryMap.keys ++ offHeapUnrollMemoryMap.keys).toSet.size
+    println("MemoryStore::numTasksUnrolling")
+    (onHeapUnrollMemoryMap.keys ++ offHeapUnrollMemoryMap.keys ++ offHeapPmemUnrollMemoryMap.keys)
+      .toSet.size
   }
 
   /**
    * Log information about current memory usage.
    */
   private def logMemoryUsage(): Unit = {
+    println("MemoryStore::logMemoryUsage")
     logInfo(
       s"Memory use = ${Utils.bytesToString(blocksMemoryUsed)} (blocks) + " +
       s"${Utils.bytesToString(currentUnrollMemory)} (scratch space shared across " +
@@ -730,6 +791,7 @@ private[spark] class MemoryStore(
    * @param finalVectorSize Final size of the vector before unrolling failed.
    */
   private def logUnrollFailureMessage(blockId: BlockId, finalVectorSize: Long): Unit = {
+        println("MemoryStore::logUnrollFailureMessage")
     logWarning(
       s"Not enough space to cache $blockId in memory! " +
       s"(computed ${Utils.bytesToString(finalVectorSize)} so far)"
@@ -797,12 +859,31 @@ private[storage] class PartiallyUnrolledIterator[T](
  */
 private[storage] class RedirectableOutputStream extends OutputStream {
   private[this] var os: OutputStream = _
-  def setOutputStream(s: OutputStream): Unit = { os = s }
-  override def write(b: Int): Unit = os.write(b)
-  override def write(b: Array[Byte]): Unit = os.write(b)
-  override def write(b: Array[Byte], off: Int, len: Int): Unit = os.write(b, off, len)
-  override def flush(): Unit = os.flush()
-  override def close(): Unit = os.close()
+  def setOutputStream(s: OutputStream): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::setOutputStream")
+    // s = bbos = ChunkedByteBufferOutputStream type
+    os = s 
+  }
+  override def write(b: Int): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::write(b:Int)")
+    os.write(b)
+  }
+  override def write(b: Array[Byte]): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::write(b: Array[Byte])")
+    os.write(b)
+  }
+  override def write(b: Array[Byte], off: Int, len: Int): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::write(b: Array[Byte], off, len)")
+    os.write(b, off, len)
+  }
+  override def flush(): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::flush")
+    os.flush()
+  }
+  override def close(): Unit = {
+    println("MemoryStore.scala::RedirectableOutpuStream::close")
+    os.close()
+  }
 }
 
 /**
