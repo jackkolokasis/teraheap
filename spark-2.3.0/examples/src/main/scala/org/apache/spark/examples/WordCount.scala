@@ -29,13 +29,13 @@ object WordCount {
       val sc = new SparkContext(conf)
 
       // Load our input data.
-      val input =  sc.textFile(inputFile).persist(storageLevel)
-      println("Storage Level: Memory = " + input.getStorageLevel.useMemory)
-      println("Storage Level: Disk = " + input.getStorageLevel.useDisk)
-      println("Storage Level: OffHeap = " + input.getStorageLevel.useOffHeap)
+      val input =  sc.textFile(inputFile, 20).persist(storageLevel)
+      input.count
 
       // Split up into words.
       val words = input.flatMap(line => line.split(" "))
+      words.persist(storageLevel)
+      words.count
      
       // Transform into word and count.
       val counts = words.map(word => (word, 1)).reduceByKey{case (x, y) => x + y}

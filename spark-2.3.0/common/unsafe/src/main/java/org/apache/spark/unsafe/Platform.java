@@ -205,16 +205,16 @@ public final class Platform {
  
   ////////////////////////////// NVM UNSAFE FUNCTIONS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-  public static long nvmInitializeMemory(String path, long size) {
+  public static void nvmInitializeMemory(String path, long size) {
     System.out.println("Platform::nvmInitializeMemory");
-    path = "/mnt/pmemdir/executor";
-    return _NVM_UNSAFE.nvmInitialPool(path, size);
+    PMEM_ADDR = _NVM_UNSAFE.nvmInitialPool(path, size);
+    // return _NVM_UNSAFE.nvmInitialPool(path, size);
   }
 
   public static long nvmAllocateMemory(long size) {
     System.out.println("Platform::nvmAllocateMemory");
-    if (PMEM_ADDR == 0)
-        PMEM_ADDR = nvmInitializeMemory("/mnt/pmemdir/executor", 1073741824);
+    //if (PMEM_ADDR == 0)
+    //    PMEM_ADDR = nvmInitializeMemory("/mnt/pmemdir/executor", initPmemSize);
     System.out.println("Platform::PMEM_ADDR=" + PMEM_ADDR);
     return _NVM_UNSAFE.nvmAllocateMemory(PMEM_ADDR, size);
   }
@@ -259,12 +259,12 @@ public final class Platform {
    * allocate a DirectByteBuffer while ignoring the JVM's MaxDirectMemorySize limit (the default
    * limit is too low and we do not want to require users to increase it).
    * 
-   * @param     size    The size of the direct buffer
-   * @return            The allocated ByteBuffer
+   * @param     size            The size of the direct buffer
+   * @return                    The allocated ByteBuffer
    *
    * @author Jack Kolokasis (08/10/18)
    */
-  public static ByteBuffer allocatePmemDirectBuffer(int size) {
+  public static ByteBuffer allocatePmemDirectBuffer(int size, long initPmemSize) {
     try {
       System.out.println("Platform::allocatePmemDirectBuffer::size=" + size);
       Class<?> cls = Class.forName("java.nio.DirectByteBuffer");

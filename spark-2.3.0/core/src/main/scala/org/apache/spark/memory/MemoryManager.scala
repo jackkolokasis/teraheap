@@ -294,30 +294,13 @@ private[spark] abstract class MemoryManager(
     } else if (conf.get(PMEM_OFFHEAP_ENABLED)) {
       require(conf.get(PMEM_OFFHEAP_SIZE) > 0,
         "spark.memory.offHeap.size must be > 0 when spark.memory.offHeap.enabled == true")
+      Platform.nvmInitializeMemory("/mnt/pmemdir/executor", conf.get(PMEM_OFFHEAP_SIZE))
       MemoryMode.PMEM_OFF_HEAP
     } else {
       MemoryMode.ON_HEAP
     }
   }
   
-  /**
-   * Jack Kolokasis (02/10/18)
-   *
-   * Tracks whether memory will be allocated on the persistent
-   * off-heap memory using PMEM_Unsafe (a library manipulate
-   * Persistent memory by allocating off-heap objects implemented by
-   * Jack Kolokasis)
-   */
-  val pmemtesting: String = {
-      if (conf.get(PMEM_OFFHEAP_ENABLED)) {
-          require(conf.get(PMEM_OFFHEAP_SIZE) > 0,
-              "spark.memory.offHeap.size must be > 0 when spark.memory.offHeap.enabled == true")
-          "PMEM_OFF_HEAP"
-      } else {
-          "ON_HEAP"
-      }
-  }
-
   /**
    * The default page size, in bytes.
    *

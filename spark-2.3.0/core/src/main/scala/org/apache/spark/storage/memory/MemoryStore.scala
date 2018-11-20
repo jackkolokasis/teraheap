@@ -30,7 +30,8 @@ import com.google.common.io.ByteStreams
 
 import org.apache.spark.{SparkConf, TaskContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.internal.config.{UNROLL_MEMORY_CHECK_PERIOD, UNROLL_MEMORY_GROWTH_FACTOR}
+import org.apache.spark.internal.config.{UNROLL_MEMORY_CHECK_PERIOD, UNROLL_MEMORY_GROWTH_FACTOR, 
+                                         PMEM_OFFHEAP_SIZE}
 import org.apache.spark.memory.{MemoryManager, MemoryMode}
 import org.apache.spark.serializer.{SerializationStream, SerializerManager}
 import org.apache.spark.storage._
@@ -217,6 +218,7 @@ private[spark] class MemoryStore(
       classTag: ClassTag[T]): Either[PartiallyUnrolledIterator[T], Long] = {
 
     println("MemoryStore::putIteratorAsValues")
+    val startTime = System.currentTimeMillis()
     require(!contains(blockId), s"Block $blockId is already present in the MemoryStore")
 
     // Number of elements unrolled so far
@@ -307,6 +309,8 @@ private[spark] class MemoryStore(
         }
         logInfo("Block %s stored as values in memory (estimated size %s, free %s)".format(
           blockId, Utils.bytesToString(size), Utils.bytesToString(maxMemory - blocksMemoryUsed)))
+        val stopTime = System.currentTimeMillis
+        println("PutIteratorAsValues Time: " + (stopTime - startTime))
         Right(size)
       } else {
         assert(currentUnrollMemoryForThisTask >= unrollMemoryUsedByThisBlock,
@@ -363,12 +367,13 @@ private[spark] class MemoryStore(
       memoryMode: MemoryMode): Either[PartiallySerializedBlock[T], Long] = {
 
     println("MemoryStore::putIteratorAsBytes")
+    val startTime = System.currentTimeMillis()
     require(!contains(blockId), s"Block $blockId is already present in the MemoryStore")
 
-    /**
-     * JK: Critical !!!
-     * Based on the memoryMode do the proper allocation
-     */
+    // Initial size of non volatile memory
+    val initPmemSize = conf.get(PMEM_OFFHEAP_SIZE)
+
+    /** Based on the memoryMode do the proper allocation */
     val allocator = memoryMode match {
       case MemoryMode.ON_HEAP => ByteBuffer.allocate _
       case MemoryMode.OFF_HEAP => Platform.allocateDirectBuffer _
@@ -465,6 +470,8 @@ private[spark] class MemoryStore(
       logInfo("Block %s stored as bytes in memory (estimated size %s, free %s)".format(
         blockId, Utils.bytesToString(entry.size),
         Utils.bytesToString(maxMemory - blocksMemoryUsed)))
+      val stopTime = System.currentTimeMillis()
+      println("PutIteratorAsBytes Time: " + (stopTime - startTime))
       Right(entry.size)
     } else {
       // We ran out of space while unrolling the values for this block
