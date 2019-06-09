@@ -1,0 +1,70 @@
+#
+# Copyright (c) 2011, 2017, Oracle and/or its affiliates. All rights reserved.
+# DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+# This code is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 2 only, as
+# published by the Free Software Foundation.  Oracle designates this
+# particular file as subject to the "Classpath" exception as provided
+# by Oracle in the LICENSE file that accompanied this code.
+#
+# This code is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# version 2 for more details (a copy is included in the LICENSE file that
+# accompanied this code).
+#
+# You should have received a copy of the GNU General Public License version
+# 2 along with this work; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+# or visit www.oracle.com if you need additional information or have any
+# questions.
+#
+
+LIB_DST_DIR := $(SUPPORT_OUTPUTDIR)/modules_libs/$(MODULE)
+CONF_DST_DIR := $(SUPPORT_OUTPUTDIR)/modules_conf/$(MODULE)
+LEGAL_DST_DIR := $(SUPPORT_OUTPUTDIR)/modules_legal/$(MODULE)
+
+################################################################################
+#
+# Copy exported include headers files to output directory, if present.
+#
+
+INCLUDE_TARGET_DIR := $(SUPPORT_OUTPUTDIR)/modules_include/$(MODULE)
+INCLUDE_SOURCE_DIR := $(TOPDIR)/src/$(MODULE)/share/native/include
+
+ifneq ($(wildcard $(INCLUDE_SOURCE_DIR)/*), )
+  $(eval $(call SetupCopyFiles, COPY_EXPORTED_INCLUDE, \
+      SRC := $(INCLUDE_SOURCE_DIR), \
+      DEST := $(INCLUDE_TARGET_DIR), \
+      FILES := $(shell $(FIND) $(INCLUDE_SOURCE_DIR) -type f), \
+  ))
+
+  TARGETS += $(COPY_EXPORTED_INCLUDE)
+endif
+
+# For historical reasons, the OS include directories have odd names.
+INCLUDE_TARGET_OS_SUBDIR := $(OPENJDK_TARGET_OS)
+ifeq ($(OPENJDK_TARGET_OS), windows)
+  INCLUDE_TARGET_OS_SUBDIR := win32
+else ifeq ($(OPENJDK_TARGET_OS), macosx)
+  INCLUDE_TARGET_OS_SUBDIR := darwin
+endif
+
+# Use the most specific of OS and OS_TYPE.
+INCLUDE_SOURCE_OS_DIR := $(TOPDIR)/src/$(MODULE)/$(OPENJDK_TARGET_OS)/native/include
+ifeq ($(wildcard $(INCLUDE_SOURCE_OS_DIR)/*), )
+  INCLUDE_SOURCE_OS_DIR := $(TOPDIR)/src/$(MODULE)/$(OPENJDK_TARGET_OS_TYPE)/native/include
+endif
+
+ifneq ($(wildcard $(INCLUDE_SOURCE_OS_DIR)/*), )
+  $(eval $(call SetupCopyFiles, COPY_EXPORTED_INCLUDE_OS, \
+      SRC := $(INCLUDE_SOURCE_OS_DIR), \
+      DEST := $(INCLUDE_TARGET_DIR)/$(INCLUDE_TARGET_OS_SUBDIR), \
+      FILES := $(shell $(FIND) $(INCLUDE_SOURCE_OS_DIR) -type f), \
+  ))
+
+  TARGETS += $(COPY_EXPORTED_INCLUDE_OS)
+endif
