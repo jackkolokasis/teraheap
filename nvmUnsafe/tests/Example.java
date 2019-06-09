@@ -19,23 +19,24 @@ public class Example {
 
         int i = 12345;
         int retVal;
-        long address;
         long allocAddr;
 
-        address = tmp.nvmInitialPool("/mnt/pmemdir/file", 1073741824);
-        System.out.println("Initial Address " + address);
+        tmp.nvmInitialPool("/mnt/pmemdir/", 1073741824);
 
-        allocAddr = tmp.nvmAllocateMemory(address, 4);
+        allocAddr = tmp.nvmAllocateMemory(4);
         System.out.println("Allocation Address " + allocAddr);
 
-        tmp.putInt(i, address, allocAddr);
+        tmp.putInt(i, allocAddr);
 
-        retVal = tmp.getInt(address, allocAddr);
+        retVal = tmp.getInt(allocAddr);
 
         System.out.println("Number is " + retVal);
 
-        tmp.nvmFreeMemory(address, allocAddr);
-        
+        tmp.nvmFreeMemory(allocAddr);
+         
         System.out.println("Free Memory");
+
+        tmp.nvmDelete();
+        System.out.println("Delete Memory");
     }
 }

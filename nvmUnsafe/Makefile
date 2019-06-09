@@ -42,16 +42,17 @@ help: 		## Show make help
 
 
 all: 		## Build all shared libraries and classes
-all: pmemalloc $(LIB_TARGET)
+all: $(LIB_TARGET)
 
 
-pmemalloc:
-	$(MAKE) -C libpmemmalloc
-
+#pmemalloc:
+#	$(MAKE) -C libpmemmalloc
+#
 
 $(LIB_TARGET): $(OBJ_DIR)/$(TARGET).o 
 	@mkdir -p $(LIB_DIR)
-	$(CC) -shared $< -Llibpmemmalloc/lib/ -lpmemalloc -lpmem -o $@
+	# $(CC) -shared $< -Llibpmemmalloc/lib/ -lpmemalloc -lpmem -o $@
+	$(CC) -shared $< -lvmem -o $@
 
 
 $(OBJ_DIR)/$(TARGET).o: $(TARGET).h
@@ -82,12 +83,12 @@ $(JAR_TARGET):
 install:	## Install the shared libraries (*.so)
 	install -D $(LIB_TARGET) $(PREFIX)/lib/
 	install -D $(H_TARGET) $(PREFIX)/include/
-	install -D $(LIB_PATH)/libpmemalloc.so $(PREFIX)/lib
+	#install -D $(LIB_PATH)/libpmemalloc.so $(PREFIX)/lib
 
 
 uninstall:	## Uninstall the shared libraries (*.so)
-	rm $(PREFIX)/lib/$(LIB_TARGET)
-	rm $(PREFIX)/include/$(H_TARGET) 
+	rm $(PREFIX)/$(LIB_TARGET)
+	rm $(PREFIX)/include/$(notdir $(H_TARGET))
 	rm $(PREFIX)/lib/libpmemalloc.so
 
 clean:		## Delete all intermediate files

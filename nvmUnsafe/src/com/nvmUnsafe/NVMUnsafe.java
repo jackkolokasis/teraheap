@@ -57,7 +57,7 @@ public final class NVMUnsafe {
     * @ret Start address of the nvm allocated pool size
     *
     */
-   public native long    nvmInitialPool(String path, long pool_size);
+   public native void    nvmInitialPool(String path, long pool_size);
 
 
    /**
@@ -69,7 +69,7 @@ public final class NVMUnsafe {
     * @ret Allocation address
     *
     */
-   public native long    nvmAllocateMemory(long pmp, long size);
+   public native long    nvmAllocateMemory(long size);
 
    /**
     * @desc Get an Integer saved on Persistent Memory
@@ -79,7 +79,7 @@ public final class NVMUnsafe {
     *
     * @ret the integer value saved on the persistent memory
     */
-   public native int     getInt(long pmp, long offset);
+   public native int     getInt(long offset);
 
    /**
     * @desc save an integer on persistent memory
@@ -89,7 +89,7 @@ public final class NVMUnsafe {
     * @param offset    allocation address
     *
     */
-   public native void    putInt(int number, long pmp, long offset);
+   public native void    putInt(int number, long offset);
   
    /**
     * @desc Get boolean saved in persistent memory pool
@@ -99,7 +99,7 @@ public final class NVMUnsafe {
     *
     * @ret return saved boolean
     */
-   public native boolean getBoolean(long pmp, long offset);
+   public native boolean getBoolean(long offset);
 
    /**
     * @desc Save a Boolean on Persistent Memory
@@ -108,7 +108,7 @@ public final class NVMUnsafe {
     * @param pmp       Start Address persistent memory pool
     * @param offset    Allocation address
     */
-   public native void    putBoolean(boolean bool, long pmp, long offset);
+   public native void    putBoolean(boolean bool, long offset);
   
    /**
     * @desc Get byte saved in persistent memory pool
@@ -117,7 +117,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native byte    getByte(long pmp, long offset);
+   public native byte    getByte(long offset);
 
    /**
     * @desc Put byte in persistent memory pool
@@ -127,7 +127,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native void    putByte(byte obj, long pmp, long offset);
+   public native void    putByte(byte obj, long offset);
    
    /**
     * @desc Get short saved in persistent memory pool
@@ -136,7 +136,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native short   getShort(long pmp, long offset);
+   public native short   getShort(long offset);
 
    /**
     * @desc Save a short on Persistent Memory
@@ -146,7 +146,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native void    putShort(short obj, long pmp, long offset);
+   public native void    putShort(short obj, long offset);
 
    /**
     * @desc Get a long from persistent memory pool
@@ -157,7 +157,7 @@ public final class NVMUnsafe {
     * @ret Return the long object
     *
     */
-   public native long    getLong(long pmp, long offset);
+   public native long    getLong(long offset);
 
    /**
     * @desc Put a long in persistent memory pool
@@ -166,7 +166,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native void    putLong(long number, long pmp, long offset);
+   public native void    putLong(long number, long offset);
 
    /**
     * @desc Get a float from persistent memory pool
@@ -175,7 +175,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native float   getFloat(long pmp, long offset);
+   public native float   getFloat(long offset);
 
    /**
     * @desc Put a float in persistent memory pool
@@ -185,7 +185,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native void    putFloat(float obj, long pmp, long offset);
+   public native void    putFloat(float obj, long offset);
 
 
    /**
@@ -195,7 +195,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native double  getDouble(long pmp, long offset);
+   public native double  getDouble(long offset);
 
    /**
     * @desc Put a double in persistent memory pool
@@ -205,7 +205,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native void    putDouble(double number, long pmp, long offset);
+   public native void    putDouble(double number, long offset);
 
    /**
     * @desc Free memory
@@ -214,7 +214,7 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native void    nvmFreeMemory(long pmp, long offset);
+   public native void    nvmFreeMemory(long offset);
    
    /**
     * @desc Get translated pmem address
@@ -223,6 +223,14 @@ public final class NVMUnsafe {
     * @param offset    Allocation address
     *
     */
-   public native long getPmemAddress(long pmp, long offset);
+   // public native long getPmemAddress(long pmp, long offset);
+   
+   /**
+    * @desc Release the memory pool vmp. If the memory pool was
+    * created using vmem_create(), deleting it allows the space to be
+    * reclaimed.
+    *
+    */
+    public native void nvmDelete();
     
 }

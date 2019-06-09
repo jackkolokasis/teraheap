@@ -48,9 +48,6 @@ main(void)
 
     pmemalloc_check(PATH);
     
-    pmemalloc_free(pmp, address_1);
-    pmemalloc_free(pmp, address_2);
-
     pmemalloc_check(PATH);
    return; 
 }

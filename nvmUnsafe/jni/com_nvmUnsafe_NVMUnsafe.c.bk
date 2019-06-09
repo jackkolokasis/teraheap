@@ -14,14 +14,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libvmem.h>
-#include <inttypes.h>
 
 #include "com_nvmUnsafe_NVMUnsafe.h"
 
-// #include "../libpmemmalloc/pmemalloc.h"
-
-static VMEM *_vmp = NULL;
+#include "../libpmemmalloc/pmemalloc.h"
 
 /**
  * @desc Inline function - Convert address of a Java Object to C
@@ -75,10 +71,11 @@ Unsafe_field_offset_from_byte_offset(jlong byte_offset)
  * @ret Start address of the nvm allocated pool size
  *
  */
-JNIEXPORT void JNICALL 
+JNIEXPORT jlong JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_nvmInitialPool (JNIEnv *env, jobject nvmUnsafe, 
         jstring path, jlong pool_size)
 {
+    void *address;                       /* Allocation pool address           */ 
     const char *nativePath;              /* Java string to native string      */
 
     /* Convert jstring to a C-style string */
@@ -86,27 +83,14 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmInitialPool (JNIEnv *env, jobject nvmUnsafe,
 
     assert(nativePath != NULL);
     assert(pool_size > 0);
-
+   
     /* Create a pool into persistent memory for future allocations */
-    if (_vmp != NULL) 
-    {
-        perror("VMP is not NULL");
-        /* Release the string 'nativePath' in order to avoid memory leak */
-        (*env)->ReleaseStringUTFChars(env, path, nativePath);
-
-        return;
-    }
-
-    _vmp = vmem_create(nativePath, pool_size);
-
-    if (_vmp == NULL)
-    {
-        perror("vmem_create");
-        exit(1);
-    }
+    address = pmemalloc_init(nativePath, pool_size);
 
     /* Release the string 'nativePath' in order to avoid memory leak */
     (*env)->ReleaseStringUTFChars(env, path, nativePath);
+
+    return addr_to_java(address);
 }
 
 /**
@@ -121,15 +105,20 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmInitialPool (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT jlong JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_nvmAllocateMemory (JNIEnv *env, jobject nvmUnsafe,
-        jlong size)
+Java_com_nvmUnsafe_NVMUnsafe_nvmAllocateMemory (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong size)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
+
+    /* Convert pmp pointer to C-style pointer */
+    address = addr_from_java(pmp);
        
+    assert(address);
     assert(size > 0);
 
     /* Allocate memory */
-    allocationAddr = vmem_malloc(_vmp, size);
+    allocationAddr = pmemalloc_reserve(address, size);
 
     return addr_to_java(allocationAddr);
 }
@@ -145,16 +134,19 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmAllocateMemory (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT void JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_putInt (JNIEnv *env, jobject nvmUnsafe, jint value,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_putInt (JNIEnv *env, jobject nvmUnsafe, 
+        jint value, jlong pmp, jlong offset)
 {
+    void *address;                      /* Memory Pool initial address        */
     void *allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
     
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jint));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jint));
 }
 
 /**
@@ -167,18 +159,21 @@ Java_com_nvmUnsafe_NVMUnsafe_putInt (JNIEnv *env, jobject nvmUnsafe, jint value,
  *
  */
 JNIEXPORT jint JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_getInt (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_getInt (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
 
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jint retrieveValue;                 /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jint));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jint));
 
     return retrieveValue;
 }
@@ -193,17 +188,20 @@ Java_com_nvmUnsafe_NVMUnsafe_getInt (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT jboolean JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_getBoolean (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_getBoolean (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jboolean retrieveValue;             /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jboolean));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jboolean));
 
     return retrieveValue;
 }
@@ -220,15 +218,18 @@ Java_com_nvmUnsafe_NVMUnsafe_getBoolean (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT void JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_putBoolean (JNIEnv *env, jobject nvmUnsafe, 
-        jboolean value, jlong offset)
+        jboolean value, jlong pmp, jlong offset)
 {
+    void *address;                      /* Memory Pool initial address        */
     void *allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
     
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jboolean));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jboolean));
 }
 
 /**
@@ -242,16 +243,19 @@ Java_com_nvmUnsafe_NVMUnsafe_putBoolean (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT jbyte JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_getByte (JNIEnv *env, jobject nvmUnsafe, 
-        jlong offset)
+        jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jbyte retrieveValue;                /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jbyte));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jbyte));
 
     return retrieveValue;
 }
@@ -268,15 +272,18 @@ Java_com_nvmUnsafe_NVMUnsafe_getByte (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT void JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_putByte (JNIEnv *env, jobject nvmUnsafe, 
-        jbyte value, jlong offset)
+        jbyte value, jlong pmp, jlong offset)
 {
+    void *address;                      /* Memory Pool initial address        */
     void *allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
     
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jbyte));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jbyte));
 }
 
 /**
@@ -289,17 +296,20 @@ Java_com_nvmUnsafe_NVMUnsafe_putByte (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT jshort JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_getShort (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_getShort (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jshort retrieveValue;               /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jshort));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jshort));
 
     return retrieveValue;
 }
@@ -316,15 +326,18 @@ Java_com_nvmUnsafe_NVMUnsafe_getShort (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT void JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_putShort (JNIEnv *env, jobject nvmUnsafe, 
-        jshort value, jlong offset)
+        jshort value, jlong pmp, jlong offset)
 {
+    void *address;                      /* Memory Pool initial address        */
     void *allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
     
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jshort));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jshort));
 }
 
 /**
@@ -339,15 +352,18 @@ Java_com_nvmUnsafe_NVMUnsafe_putShort (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT void JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_putLong (JNIEnv *env, jobject nvmUnsafe, 
-        jlong value, jlong offset)
+        jlong value, jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jlong));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jlong));
 
 }
 
@@ -361,18 +377,21 @@ Java_com_nvmUnsafe_NVMUnsafe_putLong (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT jlong JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_getLong (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_getLong (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
 
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jlong retrieveValue;                /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jlong));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jlong));
 
     return retrieveValue;
 }
@@ -387,17 +406,20 @@ Java_com_nvmUnsafe_NVMUnsafe_getLong (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT jfloat JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_getFloat (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_getFloat (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jfloat retrieveValue;               /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jfloat));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jfloat));
 
     return retrieveValue;
 }
@@ -414,15 +436,18 @@ Java_com_nvmUnsafe_NVMUnsafe_getFloat (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT void JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_putFloat (JNIEnv *env, jobject nvmUnsafe, 
-        jfloat value, jlong offset)
+        jfloat value, jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jfloat));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jfloat));
 }
 
 /**
@@ -435,16 +460,16 @@ Java_com_nvmUnsafe_NVMUnsafe_putFloat (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT void JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_nvmFreeMemory (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_nvmFreeMemory (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
-    assert(allocationAddr != NULL);
-
-    vmem_free(_vmp, allocationAddr);
+    pmemalloc_free(address, allocationAddr);
 }
 
 /**
@@ -459,15 +484,18 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmFreeMemory (JNIEnv *env, jobject nvmUnsafe,
  */
 JNIEXPORT void JNICALL 
 Java_com_nvmUnsafe_NVMUnsafe_putDouble (JNIEnv *env, jobject nvmUnsafe, 
-        jdouble value, jlong offset)
+        jdouble value, jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(allocationAddr, &value, sizeof(jdouble));
+    memcpy(PMEM(address, allocationAddr), &value, sizeof(jdouble));
 }
  
 /**
@@ -480,34 +508,22 @@ Java_com_nvmUnsafe_NVMUnsafe_putDouble (JNIEnv *env, jobject nvmUnsafe,
  *
  */
 JNIEXPORT jdouble JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_getDouble (JNIEnv *env, jobject nvmUnsafe,
-        jlong offset)
+Java_com_nvmUnsafe_NVMUnsafe_getDouble (JNIEnv *env, jobject nvmUnsafe, 
+        jlong pmp, jlong offset)
 {
+    void* address;                      /* Memory Pool initial address        */
     void* allocationAddr;               /* Allocation address                 */
     jdouble retrieveValue;              /* Value retrieve from memory         */
 
+    address = addr_from_java(pmp);
     allocationAddr = addr_from_java(offset);
 
+    assert(address != NULL);
     assert(allocationAddr != NULL);
 
-    memcpy(&retrieveValue, allocationAddr, sizeof(jdouble));
+    memcpy(&retrieveValue, PMEM(address, allocationAddr), sizeof(jdouble));
 
     return retrieveValue;
-}
-
-/**
- * @desc Release the memory pool _vmp. If the memory pool was
- * created using vmem_create(), deleting it allows the space to be
- * reclaimed.
- *
- * Note: _vmp = NULL
- *
- */
-JNIEXPORT void JNICALL 
-Java_com_nvmUnsafe_NVMUnsafe_nvmDelete (JNIEnv *env, jobject obj)
-{
-    vmem_delete(_vmp);
-    _vmp = NULL;
 }
 
 /**
@@ -520,18 +536,18 @@ Java_com_nvmUnsafe_NVMUnsafe_nvmDelete (JNIEnv *env, jobject obj)
  * @param offset    Allocation address
  *
  */
-// JNIEXPORT jlong JNICALL 
-// Java_com_nvmUnsafe_NVMUnsafe_getPmemAddress (JNIEnv *env, jobject obj, jlong pmp,
-//         jlong offset)
-// {
-//     void* address;                      /* Memory Pool initial address        */
-//     void* allocationAddr;               /* Allocation address                 */
-//     
-//     address = addr_from_java(pmp);
-//     allocationAddr = addr_from_java(offset);
-//     
-//     assert(address != NULL);
-//     assert(allocationAddr != NULL);
-// 
-//     return addr_to_java(PMEM(address, allocationAddr));
-// }
+JNIEXPORT jlong JNICALL 
+Java_com_nvmUnsafe_NVMUnsafe_getPmemAddress (JNIEnv *env, jobject obj, jlong pmp,
+        jlong offset)
+{
+    void* address;                      /* Memory Pool initial address        */
+    void* allocationAddr;               /* Allocation address                 */
+    
+    address = addr_from_java(pmp);
+    allocationAddr = addr_from_java(offset);
+    
+    assert(address != NULL);
+    assert(allocationAddr != NULL);
+
+    return addr_to_java(PMEM(address, allocationAddr));
+}
