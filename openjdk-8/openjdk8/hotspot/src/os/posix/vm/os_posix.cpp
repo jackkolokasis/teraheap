@@ -146,7 +146,9 @@ int os::create_file_for_heap(const char* dir) {
 static char* reserve_mmaped_memory(size_t bytes, char* requested_addr) {
     char *addr;
 
+    // JK: Add MAP_POPULATE flag -> now I removed the flag
     int flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS;
+
     if (requested_addr != NULL) {
         assert((uintptr_i) requested_addr % os::vm_page_size() == 0, "Requested address should be aligned to OS page size");
         flags |= MAP_FIXED;
@@ -217,6 +219,7 @@ char* os::map_memory_to_file(char* base, size_t size, int fd) {
         }
         return NULL;
     }
+    madvise(addr, size, MADV_SEQUENTIAL);
 
     return addr;
 }
