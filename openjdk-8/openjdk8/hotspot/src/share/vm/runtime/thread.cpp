@@ -3500,6 +3500,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
     // Initialize java_lang.System (needed before creating the thread)
     initialize_class(vmSymbols::java_lang_System(), CHECK_0);
+    // JK: Added here
+    // The VM creates & returns objects of this class. Make sure it's initialized.
+    initialize_class(vmSymbols::java_lang_Class(), CHECK_0);
     initialize_class(vmSymbols::java_lang_ThreadGroup(), CHECK_0);
     Handle thread_group = create_initial_thread_group(CHECK_0);
     Universe::set_main_thread_group(thread_group());
@@ -3511,8 +3514,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     java_lang_Thread::set_thread_status(thread_object,
                                         java_lang_Thread::RUNNABLE);
 
+    // JK: Move these 2 lines above
     // The VM creates & returns objects of this class. Make sure it's initialized.
-    initialize_class(vmSymbols::java_lang_Class(), CHECK_0);
+    // initialize_class(vmSymbols::java_lang_Class(), CHECK_0);
 
     // The VM preresolves methods to these classes. Make sure that they get initialized
     initialize_class(vmSymbols::java_lang_reflect_Method(), CHECK_0);

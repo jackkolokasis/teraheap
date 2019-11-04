@@ -133,14 +133,20 @@ public abstract class AbstractCollection<E> implements Collection<E> {
      */
     public Object[] toArray() {
         // Estimate size of array; be prepared to see more or fewer elements
-        Object[] r = new Object[size()];
-        Iterator<E> it = iterator();
-        for (int i = 0; i < r.length; i++) {
-            if (! it.hasNext()) // fewer elements than expected
-                return Arrays.copyOf(r, i);
-            r[i] = it.next();
-        }
-        return it.hasNext() ? finishToArray(r, it) : r;
+        // Object[] r = new Object[size()];
+        // Iterator<E> it = iterator();
+        // for (int i = 0; i < r.length; i++) {
+        //     if (! it.hasNext()) // fewer elements than expected
+        //         return Arrays.copyOf(r, i);
+        //     r[i] = it.next();
+        // }
+        // return it.hasNext() ? finishToArray(r, it) : r;
+        Iterator<E> itr = iterator();
+        int size = size();
+        Object[] a = new Object[size];
+        for (int pos =0; pos < size; pos++)
+            a[pos] = itr.next();
+        return a;
     }
 
     /**

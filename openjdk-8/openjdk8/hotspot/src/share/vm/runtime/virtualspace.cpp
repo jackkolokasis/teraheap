@@ -759,9 +759,8 @@ ReservedHeapSpace::ReservedHeapSpace(size_t size,
     MemTracker::record_virtual_memory_type((address)base(), mtJavaHeap);
   }
 
-    if (_fd_for_heap != -1) {
+    if (_fd_for_heap != -1) 
         os::close(_fd_for_heap);
-    }
 }
 
 

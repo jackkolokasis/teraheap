@@ -1496,6 +1496,7 @@ bool os::getTimesSecs(double* process_real_time,
   if (real_ticks == (clock_t) (-1)) {
     return false;
   } else {
+    // JK: Clock_tics_per_sec is 100 (by default) in Linux systems
     double ticks_per_second = (double) clock_tics_per_sec;
     *process_user_time = ((double) ticks.tms_utime) / ticks_per_second;
     *process_system_time = ((double) ticks.tms_stime) / ticks_per_second;
