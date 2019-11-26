@@ -208,6 +208,7 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // This is the correct place to place such initialization methods.
   virtual void post_initialize() = 0;
 
+  void initialize_reserved_region(HeapWord *start, HeapWord *end);
   MemRegion reserved_region() const { return _reserved; }
   address base() const { return (address)reserved_region().start(); }
 

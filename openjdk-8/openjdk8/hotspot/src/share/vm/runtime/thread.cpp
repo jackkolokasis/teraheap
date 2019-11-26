@@ -146,9 +146,9 @@ HS_DTRACE_PROBE_DECL5(hotspot, thread__stop, char*, intptr_t,
     const char* name = (javathread)->get_thread_name();                    \
     len = strlen(name);                                                    \
     HOTSPOT_THREAD_PROBE_##probe(  /* probe = start, stop */               \
-      (char *) name, len,                                                           \
+      (char *) name, len,                                                  \
       java_lang_Thread::thread_id((javathread)->threadObj()),              \
-      (uintptr_t) (javathread)->osthread()->thread_id(),                               \
+      (uintptr_t) (javathread)->osthread()->thread_id(),                   \
       java_lang_Thread::is_daemon((javathread)->threadObj()));             \
   }
 
@@ -207,7 +207,6 @@ void Thread::operator delete(void* p) {
 
 // Base class for all threads: VMThread, WatcherThread, ConcurrentMarkSweepThread,
 // JavaThread
-
 
 Thread::Thread() {
   // stack and get_thread
@@ -3316,11 +3315,29 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   Arguments::process_sun_java_launcher_properties(args);
 
   // Initialize the os module before using TLS
+  // Initialize the operatiing system module, such as page size, number of
+  // processors, system clock, etc.
   os::init();
-  
+
   // Initialize system properties.
+  // Initialize system properties.
+  // Initialize system properties which are divided into [readable properties]
+  // and [read and write properties]
+  // readable properties:
+  // java.vm.specification.name
+  // java.vm.version
+  // java.vm.name
+  // java.vm.info
+  // Read and write attributes:
+  // java.ext.dirs
+  // java.endorsed.dirs
+  // 
+  // sun.boot.library.path
+  // java.library.path
+  // java.home
+  // sun.boot.class.path
+  // java.class.path
   Arguments::init_system_properties();
-  
 
   // So that JDK version can be used as a discrimintor when parsing arguments
   JDK_Version_init();
@@ -3329,6 +3346,8 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   Arguments::init_version_specific_system_properties();
 
   // Parse arguments
+  // Parse the startup parameters, such as -XX:Flags=, -XX:+PrintVMOptions,
+  // -XX:PrintFlagsInitial etc.
   jint parse_result = Arguments::parse(args);
   if (parse_result != JNI_OK) return parse_result;
 
@@ -3370,6 +3389,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   MemTracker::bootstrap_single_thread();
 
   // Initialize output stream logging
+  // Initial the GC log ouput stream to handle the -Xloggc parameter
   ostream_init_log();
 
   // Convert -Xrun to -agentlib: if there is no JVM_OnLoad
@@ -3389,6 +3409,12 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   _number_of_non_daemon_threads = 0;
 
   // Initialize global data structures and create system classes in heap
+  // Initialize the global data structure and system classes, including:
+  // Initialize the Java base type
+  // Initialize the time queue
+  // Initialize the lock
+  // Initialize the chunkpool
+  // Initialize the performance data statistics module
   vm_init_globals();
 
   // Attach the main thread to this os thread

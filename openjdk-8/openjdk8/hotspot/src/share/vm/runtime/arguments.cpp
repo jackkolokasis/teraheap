@@ -1570,6 +1570,16 @@ void Arguments::set_parallel_gc_flags() {
     vm_exit(1);
   }
 
+  if (UseAdaptiveSizePolicy) {
+      // We do not want to limit adaptive heap sizing's freedom to
+      // adjust the heap unless the user actually sets these flags
+      if (FLAG_IS_DEFAULT(MinHeapFreeRatio)) {
+          FLAG_SET_DEFAULT(MinHeapFreeRatio, 0);
+      }
+      if (FLAG_IS_DEFAULT(MaxHeapFreeRatio)) {
+          FLAG_SET_DEFAULT(MaxHeapFreeRatio, 100);
+      }
+  }
 
   // If InitialSurvivorRatio or MinSurvivorRatio were not specified, but the
   // SurvivorRatio has been set, reset their default values to SurvivorRatio +
@@ -2093,11 +2103,24 @@ bool Arguments::check_vm_args_consistency() {
     }
   }
 
+
+
   status = status && verify_percentage(GCHeapFreeLimit, "GCHeapFreeLimit");
   status = status && verify_percentage(GCTimeLimit, "GCTimeLimit");
   if (GCTimeLimit == 100) {
     // Turn off gc-overhead-limit-exceeded checks
     FLAG_SET_DEFAULT(UseGCOverheadLimit, false);
+  }
+
+  // Added by JK
+  if (!FLAG_IS_DEFAULT(AllocateOldGenAt)) {
+      // CompressedOops not supported when AllocatedOldGenAt is set.
+      FLAG_SET_DEFAULT(UseCompressedOops, false);
+      FLAG_SET_DEFAULT(UseCompressedClassPointers, false);
+      // When AllocatedOldGenAt is set, we cannot use largepages for
+      // entire heap memory. Only young gen which is allocated on DRAM
+      // can use large pages, but we currently do not support that
+      FLAG_SET_DEFAULT(UseLargePages, false);
   }
 
   status = status && check_gc_consistency();

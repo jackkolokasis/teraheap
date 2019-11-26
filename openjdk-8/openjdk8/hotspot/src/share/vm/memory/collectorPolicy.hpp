@@ -30,6 +30,7 @@
 #include "memory/generationSpec.hpp"
 #include "memory/genRemSet.hpp"
 #include "utilities/macros.hpp"
+#include <iostream>
 
 // This class (or more correctly, subtypes of this class)
 // are used to define global garbage collector attributes.
@@ -232,7 +233,7 @@ class GenCollectorPolicy : public CollectorPolicy {
   GenerationSpec **_generations;
 
   // Return true if an allocation should be attempted in the older
-  // generation if it fails in the younger generation.  Return
+  // generation if it fails in the younger generation. Return
   // false, otherwise.
   virtual bool should_try_older_generation_allocation(size_t word_size) const;
 

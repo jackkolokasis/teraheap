@@ -57,6 +57,8 @@
 #include "gc_implementation/concurrentMarkSweep/vmCMSOperations.hpp"
 #endif // INCLUDE_ALL_GCS
 
+
+// GenCollected Heap is the manager of the entire heap
 GenCollectedHeap* GenCollectedHeap::_gch;
 NOT_PRODUCT(size_t GenCollectedHeap::_skip_header_HeapWords = 0;)
 

@@ -27,11 +27,13 @@
 #include "gc_implementation/parallelScavenge/psAdaptiveSizePolicy.hpp"
 #include "gc_implementation/parallelScavenge/psMarkSweepDecorator.hpp"
 #include "gc_implementation/parallelScavenge/psOldGen.hpp"
+#include "gc_implementation/parallelScavenge/psFileBackedVirtualSpace.hpp"
 #include "gc_implementation/shared/spaceDecorator.hpp"
 #include "memory/cardTableModRefBS.hpp"
 #include "memory/gcLocker.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/java.hpp"
+#include <iostream>
 
 inline const char* PSOldGen::select_name() {
   return UseParallelOldGC ? "ParOldGen" : "PSOldGen";
@@ -67,7 +69,20 @@ void PSOldGen::initialize(ReservedSpace rs, size_t alignment,
 
 void PSOldGen::initialize_virtual_space(ReservedSpace rs, size_t alignment) {
 
-  _virtual_space = new PSVirtualSpace(rs, alignment);
+  // Check if they used heterogeneous heaps
+  // Heterogeneous heaps enable then allocate Old Generation on the storage
+  // device
+  // The allocation on the storage device could be made by fmap or mmap
+
+  if (ParallelScavengeHeap::heap()->ps_collector_policy()->is_hetero_heap()) {
+      _virtual_space = new PSFileBackedVirtualSpace(rs, alignment, AllocateOldGenAt);
+      if (!(static_cast <PSFileBackedVirtualSpace*>(_virtual_space))->initialize()) {
+          vm_exit_during_initialization("Could not map space for PSOldGen at given AllocateOldGentAt path");
+      }
+  } else {
+      _virtual_space = new PSVirtualSpace(rs, alignment);
+  }
+
   if (!_virtual_space->expand_by(_init_gen_size)) {
     vm_exit_during_initialization("Could not reserve enough space for "
                                   "object heap");
@@ -78,7 +93,6 @@ void PSOldGen::initialize_work(const char* perf_data_name, int level) {
   //
   // Basic memory initialization
   //
-
   MemRegion limit_reserved((HeapWord*)virtual_space()->low_boundary(),
     heap_word_size(_max_gen_size));
   assert(limit_reserved.byte_size() == _max_gen_size,

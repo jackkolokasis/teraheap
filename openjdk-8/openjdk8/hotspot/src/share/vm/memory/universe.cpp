@@ -680,7 +680,7 @@ jint universe_init() {
 // HeapBased - Use compressed oops with heap base + encoding.
 
 // 4Gb
-//static const uint64_t UnscaledOopHeapMax = (uint64_t(max_juint) + 1);
+// static const uint64_t UnscaledOopHeapMax = (uint64_t(max_juint) + 1);
 // 32Gb
 // OopEncodingHeapMax == UnscaledOopHeapMax << LogMinObjAlignmentInBytes;
 
@@ -785,12 +785,13 @@ jint Universe::initialize_heap() {
   // Create a  collector Policy based on the Selected GC
   if (UseParallelGC) {
 #if INCLUDE_ALL_GCS
+    // We use this kind of heap for ParallelGC
     Universe::_collectedHeap = new ParallelScavengeHeap();
 #else  // INCLUDE_ALL_GCS
     fatal("UseParallelGC not supported in this VM.");
 #endif // INCLUDE_ALL_GCS
-
-  } else if (UseG1GC) {
+  } 
+  else if (UseG1GC) {
 #if INCLUDE_ALL_GCS
     G1CollectorPolicy* g1p = new G1CollectorPolicy();
     g1p->initialize_all();
@@ -799,7 +800,6 @@ jint Universe::initialize_heap() {
 #else  // INCLUDE_ALL_GCS
     fatal("UseG1GC not supported in java kernel vm.");
 #endif // INCLUDE_ALL_GCS
-
   } else {
     GenCollectorPolicy *gc_policy;
 
@@ -810,6 +810,8 @@ jint Universe::initialize_heap() {
       if (UseAdaptiveSizePolicy) {
         gc_policy = new ASConcurrentMarkSweepPolicy();
       } else {
+        // In the case of ParNew and CMS, it will execute the
+        // ConcurrentMarkSweepPolicy
         gc_policy = new ConcurrentMarkSweepPolicy();
       }
 #else  // INCLUDE_ALL_GCS
@@ -828,6 +830,7 @@ jint Universe::initialize_heap() {
   }
 
   // JK: Here is the real alocation
+  // This is the path for the UseParallelGC
   jint status = Universe::heap()->initialize();
   if (status != JNI_OK) {
     return status;

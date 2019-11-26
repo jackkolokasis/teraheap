@@ -473,6 +473,13 @@ void CollectedHeap::post_initialize() {
   collector_policy()->post_heap_initialize();
 }
 
+void CollectedHeap::initialize_reserved_region(HeapWord *start, HeapWord *end)
+{
+    _reserved.set_word_size(0);
+    _reserved.set_start(start);
+    _reserved.set_end(end);
+}
+
 HeapWord* CollectedHeap::allocate_new_tlab(size_t size) {
   guarantee(false, "thread-local allocation buffers not supported");
   return NULL;

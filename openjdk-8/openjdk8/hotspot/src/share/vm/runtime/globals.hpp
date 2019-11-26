@@ -2048,6 +2048,9 @@ class CommandLineFlags {
   product(uintx, InitialRAMFraction, 64,                                    \
           "Fraction (1/n) of real memory used for initial heap size")       \
                                                                             \
+  product(double, MaxRAMPercentage, 25.0,                                   \
+          "Maximum percentage of real memory used for maximum heap size")   \
+                                                                            \
   develop(uintx, MaxVirtMemFraction, 2,                                     \
           "Maximum fraction (1/n) of virtual memory used for ergonomically "\
           "determining maximum heap size")                                  \
@@ -2403,6 +2406,14 @@ class CommandLineFlags {
   product(ccstr, AllocateHeapAt, NULL,                                      \
           "Path to the directory where a temporary file will be created"    \
           "to use as a backing store for Java Heap")                        \
+  /* GC log rotation setting */                                             \
+                                                                            \
+  product(ccstr, AllocateOldGenAt, NULL,                                    \
+          "Path to the directory where a temporary file will be created"    \
+          "to use as a backing store for old generation"                    \
+          "File of size Xmx is preallocated for performance reason, so"     \
+          "we need that much sapce available")                              \
+                                                                            \
   /* GC log rotation setting */                                             \
                                                                             \
   product(bool, UseGCLogFileRotation, false,                                \
