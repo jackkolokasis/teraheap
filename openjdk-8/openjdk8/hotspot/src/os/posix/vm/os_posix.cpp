@@ -113,8 +113,10 @@ int os::create_file_for_heap(const char* dir) {
     size_t fullname_len;
     char *fullname;
     int n;
+    bool is_fmap = false
 
-    int is_fmap = (strcmp(dir, "/dev/nvme0n1") == 0) ? 1 : 0;
+    if (strcmp(dir, "/dev/nvme0n1") == 0 || strcmp(dir, "/dev/nvme1n1") == 0 || strcmp(dir, "/dev/dmap/dmap1") == 0)
+        is_fmap = true;
 
     if (is_fmap)
     {
@@ -149,7 +151,7 @@ int os::create_file_for_heap(const char* dir) {
     int fd;
     if (is_fmap)
     {
-        fd = open("/dev/nvme0n1", O_RDWR, file_mode);
+        fd = open(dir, O_RDWR, file_mode);
     } else {
         fd = mkstemp(fullname);
     }
@@ -219,12 +221,12 @@ char* os::map_memory_to_file(char* base, size_t size, int fd) {
 
     // Allocate space for the file
     // JK: Comment only for fmap
-    // int ret = util_posix_fallocate(fd, 0, (off_t)size);
+    //int ret = util_posix_fallocate(fd, 0, (off_t)size);
 
-    // if (ret != 0) {
-    //     vm_exit_during_initialization(err_msg("Error in mapping Java Heap at the given filesystem directory. error(%d)", ret));
-    //     return NULL;
-    // }
+    //if (ret != 0) {
+    //    vm_exit_during_initialization(err_msg("Error in mapping Java Heap at the given filesystem directory. error(%d)", ret));
+    //    return NULL;
+    //}
 
     int prot = PROT_READ | PROT_WRITE;
     int flags = MAP_SHARED;

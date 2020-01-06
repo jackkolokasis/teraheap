@@ -88,6 +88,9 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
 
+  // Scavenge youngest generation before each full GC used with
+  // UseParallelGC.
+  // ScavengeBeforeFullGC by default is true
   if (ScavengeBeforeFullGC) {
     PSScavenge::invoke_no_policy();
   }
@@ -197,16 +200,21 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     ref_processor()->enable_discovery(true /*verify_disabled*/, true /*verify_no_refs*/);
     ref_processor()->setup_policy(clear_all_softrefs);
 
+    // Recursive mark all the live objects
     mark_sweep_phase1(clear_all_softrefs);
 
+    // Calculate the offset addresses of all active objects after
+    // compression
     mark_sweep_phase2();
 
     // Don't add any more derived pointers during phase3
     COMPILER2_PRESENT(assert(DerivedPointerTable::is_active(), "Sanity"));
     COMPILER2_PRESENT(DerivedPointerTable::set_active(false));
 
+    // Update the reference address of the object
     mark_sweep_phase3();
 
+    // Move all active objects to a new position
     mark_sweep_phase4();
 
     restore_marks();

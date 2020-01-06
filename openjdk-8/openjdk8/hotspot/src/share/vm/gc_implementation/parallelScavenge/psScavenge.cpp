@@ -229,6 +229,7 @@ bool PSScavenge::invoke() {
   IsGCActiveMark mark;
 
   const bool scavenge_done = PSScavenge::invoke_no_policy();
+  // Check if there is a need for full GC
   const bool need_full_gc = !scavenge_done ||
     policy->should_full_GC(heap->old_gen()->free_in_bytes());
   bool full_gc_done = false;

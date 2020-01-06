@@ -438,11 +438,19 @@ HeapWord* ParallelScavengeHeap::mem_allocate_old_gen(size_t size) {
 }
 
 void ParallelScavengeHeap::do_full_collection(bool clear_all_soft_refs) {
+  if (DisableFullGC) {
+      return;
+  }
+
+  // UseParallelOldGC is the default Collector for the Old Generation.
+  // Close ParallelOld and Use PSMarkSweep for full GC -XX:-UseParallelOldGC
   if (UseParallelOldGC) {
     // The do_full_collection() parameter clear_all_soft_refs
     // is interpreted here as maximum_compaction which will
     // cause SoftRefs to be cleared.
     bool maximum_compaction = clear_all_soft_refs;
+
+    // ParallelOld uses PSParallelCompact for full GC
     PSParallelCompact::invoke(maximum_compaction);
   } else {
     PSMarkSweep::invoke(clear_all_soft_refs);
@@ -469,7 +477,7 @@ HeapWord* ParallelScavengeHeap::failed_mem_allocate(size_t size) {
   HeapWord* result = young_gen()->allocate(size);
 
   // Second level allocation failure.
-  //   Mark sweep and allocate in young generation.
+  // Mark sweep and allocate in young generation.
   if (result == NULL && !invoked_full_gc) {
     do_full_collection(false);
     result = young_gen()->allocate(size);

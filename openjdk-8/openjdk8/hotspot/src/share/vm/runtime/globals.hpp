@@ -2413,6 +2413,8 @@ class CommandLineFlags {
           "to use as a backing store for old generation"                    \
           "File of size Xmx is preallocated for performance reason, so"     \
           "we need that much sapce available")                              \
+  product(bool, DisableFullGC, false,                                       \
+          "Disable Full GC in ParalellGC")                                  \
                                                                             \
   /* GC log rotation setting */                                             \
                                                                             \

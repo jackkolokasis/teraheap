@@ -5,3 +5,8 @@ webrev
 .hgtip
 .bridge2
 .DS_Store
+
+### Editor ###
+## Vim temp files:
+.*sw[op]
+
