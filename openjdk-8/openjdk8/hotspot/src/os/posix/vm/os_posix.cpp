@@ -113,7 +113,7 @@ int os::create_file_for_heap(const char* dir) {
     size_t fullname_len;
     char *fullname;
     int n;
-    bool is_fmap = false
+    bool is_fmap = false;
 
     if (strcmp(dir, "/dev/nvme0n1") == 0 || strcmp(dir, "/dev/nvme1n1") == 0 || strcmp(dir, "/dev/dmap/dmap1") == 0)
         is_fmap = true;
