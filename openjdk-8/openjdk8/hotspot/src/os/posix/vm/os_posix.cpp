@@ -35,6 +35,7 @@
 #include <sys/mman.h>
 #include <pthread.h>
 #include <signal.h>
+#include <string.h>
 
 #define check_with_errno(check_type, cond, msg)                               \
 do {                                                                          \
@@ -115,7 +116,7 @@ int os::create_file_for_heap(const char* dir) {
     int n;
     bool is_fmap = false;
 
-    if (strcmp(dir, "/dev/nvme0n1") == 0 || strcmp(dir, "/dev/nvme1n1") == 0 || strcmp(dir, "/dev/dmap/dmap1") == 0)
+    if (strstr(dir, "dev"))
         is_fmap = true;
 
     if (is_fmap)
