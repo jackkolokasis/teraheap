@@ -36,6 +36,7 @@
 #include "runtime/stubRoutines.hpp"
 #include "runtime/synchronizer.hpp"
 #include "utilities/macros.hpp"
+#include "memory/sharedDefines.h"
 
 #ifndef CC_INTERP
 
@@ -3247,15 +3248,29 @@ void TemplateTable::invokedynamic(int byte_no) {
 // Allocation
 
 void TemplateTable::_new() {
+  // Check
   transition(vtos, atos);
+  // Code generation: Obtain the index of the constant pool in rdx
   __ get_unsigned_2_byte_index_at_bcp(rdx, 1);
+  // Variable declaration
   Label slow_case;
   Label done;
   Label initialize_header;
   Label initialize_object; // including clearing the fields
   Label allocate_shared;
+  Label no_cache_anno;
 
+  // Code generation: "Get the constant pool corresponding to the
+  // currently executing method
+  // Also, get the tag corresponding to the new class object
   __ get_cpool_and_tags(rsi, rax);
+
+  // Code generation:
+  // Check if the target class of new has been resolved.
+  // If it has not been resolved (=the corresponding entry in pool is
+  // not JVM_CONSTANT_Class. Since it can not be processed in
+  // fast_path, it jumps to the slow_case label
+
   // Make sure the class we're about to instantiate has been resolved.
   // This is done before loading InstanceKlass to be consistent with the order
   // how Constant Pool is updated (see ConstantPool::klass_at_put)
@@ -3264,10 +3279,20 @@ void TemplateTable::_new() {
           JVM_CONSTANT_Class);
   __ jcc(Assembler::notEqual, slow_case);
 
+  #if DEBUG_SLOWPATH_INTR 
+  __ jmp(slow_case);
+  #endif
+
+
+  // Code generation: "Get new class object - corresponding entry from
+  // constant pool
   // get InstanceKlass
   __ movptr(rsi, Address(rsi, rdx,
             Address::times_8, sizeof(ConstantPool)));
 
+  // Code generation: If the class is not completely initialized it
+  // cannnot be processed in fast-path, it jumps to the slow_case
+  // label
   // make sure klass is initialized & doesn't have finalizer
   // make sure klass is fully initialized
   __ cmpb(Address(rsi,
@@ -3283,12 +3308,31 @@ void TemplateTable::_new() {
   __ testl(rdx, Klass::_lh_instance_slow_path_bit);
   __ jcc(Assembler::notZero, slow_case);
 
+  // Following is the securing process with fast-path
+  // Fast-path will try to secure as follow:
+  //    1. Try to secure in TLAB
+  //    2. If TLAB avquisition fails, but there is still enough space
+  //    in TLAB
+  //        2.1 If it is waste throw away the current TLAB, so try to
+  //        allocate it directly in the shared Eden.
+
   // Allocate the instance
   // 1) Try to allocate in the TLAB
   // 2) if fail and the object is large allocate in the shared Eden
   // 3) if the above fails (or is not applicable), go to a slow case
   // (creates a new TLAB, etc.)
+  
+  #if DEBUG_ANNO_INTR
+  __ get_method(rax);
+  __ cmpptr(Address(rax, in_bytes(Method::alloc_anno_offset())), (int32_t)NULL_WORD);
+  __ jcc(Assembler::equal, no_cache_anno);
 
+  __ jmp(slow_case);
+  #endif
+
+  #if DEBUG_ANNO_INTR
+  __ bind(no_cache_anno);
+  #endif
   const bool allow_shared_alloc =
     Universe::heap()->supports_inline_contig_alloc() && !CMSIncrementalMode;
 

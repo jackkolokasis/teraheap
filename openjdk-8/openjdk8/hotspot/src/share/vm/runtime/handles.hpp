@@ -177,14 +177,21 @@ DEF_METADATA_HANDLE(constantPool, ConstantPool)
 // could be removed when we don't have the Klass* typedef anymore.
 class KlassHandle : public StackObj {
   Klass* _value;
+
+  // Integer that indicates in which generation the next instance
+  // should be allocated. For now, >0 means that the objects should be
+  // allocated in cache heap (not eden).
+  
+  bool _alloc_cache;
+
  protected:
    Klass* obj() const          { return _value; }
    Klass* non_null_obj() const { assert(_value != NULL, "resolving NULL _value"); return _value; }
 
  public:
-   KlassHandle()                                 : _value(NULL) {}
-   KlassHandle(const Klass* obj)                 : _value(const_cast<Klass *>(obj)) {};
-   KlassHandle(Thread* thread, const Klass* obj) : _value(const_cast<Klass *>(obj)) {};
+   KlassHandle()                                 : _value(NULL), _alloc_cache(false) {}
+   KlassHandle(const Klass* obj)                 : _value(const_cast<Klass *>(obj)), _alloc_cache(false) {};
+   KlassHandle(Thread* thread, const Klass* obj) : _value(const_cast<Klass *>(obj)), _alloc_cache(false) {};
 
    Klass* operator () () const { return obj(); }
    Klass* operator -> () const { return non_null_obj(); }
@@ -194,6 +201,11 @@ class KlassHandle : public StackObj {
 
     bool is_null() const  { return _value == NULL; }
     bool not_null() const { return _value != NULL; }
+
+    // <jk> Get if the object is allocated in cache
+    bool alloc_cache() { return _alloc_cache; }
+    // <jk> Set that the object is going to be allocated in cache
+    void set_cache(bool cache) { _alloc_cache = cache; }
 };
 
 class instanceKlassHandle : public KlassHandle {

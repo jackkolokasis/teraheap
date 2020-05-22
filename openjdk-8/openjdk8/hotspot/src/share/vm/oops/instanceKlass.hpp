@@ -730,6 +730,9 @@ class InstanceKlass: public Klass {
   }
   // allocation
   instanceOop allocate_instance(TRAPS);
+  
+  // <jk> Allocate objects to the Cache Heap
+  instanceOop allocate_instance(bool cache, TRAPS);
 
   // additional member function to return a handle
   instanceHandle allocate_instance_handle(TRAPS)      { return instanceHandle(THREAD, allocate_instance(THREAD)); }

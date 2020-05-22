@@ -119,6 +119,7 @@ IRT_ENTRY(void, InterpreterRuntime::ldc(JavaThread* thread, bool wide))
   assert (tag.is_unresolved_klass() || tag.is_klass(), "wrong ldc call");
   Klass* klass = pool->klass_at(index, CHECK);
     oop java_class = klass->java_mirror();
+
     thread->set_vm_result(java_class);
 IRT_END
 
@@ -141,19 +142,103 @@ IRT_ENTRY(void, InterpreterRuntime::resolve_ldc(JavaThread* thread, Bytecodes::C
 }
 IRT_END
 
+// Check if the new operation is annotated with @Cache
+// @problem identify only one annotation in a .class file 
+//          skip all the others
+//
+int get_alloc_gen(ConstantPool* pool, Method* method, int bci, int n_dims=0) {
+    int alloc_gen = 0;
+    int next_centry = 0;
+    AnnotationArray* aa = method->type_annotations();
+    // Annotation Array Cache
+    Array<u2>* aac = method->alloc_anno_cache();
+
+    // First look into cache
+    if (aac != NULL)
+    {
+        for (; next_centry < aac->length(); next_centry++)
+        {
+            if (bci == aac->at(next_centry))
+            {
+                return 1;
+            }
+
+            // If the annotation is not in the cache break
+            if (aac->at(next_centry) == max_jushort)
+            {
+                break;
+            }
+        }
+    }
+
+    if (aa != NULL && method->alloc_anno() != NULL)
+    {
+        // Get the Annotation Array data
+        u1* data = aa->data();
+        // Get short (# of annotations)
+        u2 n_anno = Bytes::get_Java_u2(data);
+
+        data += 2;
+
+        for (u2 i = 0; i < n_anno; i++) {
+            // Byte target type (should be 68 == 0x44 == NEW)
+            u1 anno_target = *data;
+            // Get short (location, should be bci)
+            u2 anno_bci = Bytes::get_Java_u2(data + 1);
+			// byte loc data size (should be zero)
+			u1 dsize = *(data + 3);
+			// Note: after the previous byte comes 'dsize'*2 bytes of location data.
+			// Get short (type index in constant pool, should be Old)
+			u2 anno_type_index = Bytes::get_Java_u2(data + 4 + dsize*2);
+			// Get char* (type name, should be Ljava/lang/Gen;)
+			Symbol* type_name = pool->symbol_at(anno_type_index);
+
+			// Note: If anno_bco == bci, then they both point to the same bc. In this
+			// situation there is no need to fix the bci. Only if they differ, we
+			// should look into the size of make sure that both bcis are a match.
+			int anno_bc_len = 0;
+
+            for (int j = 0; j < n_dims; i++) {
+                anno_bc_len += Bytecodes::length_for(Bytecodes::code_at(method, anno_bci + anno_bc_len));
+            }
+
+            // 68 ----> NEW op. byte code
+            // 17 ----> NEW op. byte code
+            if (anno_target == 68 && (anno_bci + anno_bc_len) == bci && type_name->equals("Ljava/lang/Cache;", 17)) 
+            {
+                aac->at_put(next_centry, bci);
+                alloc_gen = 1;
+                break;
+            }
+            data += 8 + dsize*2;
+        }
+    }
+    return alloc_gen;
+}
 
 //------------------------------------------------------------------------------------------------------------------------
 // Allocation
 
+// Macro expansion
 IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool, int index))
+  // Call ConstantPool to get the target calss (klassOop)
+  // At this time, if the target class is not yet resolved in
+  // constantPool, it is also resolved 
   Klass* k_oop = pool->klass_at(index, CHECK);
+
+  // Variable declaration
   instanceKlassHandle klass (THREAD, k_oop);
 
+  // Check if the target class of new is valid
+  // InstantiationError if trying to instantiate an interface or
+  // abstract class
   // Make sure we are not instantiating an abstract klass
   klass->check_valid_for_instantiation(true, CHECK);
 
   // Make sure klass is initialized
   klass->initialize(CHECK);
+
+  int alloc_cache = get_alloc_gen(pool, method(thread), bci(thread));
 
   // At this point the class may not be fully initialized
   // because of recursive initialization. If it is fully
@@ -169,7 +254,19 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   //       Java).
   //       If we have a breakpoint, then we don't rewrite
   //       because the _breakpoint bytecode would be lost.
-  oop obj = klass->allocate_instance(CHECK);
+  //
+  oop obj;
+  
+  // Allocate memory for the instance
+  if (alloc_cache == 0)
+  {
+      obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
+  } else {
+      obj = klass->allocate_instance(true, CHECK);
+  }
+
+  // The secured result is stored in JavaThread with JavaThread and
+  // return
   thread->set_vm_result(obj);
 IRT_END
 

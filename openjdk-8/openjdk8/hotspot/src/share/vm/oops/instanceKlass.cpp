@@ -1100,9 +1100,27 @@ instanceOop InstanceKlass::allocate_instance(TRAPS) {
   KlassHandle h_k(THREAD, this);
 
   instanceOop i;
-
+    
   i = (instanceOop)CollectedHeap::obj_allocate(h_k, size, CHECK_NULL);
   if (has_finalizer_flag && !RegisterFinalizersAtInit) {
+    i = register_finalizer(i, CHECK_NULL);
+  }
+  return i;
+}
+
+// <jk>
+// Allocate object in the cache heap
+instanceOop InstanceKlass::allocate_instance(bool cache, TRAPS) {
+    bool has_finalizer_flag = has_finalizer(); // Query before possible GC
+    int size = size_helper(); // Query before forming handle.
+
+    KlassHandle h_k(THREAD, this);
+
+    instanceOop i;
+  
+  i = (instanceOop)CollectedHeap::obj_allocate(h_k, cache, size, CHECK_NULL);
+  if (has_finalizer_flag && !RegisterFinalizersAtInit)
+  {
     i = register_finalizer(i, CHECK_NULL);
   }
   return i;

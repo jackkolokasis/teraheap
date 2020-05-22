@@ -48,7 +48,7 @@ CFLAGS/sparcv9	+= -xarch=v9
 CFLAGS/amd64	+= -m64
 CFLAGS		+= $(CFLAGS/$(ARCH))
 DLDFLAGS	+= -G
-LDFLAGS         += -ldl
+LDFLAGS     += -ldl -lregions
 OUTFLAGS	+= -o $@
 LIB_EXT		= .so
 else
@@ -86,7 +86,7 @@ CC 		= gcc
 endif
 CFLAGS		+= -O
 DLDFLAGS	+= -shared
-LDFLAGS         += -ldl
+LDFLAGS         += -ldl -L$(TARGET_DIR)/lib/libregions.so -lregions
 OUTFLAGS	+= -o $@
 ## OS = Windows ##
 else   # !SunOS, !Linux => Darwin or Windows

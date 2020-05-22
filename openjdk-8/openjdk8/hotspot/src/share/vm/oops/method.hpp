@@ -116,6 +116,12 @@ class Method : public Metadata {
                     _hidden           : 1,
                     _dont_inline      : 1,
                                       : 3;
+  // <jk>
+  // NULL if there is no allocation
+  AnnotationArray* _alloc_anno;
+  // Null if ther is no alloc anno. Cache of final bcis where we
+  // alloc in gens.
+  Array<u2>* _alloc_anno_cache;
 
 #ifndef PRODUCT
   int               _compiled_invocation_count;  // Number of nmethod invocations so far (for perf. debugging)
@@ -184,6 +190,11 @@ class Method : public Metadata {
   Symbol* generic_signature() const              { int idx = generic_signature_index(); return ((idx != 0) ? constants()->symbol_at(idx) : (Symbol*)NULL); }
   int generic_signature_index() const            { return constMethod()->generic_signature_index(); }
   void set_generic_signature_index(int index)    { constMethod()->set_generic_signature_index(index); }
+
+  AnnotationArray* alloc_anno()                  { return _alloc_anno; }       // <jk>
+  void set_alloc_anno(AnnotationArray* ptr)      { _alloc_anno = ptr; }        // <jk>
+  Array<u2>* alloc_anno_cache()                  { return _alloc_anno_cache; } // <jk>
+  void set_alloc_anno_cache(Array<u2>* ptr)       { _alloc_anno_cache = ptr; } // <jk>
 
   // annotations support
   AnnotationArray* annotations() const           {
@@ -631,7 +642,9 @@ class Method : public Metadata {
 #ifdef CC_INTERP
   static ByteSize result_index_offset()          { return byte_offset_of(Method, _result_index ); }
 #endif /* CC_INTERP */
+  static ByteSize alloc_anno_offset()            { return byte_offset_of(Method, _alloc_anno); }
   static ByteSize from_compiled_offset()         { return byte_offset_of(Method, _from_compiled_entry); }
+  // jk
   static ByteSize code_offset()                  { return byte_offset_of(Method, _code); }
   static ByteSize method_data_offset()           {
     return byte_offset_of(Method, _method_data);

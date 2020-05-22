@@ -1,4 +1,3 @@
-#
 # Copyright (c) 1999, 2013, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
@@ -127,7 +126,7 @@ LFLAGS += $(EXTRA_CFLAGS)
 # the same could be done by separate execstack command
 LFLAGS += -Xlinker -z -Xlinker noexecstack
 
-LIBS += -lm -ldl -lpthread
+LIBS += -lm -ldl -lpthread -lregions
 
 # By default, link the *.o into the library, not the executable.
 LINK_INTO$(LINK_INTO) = LIBJVM
@@ -263,7 +262,7 @@ ifeq ($(LINK_INTO),AOUT)
   LIBJVM_MAPFILE           =
   LIBS_VM                  = $(LIBS)
 else
-  LIBJVM.o                 = $(JVM_OBJ_FILES)
+  LIBJVM.o                 = $(JVM_OBJ_FILES) 
   LIBJVM_MAPFILE$(LDNOMAP) = mapfile_reorder
   LFLAGS_VM$(LDNOMAP)      += $(MAPFLAG:FILENAME=$(LIBJVM_MAPFILE))
   LFLAGS_VM                += $(SONAMEFLAG:SONAME=$(LIBJVM))
@@ -313,7 +312,7 @@ $(LD_SCRIPT): $(LIBJVM_MAPFILE)
 		-e 's/0\( + SIZEOF_HEADERS\)/$(JVM_BASE_ADDR)\1/'   \
 		> $@;                                               \
 	}
-LD_SCRIPT_FLAG = -Wl,-T,$(LD_SCRIPT)
+LD_SCRIPT_FLAG = -Wl,-T,$(LD_SCRIPT) 
 endif
 
 # With more recent Redhat releases (or the cutting edge version Fedora), if

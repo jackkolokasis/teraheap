@@ -1926,6 +1926,8 @@ void ClassFileParser::copy_method_annotations(ConstMethod* cm,
                                        int runtime_invisible_parameter_annotations_length,
                                        u1* runtime_visible_type_annotations,
                                        int runtime_visible_type_annotations_length,
+                                       u1* runtime_alloc_type_annotations,        // <underscore>
+                                       int runtime_alloc_type_annotations_length, // <underscore>
                                        u1* runtime_invisible_type_annotations,
                                        int runtime_invisible_type_annotations_length,
                                        u1* annotation_default,
@@ -1963,10 +1965,14 @@ void ClassFileParser::copy_method_annotations(ConstMethod* cm,
     cm->set_default_annotations(a);
   }
 
+  // Added alloc annotations
   if (runtime_visible_type_annotations_length +
-      runtime_invisible_type_annotations_length > 0) {
+      runtime_invisible_type_annotations_length + 
+      runtime_alloc_type_annotations_length > 0) {
     a = assemble_annotations(runtime_visible_type_annotations,
                              runtime_visible_type_annotations_length,
+                             runtime_alloc_type_annotations,
+                             runtime_alloc_type_annotations_length,
                              runtime_invisible_type_annotations,
                              runtime_invisible_type_annotations_length,
                              CHECK);
@@ -2077,6 +2083,8 @@ methodHandle ClassFileParser::parse_method(bool is_interface,
   int runtime_invisible_parameter_annotations_length = 0;
   u1* runtime_visible_type_annotations = NULL;
   int runtime_visible_type_annotations_length = 0;
+  u1* runtime_alloc_type_annotations = NULL;
+  int runtime_alloc_type_annotations_length= 0; 
   u1* runtime_invisible_type_annotations = NULL;
   int runtime_invisible_type_annotations_length = 0;
   bool runtime_invisible_type_annotations_exists = false;
@@ -2246,6 +2254,18 @@ methodHandle ClassFileParser::parse_method(bool is_interface,
           stackmap_data = parse_stackmap_table(code_attribute_length, CHECK_(nullHandle));
           stackmap_data_length = code_attribute_length;
           parsed_stackmap_attribute = true;
+        } 
+        else if (_major_version >= JAVA_8_VERSION && 
+                _cp->symbol_at(code_attribute_name_index) == vmSymbols::tag_runtime_visible_type_annotations()) {
+          if (runtime_alloc_type_annotations != NULL) {
+              classfile_parse_error(
+                      "Multiple RuntimeAllocTypeAnnotations attributes for methods in class file %s", 
+                      CHECK_(nullHandle));
+          }
+          runtime_alloc_type_annotations_length = code_attribute_length;
+          runtime_alloc_type_annotations = cfs->get_u1_buffer();
+          assert(runtime_alloc_type_annotations != NULL, "null alloc type annotations");
+          cfs->skip_u1(runtime_alloc_type_annotations_length, CHECK_(nullHandle));
         } else {
           // Skip unknown attributes
           cfs->skip_u1(code_attribute_length, CHECK_(nullHandle));
@@ -2394,6 +2414,7 @@ methodHandle ClassFileParser::parse_method(bool is_interface,
       runtime_visible_parameter_annotations_length +
            runtime_invisible_parameter_annotations_length,
       runtime_visible_type_annotations_length +
+      runtime_alloc_type_annotations_length +
            runtime_invisible_type_annotations_length,
       annotation_default_length,
       0);
@@ -2494,11 +2515,24 @@ methodHandle ClassFileParser::parse_method(bool is_interface,
                           runtime_invisible_parameter_annotations_length,
                           runtime_visible_type_annotations,
                           runtime_visible_type_annotations_length,
+                          runtime_alloc_type_annotations,
+                          runtime_alloc_type_annotations_length,
                           runtime_invisible_type_annotations,
                           runtime_invisible_type_annotations_length,
                           annotation_default,
                           annotation_default_length,
                           CHECK_NULL);
+
+  m->set_alloc_anno(m->constMethod()->type_annotations());
+  
+  // Prepare alloc anno cache
+  if (runtime_alloc_type_annotations_length > 0) {
+      Array<u2>* alloc_anno_cache = NULL;
+      alloc_anno_cache = MetadataFactory::new_writeable_array<u2>(
+              _loader_data, runtime_alloc_type_annotations_length, max_jushort, CHECK_NULL);
+
+      m->set_alloc_anno_cache(alloc_anno_cache);
+  }
 
   if (name == vmSymbols::finalize_method_name() &&
       signature == vmSymbols::void_method_signature()) {
@@ -3085,6 +3119,48 @@ AnnotationArray* ClassFileParser::assemble_annotations(u1* runtime_visible_annot
     }
   }
   return annotations;
+}
+
+// Added this method to assemble visible, alloc, and invisible type
+// annotations/
+// Note: alloc annotations go first in the array
+AnnotationArray* ClassFileParser::assemble_annotations(u1* runtime_visible_annotations,
+                                                       int runtime_visible_annotations_length,
+                                                       u1* runtime_alloc_annotations,
+                                                       int runtime_alloc_annotations_length,
+                                                       u1* runtime_invisible_annotations,
+                                                       int runtime_invisible_annotations_length, TRAPS) {
+    AnnotationArray* annotations = NULL;
+
+    if (runtime_visible_annotations != NULL ||
+            runtime_invisible_annotations != NULL ||
+            runtime_alloc_annotations != NULL) {
+
+        annotations = MetadataFactory::new_array<u1>(_loader_data,
+                runtime_visible_annotations_length +
+                runtime_alloc_annotations_length +
+                runtime_invisible_annotations_length,
+                CHECK_(annotations));
+
+        if (runtime_alloc_annotations != NULL) {
+            for (int i = 0; i < runtime_alloc_annotations_length; i++) {
+
+                annotations->at_put(i, runtime_alloc_annotations[i]);
+            }
+        }
+        if (runtime_visible_annotations != NULL) {
+            for (int i = 0; i < runtime_visible_annotations_length; i++) {
+                annotations->at_put(i, runtime_visible_annotations[i]);
+            }
+        }
+        if (runtime_invisible_annotations != NULL) {
+            for (int i = 0; i < runtime_invisible_annotations_length; i++) {
+                int append = runtime_visible_annotations_length+i;
+                annotations->at_put(append, runtime_invisible_annotations[i]);
+            }
+        }
+    }
+    return annotations;
 }
 
 instanceKlassHandle ClassFileParser::parse_super_class(int super_class_index,
