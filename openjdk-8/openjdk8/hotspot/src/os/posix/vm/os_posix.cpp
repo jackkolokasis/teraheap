@@ -116,8 +116,15 @@ int os::create_file_for_heap(const char* dir) {
     int n;
     bool is_fmap = false;
 
-    if (strstr(dir, "dev"))
+    if (strcmp(dir, "/dev/nvme0n1") == 0 || 
+        strcmp(dir, "/dev/nvme1n1") == 0 || 
+        strcmp(dir, "/dev/dmap/dmap1") == 0 || 
+        strcmp(dir, "/dev/sdb") == 0 || 
+        strcmp(dir, "/dev/sdd") == 0 || 
+        strcmp(dir, "/dev/zero") == 0)
+    {
         is_fmap = true;
+    }
 
     if (is_fmap)
     {
