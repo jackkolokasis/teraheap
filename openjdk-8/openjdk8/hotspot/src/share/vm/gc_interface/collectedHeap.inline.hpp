@@ -35,6 +35,7 @@
 #include "runtime/thread.inline.hpp"
 #include "services/lowMemoryDetector.hpp"
 #include "utilities/copy.hpp"
+#include <regions.h>
 
 // Inline allocation implementations.
 
@@ -46,6 +47,7 @@ void CollectedHeap::post_allocation_setup_common(KlassHandle klass,
 
 void CollectedHeap::post_allocation_setup_no_klass_install(KlassHandle klass,
                                                            HeapWord* objPtr) {
+
   oop obj = (oop)objPtr;
 
   assert(obj != NULL, "NULL object pointer");
@@ -108,6 +110,8 @@ void CollectedHeap::post_allocation_setup_array(KlassHandle klass,
   post_allocation_notify(klass, (oop)obj);
 }
 
+// <jk> Allocation in tlab if UseTLAB flag is enabled, otherwise use
+// mem_allocate from heap
 HeapWord* CollectedHeap::common_mem_allocate_noinit(KlassHandle klass, size_t size, TRAPS) {
 
   // Clear unhandled oops for memory allocation.  Memory allocation might
@@ -120,17 +124,23 @@ HeapWord* CollectedHeap::common_mem_allocate_noinit(KlassHandle klass, size_t si
   }
 
   HeapWord* result = NULL;
+
+  // Check if this object have to be promoted in TeraCache
+  // First allocate this object to the OldGen and then in the first
+  // FGC will promote it to TeraCache
+  // <jk> UseTLAB is a runtime flag. It should be always be on.
   if (UseTLAB) {
-    result = allocate_from_tlab(klass, THREAD, size);
-    if (result != NULL) {
-      assert(!HAS_PENDING_EXCEPTION,
-             "Unexpected exception, will result in uninitialized storage");
-      return result;
-    }
+      result = allocate_from_tlab(klass, THREAD, size);
+      if (result != NULL) {
+          assert(!HAS_PENDING_EXCEPTION,
+                  "Unexpected exception, will result in uninitialized storage");
+          return result;
+      }
   }
+
   bool gc_overhead_limit_was_exceeded = false;
-  result = Universe::heap()->mem_allocate(size,
-                                          &gc_overhead_limit_was_exceeded);
+  result = Universe::heap()->mem_allocate(size, &gc_overhead_limit_was_exceeded);
+
   if (result != NULL) {
     NOT_PRODUCT(Universe::heap()->
       check_for_non_bad_heap_word_value(result, size));
@@ -169,20 +179,107 @@ HeapWord* CollectedHeap::common_mem_allocate_noinit(KlassHandle klass, size_t si
   }
 }
 
+// JK direct allocate to OldGen
+HeapWord* CollectedHeap::mem_allocate_old_noinit(KlassHandle klass, size_t size, TRAPS) {
+
+  // Clear unhandled oops for memory allocation.  Memory allocation might
+  // not take out a lock if from tlab, so clear here.
+  CHECK_UNHANDLED_OOPS_ONLY(THREAD->clear_unhandled_oops();)
+
+  if (HAS_PENDING_EXCEPTION) {
+    NOT_PRODUCT(guarantee(false, "Should not allocate with exception pending"));
+    return NULL;  // caller does a CHECK_0 too
+  }
+
+  HeapWord* result = NULL;
+
+  bool gc_overhead_limit_was_exceeded = false;
+  result = Universe::heap()->direct_mem_allocate_old(size, &gc_overhead_limit_was_exceeded);
+
+  if (result != NULL) {
+    NOT_PRODUCT(Universe::heap()->
+      check_for_non_bad_heap_word_value(result, size));
+    assert(!HAS_PENDING_EXCEPTION,
+           "Unexpected exception, will result in uninitialized storage");
+    THREAD->incr_allocated_bytes(size * HeapWordSize);
+
+    AllocTracer::send_allocation_outside_tlab_event(klass, size * HeapWordSize);
+
+    return result;
+  } else {
+      std::cout << "Object allocation result return NULL" << std::endl;
+      return NULL;
+  }
+
+  //if (!gc_overhead_limit_was_exceeded) {
+  //  // -XX:+HeapDumpOnOutOfMemoryError and -XX:OnOutOfMemoryError support
+  //  report_java_out_of_memory("Java heap space");
+
+  //  if (JvmtiExport::should_post_resource_exhausted()) {
+  //    JvmtiExport::post_resource_exhausted(
+  //      JVMTI_RESOURCE_EXHAUSTED_OOM_ERROR | JVMTI_RESOURCE_EXHAUSTED_JAVA_HEAP,
+  //      "Java heap space");
+  //  }
+
+  //  THROW_OOP_0(Universe::out_of_memory_error_java_heap());
+  //} else {
+  //  // -XX:+HeapDumpOnOutOfMemoryError and -XX:OnOutOfMemoryError support
+  //  report_java_out_of_memory("GC overhead limit exceeded");
+
+  //  if (JvmtiExport::should_post_resource_exhausted()) {
+  //    JvmtiExport::post_resource_exhausted(
+  //      JVMTI_RESOURCE_EXHAUSTED_OOM_ERROR | JVMTI_RESOURCE_EXHAUSTED_JAVA_HEAP,
+  //      "GC overhead limit exceeded");
+  //  }
+
+  //  THROW_OOP_0(Universe::out_of_memory_error_gc_overhead_limit());
+  //}
+}
+
+// <jk> allocation init
+// eimai dame
 HeapWord* CollectedHeap::common_mem_allocate_init(KlassHandle klass, size_t size, TRAPS) {
   HeapWord* obj = common_mem_allocate_noinit(klass, size, CHECK_NULL);
   init_obj(obj, size);
   return obj;
 }
 
+// Allocate object to OldGen Directly
+HeapWord* CollectedHeap::mem_allocate_old_init(KlassHandle klass, size_t size, TRAPS) {
+  HeapWord* obj = mem_allocate_old_noinit(klass, size, CHECK_NULL);
+  init_obj(obj, size);
+  return obj;
+}
+
+// JK: TeraCache allocation path
+//HeapWord* CollectedHeap::teraCache_allocate(KlassHandle klass, size_t size) {
+//      // Initialize allocator
+//      init();
+//
+//      // Get a region from the allocator to locate the object
+//      region_t myregion = new_region(NULL);
+//      printf("Region = %p\n", myregion);
+//
+//      // Calculate the header size and reserve this space to the
+//      // region
+//      size_t hdr_size = oopDesc::header_size();
+//      HeapWord *tmp = (HeapWord *)rc_rstralloc0(myregion, (hdr_size + size) * sizeof(HeapWord));
+//
+//      return tmp;
+//}
+
+// <jk> Allocation from tlab. Introduce if to select tlab
 HeapWord* CollectedHeap::allocate_from_tlab(KlassHandle klass, Thread* thread, size_t size) {
   assert(UseTLAB, "should use UseTLAB");
 
   HeapWord* obj = thread->tlab().allocate(size);
+
   if (obj != NULL) {
     return obj;
   }
   // Otherwise...
+  // <jk> I do not care here about cache allocation
+  // Cache allocation ends up before
   return allocate_from_tlab_slow(klass, thread, size);
 }
 
@@ -201,6 +298,27 @@ oop CollectedHeap::obj_allocate(KlassHandle klass, int size, TRAPS) {
   HeapWord* obj = common_mem_allocate_init(klass, size, CHECK_NULL);
   post_allocation_setup_obj(klass, obj);
   NOT_PRODUCT(Universe::heap()->check_for_bad_heap_word_value(obj, size));
+  return (oop)obj;
+}
+
+oop CollectedHeap::obj_allocate(KlassHandle klass, bool cache, int size, TRAPS) {
+  debug_only(check_for_valid_allocation_state());
+  assert(!Universe::heap()->is_gc_active(), "Allocation during gc not allowed");
+  assert(size >= 0, "int won't convert to size_t");
+
+  klass.set_cache(cache);
+  
+  // Allocate space to old generation directly
+  HeapWord* obj = mem_allocate_old_init(klass, size, CHECK_NULL);
+
+  // Allocate object in TeraCache
+  // HeapWord* obj = teraCache_allocate(klass, size);
+
+  std::cout << "\t\t " << obj << std::endl;
+
+  post_allocation_setup_obj(klass, obj);
+  
+  //NOT_PRODUCT(Universe::heap()->check_for_bad_heap_word_value(obj, size));
   return (oop)obj;
 }
 

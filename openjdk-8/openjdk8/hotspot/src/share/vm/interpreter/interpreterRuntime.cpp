@@ -262,9 +262,18 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   {
       obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
   } else {
+      // Allocate object to Old Generation directly
       obj = klass->allocate_instance(true, CHECK);
-  }
 
+      // obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
+#if DEBUG_EXTRA_FIELD_MARK
+      obj->set_mark(markOopDesc::prototype()->set_teraCache());
+#endif
+
+#if DEBUG_PRINT
+      std::cout<< "\t Inter Objects = " << obj->mark()->is_teraCache() << std::endl;
+#endif
+  }
   // The secured result is stored in JavaThread with JavaThread and
   // return
   thread->set_vm_result(obj);

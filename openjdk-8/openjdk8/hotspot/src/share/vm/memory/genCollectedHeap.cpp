@@ -338,6 +338,11 @@ HeapWord* GenCollectedHeap::mem_allocate(size_t size,
                                                false /* is_tlab */,
                                                gc_overhead_limit_was_exceeded);
 }
+ 
+HeapWord* GenCollectedHeap::direct_mem_allocate_old(size_t size,
+                                            bool* gc_overhead_limit_was_exceeded) {
+    return NULL;
+}
 
 bool GenCollectedHeap::must_clear_all_soft_refs() {
   return _gc_cause == GCCause::_last_ditch_collection;

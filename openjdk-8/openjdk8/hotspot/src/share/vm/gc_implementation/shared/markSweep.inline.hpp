@@ -29,6 +29,7 @@
 #include "gc_interface/collectedHeap.hpp"
 #include "utilities/stack.inline.hpp"
 #include "utilities/macros.hpp"
+#include <iostream>
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/parallelScavenge/psParallelCompact.hpp"
 #endif // INCLUDE_ALL_GCS
@@ -68,8 +69,16 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+#if DEBUG_PRINT
+    // Check if the heap is marked
+      std::cout << "TeraCache value = " << obj->mark()->is_teraCache() << std::endl;
+#endif
     if (!obj->mark()->is_marked()) {
       mark_object(obj);
+#if DEBUG_PRINT
+      std::cout << "TeraCache value = " << obj->mark()->is_teraCache() << std::endl;
+      std::cout << "Object = " << obj << " | " << obj->print_value_string() << std::endl;
+#endif
       _marking_stack.push(obj);
     }
   }

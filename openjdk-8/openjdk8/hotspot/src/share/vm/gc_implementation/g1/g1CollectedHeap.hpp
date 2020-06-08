@@ -558,6 +558,10 @@ protected:
   virtual HeapWord* mem_allocate(size_t word_size,
                                  bool*  gc_overhead_limit_was_exceeded);
 
+  // jk (added just to compile)
+  virtual HeapWord* direct_mem_allocate_old(size_t size,
+                                            bool* gc_overhead_limit_was_exceeded);
+
   // The following three methods take a gc_count_before_ret
   // parameter which is used to return the GC count if the method
   // returns NULL. Given that we are required to read the GC count

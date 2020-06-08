@@ -159,6 +159,10 @@ public:
 
   HeapWord* mem_allocate(size_t size,
                          bool*  gc_overhead_limit_was_exceeded);
+  
+  // jk (added just to compile)
+  HeapWord* direct_mem_allocate_old(size_t size,
+                                            bool* gc_overhead_limit_was_exceeded);
 
   // We may support a shared contiguous allocation area, if the youngest
   // generation does.

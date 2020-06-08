@@ -154,6 +154,7 @@ inline bool oopDesc::is_array()              const { return klass()->oop_is_arra
 inline bool oopDesc::is_objArray()           const { return klass()->oop_is_objArray(); }
 inline bool oopDesc::is_typeArray()          const { return klass()->oop_is_typeArray(); }
 
+// Get the offset where data area starts
 inline void*     oopDesc::field_base(int offset)        const { return (void*)&((char*)this)[offset]; }
 
 template <class T> inline T* oopDesc::obj_field_addr(int offset) const { return (T*)field_base(offset); }
@@ -161,6 +162,7 @@ inline Metadata** oopDesc::metadata_field_addr(int offset) const { return (Metad
 inline jbyte*    oopDesc::byte_field_addr(int offset)   const { return (jbyte*)   field_base(offset); }
 inline jchar*    oopDesc::char_field_addr(int offset)   const { return (jchar*)   field_base(offset); }
 inline jboolean* oopDesc::bool_field_addr(int offset)   const { return (jboolean*)field_base(offset); }
+// Return the address of int field
 inline jint*     oopDesc::int_field_addr(int offset)    const { return (jint*)    field_base(offset); }
 inline jshort*   oopDesc::short_field_addr(int offset)  const { return (jshort*)  field_base(offset); }
 inline jlong*    oopDesc::long_field_addr(int offset)   const { return (jlong*)   field_base(offset); }
@@ -342,6 +344,7 @@ inline void oopDesc::bool_field_put(int offset, jboolean contents)  { *bool_fiel
 inline jchar oopDesc::char_field(int offset) const                  { return (jchar) *char_field_addr(offset);    }
 inline void oopDesc::char_field_put(int offset, jchar contents)     { *char_field_addr(offset) = (jint) contents; }
 
+// Return the address of int field
 inline jint oopDesc::int_field(int offset) const                    { return *int_field_addr(offset);        }
 inline void oopDesc::int_field_put(int offset, jint contents)       { *int_field_addr(offset) = contents;    }
 
@@ -382,6 +385,7 @@ inline void oopDesc::release_bool_field_put(int offset, jboolean contents)  { Or
 inline jchar oopDesc::char_field_acquire(int offset) const                  { return OrderAccess::load_acquire(char_field_addr(offset));     }
 inline void oopDesc::release_char_field_put(int offset, jchar contents)     { OrderAccess::release_store(char_field_addr(offset), contents); }
 
+// Acquire int field with one lock
 inline jint oopDesc::int_field_acquire(int offset) const                    { return OrderAccess::load_acquire(int_field_addr(offset));      }
 inline void oopDesc::release_int_field_put(int offset, jint contents)       { OrderAccess::release_store(int_field_addr(offset), contents);  }
 

@@ -87,7 +87,7 @@ oop_oop_iterate_backwards##nv_suffix(oop obj, OopClosureType* closure) {        
 #endif // INCLUDE_ALL_GCS
 
 
-#define InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m(OopClosureType, nv_suffix)      \
+#define InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m(OopClosureType, nv_suffix) \
                                                                                 \
 int InstanceClassLoaderKlass::                                                  \
 oop_oop_iterate##nv_suffix##_m(oop obj,                                         \
@@ -131,8 +131,7 @@ void InstanceClassLoaderKlass::oop_follow_contents(oop obj) {
 }
 
 #if INCLUDE_ALL_GCS
-void InstanceClassLoaderKlass::oop_follow_contents(ParCompactionManager* cm,
-        oop obj) {
+void InstanceClassLoaderKlass::oop_follow_contents(ParCompactionManager* cm, oop obj) {
   InstanceKlass::oop_follow_contents(cm, obj);
   ClassLoaderData * const loader_data = java_lang_ClassLoader::loader_data(obj);
   if (loader_data != NULL) {

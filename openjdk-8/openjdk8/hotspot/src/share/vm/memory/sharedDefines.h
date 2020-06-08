@@ -16,4 +16,10 @@
 
 #define DEBUG_ANNO_INTR 1
 
-#endif      // _SHARE_DEFINES_H_
+#define DEBUG_DIRECT_ALLOC 1
+
+#define DEBUG_EXTRA_FIELD_MARK 1
+
+#define DEBUG_PRINT 1
+
+#endif  // _SHARE_DEFINES_H_

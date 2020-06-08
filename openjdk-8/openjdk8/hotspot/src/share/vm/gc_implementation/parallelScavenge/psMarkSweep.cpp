@@ -193,6 +193,7 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     size_t old_gen_prev_used = old_gen->used_in_bytes();
     size_t young_gen_prev_used = young_gen->used_in_bytes();
 
+    // This function reserves the area for preservedMark
     allocate_stacks();
 
     COMPILER2_PRESENT(DerivedPointerTable::clear());
@@ -500,6 +501,11 @@ void PSMarkSweep::allocate_stacks() {
   PSYoungGen* young_gen = heap->young_gen();
 
   MutableSpace* to_space = young_gen->to_space();
+  
+  // Set the value of the _preserved_marks field (and related
+  // _preserved_count and _preserved_count_max fields)
+  // Here, the unused area (from top to end) in the Top area is used
+  // as the PreservedMark area.
   _preserved_marks = (PreservedMark*)to_space->top();
   _preserved_count = 0;
 
@@ -519,37 +525,65 @@ void PSMarkSweep::deallocate_stacks() {
 
 void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // Recursively traverse all live objects and mark them
+  // Trace output
   GCTraceTime tm("phase 1", PrintGCDetails && Verbose, true, _gc_timer);
   trace(" 1");
 
+  // Variable declaration
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
   assert(heap->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
 
   // Need to clear claim bits before the tracing starts.
   ClassLoaderDataGraph::clear_claimed_marks();
 
+  // First, the objects that are directly referenced by the strong root are stored in the marking stack.
+  // Mark the objects that are directly referenced by the strong root.
   // General strong roots.
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
+    // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
+
+    // You can also clear the handle created by the JNI to keep the object active
     JNIHandles::oops_do(mark_and_push_closure());   // Global (strong) JNI handles
     CLDToOopClosure mark_and_push_from_cld(mark_and_push_closure());
     CodeBlobToOopClosure each_active_code_blob(mark_and_push_closure(), /*do_marking=*/ true);
     Threads::oops_do(mark_and_push_closure(), &mark_and_push_from_cld, &each_active_code_blob);
+
+    // A monitor used for synchronization
     ObjectSynchronizer::oops_do(mark_and_push_closure());
+
+    // A profiler that is part of Hotspot, keeping the class loader active.
     FlatProfiler::oops_do(mark_and_push_closure());
+
+    // Objects that remain active for certain management services, such as memoryPoolMxBean
     Management::oops_do(mark_and_push_closure());
+
+    // keep active jvmti breakpoints and objects allocated by jvmti
     JvmtiExport::oops_do(mark_and_push_closure());
+
+    // Keep all the classes loaded by the Java system class loader, as well as the objects referenced by the static fields of the class.
     SystemDictionary::always_strong_oops_do(mark_and_push_closure());
-    ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(), follow_klass_closure(), true);
+    // May be uncomment this
+    // ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(), follow_klass_closure(), true);
+    
+    // This is a bit unclear to me. I think this is a class loader that is not a
+    // Java system class loader, that is, it covers classes (and their static fields)
+    // that are loaded by different class loaders.
+    //
+    // ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(),
+    // follow_klass_closure(), true);
+
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
   }
 
+  // Next, mark all objects that can be recursively traced from the marked object.
   // Flush marking stack.
   follow_stack();
 
   // Process reference objects found during marking
+  // Process the reference object (java.lang.ref object) found in the above process
   {
     ref_processor()->setup_policy(clear_all_softrefs);
     const ReferenceProcessorStats& stats =

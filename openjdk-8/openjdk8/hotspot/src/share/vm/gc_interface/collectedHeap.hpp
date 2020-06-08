@@ -141,10 +141,17 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // Allocate an uninitialized block of the given size, or returns NULL if
   // this is impossible.
   inline static HeapWord* common_mem_allocate_noinit(KlassHandle klass, size_t size, TRAPS);
+ 
+  inline static HeapWord* mem_allocate_old_noinit(KlassHandle klass, size_t size, TRAPS);
+
+  inline static HeapWord* mem_allocate_old_init(KlassHandle klass, size_t size, TRAPS);
 
   // Like allocate_init, but the block returned by a successful allocation
   // is guaranteed initialized to zeros.
   inline static HeapWord* common_mem_allocate_init(KlassHandle klass, size_t size, TRAPS);
+  
+  // Allocate object in TeraCache
+  inline static HeapWord* teraCache_allocate(KlassHandle klass, size_t size);
 
   // Helper functions for (VM) allocation.
   inline static void post_allocation_setup_common(KlassHandle klass, HeapWord* obj);
@@ -318,6 +325,7 @@ class CollectedHeap : public CHeapObj<mtInternal> {
 
   // General obj/array allocation facilities.
   inline static oop obj_allocate(KlassHandle klass, int size, TRAPS);
+  inline static oop obj_allocate(KlassHandle klass, bool cache, int size, TRAPS);
   inline static oop array_allocate(KlassHandle klass, int size, int length, TRAPS);
   inline static oop array_allocate_nozero(KlassHandle klass, int size, int length, TRAPS);
 
@@ -330,6 +338,11 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // called to allocate TLABs, only individual objects.
   virtual HeapWord* mem_allocate(size_t size,
                                  bool* gc_overhead_limit_was_exceeded) = 0;
+
+
+  // Direct allocation to Old generation bypassing Eden space
+  virtual HeapWord* direct_mem_allocate_old(size_t size,
+                                            bool* gc_overhead_limit_was_exceeded) = 0;
 
   // Utilities for turning raw memory into filler objects.
   //

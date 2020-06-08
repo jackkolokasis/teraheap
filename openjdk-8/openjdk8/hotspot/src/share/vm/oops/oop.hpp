@@ -56,9 +56,40 @@ class CMSIsAliveClosure;
 class PSPromotionManager;
 class ParCompactionManager;
 
+// oopDesc is the top baseclass for object classes.
+// The {name}Desc classses descibe the format of Java objects so the
+// fields can be accessed from C++.
+// oopDesc is abstract.
+// (see oopHierarchy fro complete oop class hierarchy)
+//
+// no virtual functions are allowed
+//
+// oopDesc has the following structure(additional fields are added in
+// the subclass)
+// The first 1 word is markOop. This manages object lock and GC.
+//
+// The next 1 word (32bit if UseCompressedOop) is klassOopDesc.
+// Indicates the class of the oopDesc object (e.g., instanceOopDesc, arrayOopDesc, methodOopDesc, etc)
+//
+// instanceOopDesc          -- OopDesc representing "Java instance object (and class object)"
+// methodOopDesc            -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// constMethodOopDesc       -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// methodDataOopDesc        -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// arrayOopDesc             -- Base of oopDesc that represents "array of Java" (Abstract class)
+// 	objArrayOopDesc          -- Represent "array of Java pointer type"
+// 	typeArrayOopDesc         -- Represent array of Java primitive type
+// constantPoolOopDesc      -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// constantPoolCacheOopDesc -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// klassOopDesc             -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// markOopDesc              -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+// compiledICHolderOopDesc  -- For internal processing of oopDesc. HotSpot that is not directly related to the Java world
+
+// Abstract class
+// The base of all oopDesc
 class oopDesc {
   friend class VMStructs;
  private:
+  // Use for GC, lock etc.
   volatile markOop  _mark;
   union _metadata {
     Klass*      _klass;
@@ -132,6 +163,7 @@ class oopDesc {
 
  public:
   // Need this as public for garbage collection.
+  // This is how the GC is able to get references from the objects!
   template <class T> T* obj_field_addr(int offset) const;
 
   // Needed for javaClasses

@@ -167,6 +167,8 @@ HS_DTRACE_PROBE_DECL5(hotspot, class__initialization__end,
 
 volatile int InstanceKlass::_total_instanceKlass_count = 0;
 
+// Initialize an empty instanceKlass object and fills the data with
+// subsequent logic.
 InstanceKlass* InstanceKlass::allocate_instance_klass(
                                               ClassLoaderData* loader_data,
                                               int vtable_len,
@@ -1101,6 +1103,11 @@ instanceOop InstanceKlass::allocate_instance(TRAPS) {
 
   instanceOop i;
     
+  // Allocate this object in the heap
+  // Collected heap is an implementetion of Java heap hotspot. This is
+  // an abstract class: there may be many different kind of heaps
+  // This class define the function that a heap must implement, and
+  // contains infrastructure to all heaps
   i = (instanceOop)CollectedHeap::obj_allocate(h_k, size, CHECK_NULL);
   if (has_finalizer_flag && !RegisterFinalizersAtInit) {
     i = register_finalizer(i, CHECK_NULL);

@@ -914,6 +914,14 @@ G1CollectedHeap::mem_allocate(size_t word_size,
   return NULL;
 }
 
+
+HeapWord* 
+G1CollectedHeap::direct_mem_allocate_old(size_t size,
+                                            bool* gc_overhead_limit_was_exceeded)
+{
+    return NULL;
+}
+
 HeapWord* G1CollectedHeap::attempt_allocation_slow(size_t word_size,
                                            unsigned int *gc_count_before_ret,
                                            int* gclocker_retry_count_ret) {

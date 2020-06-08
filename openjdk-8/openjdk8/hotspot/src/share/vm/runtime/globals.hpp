@@ -2416,6 +2416,9 @@ class CommandLineFlags {
   product(bool, DisableFullGC, false,                                       \
           "Disable Full GC in ParalellGC")                                  \
                                                                             \
+  product(bool, CacheGenerationEnabled, false,                              \
+          "Enable Cache generation in ParalellGC")                          \
+                                                                            \
   /* GC log rotation setting */                                             \
                                                                             \
   product(bool, UseGCLogFileRotation, false,                                \
@@ -3107,6 +3110,13 @@ class CommandLineFlags {
                                                                             \
   product(uintx, MaxNewSize, max_uintx,                                     \
           "Maximum new generation size (in bytes), max_uintx means set "    \
+          "ergonomically")                                                  \
+                                                                            \
+  product(uintx, CacheSize, ScaleForWordSize(4*M),                          \
+          "Initial cache generation size (in bytes)")                       \
+                                                                            \
+  product(uintx, MaxCacheSize, max_uintx,                                   \
+          "Maximum cache generation size (in bytes), max_uintx means set "  \
           "ergonomically")                                                  \
                                                                             \
   product(uintx, PretenureSizeThreshold, 0,                                 \
