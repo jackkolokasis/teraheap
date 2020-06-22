@@ -78,6 +78,7 @@
 #include "utilities/dtrace.hpp"
 #include "utilities/events.hpp"
 #include "utilities/histogram.hpp"
+#include <cstring>
 #ifdef TARGET_OS_FAMILY_linux
 # include "os_linux.inline.hpp"
 #endif
@@ -1393,7 +1394,15 @@ static instanceOop alloc_object(jclass clazz, TRAPS) {
   KlassHandle k(THREAD, java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz)));
   k()->check_valid_for_instantiation(false, CHECK_NULL);
   InstanceKlass::cast(k())->initialize(CHECK_NULL);
-  instanceOop ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
+  instanceOop ih = NULL;
+  if (!strstr(InstanceKlass::cast(k())->signature_name(), "DeserializedMemoryEntry"))
+  {
+      ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
+  }
+  else
+  {
+      ih = InstanceKlass::cast(k())->allocate_instance(true, THREAD);
+  }
   return ih;
 }
 

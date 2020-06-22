@@ -56,6 +56,7 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/threadCritical.hpp"
 #include "utilities/events.hpp"
+#include <cstring>
 #ifdef TARGET_ARCH_x86
 # include "vm_version_x86.hpp"
 #endif
@@ -237,6 +238,9 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
 
   // Make sure klass is initialized
   klass->initialize(CHECK);
+  
+  
+  
 
   int alloc_cache = get_alloc_gen(pool, method(thread), bci(thread));
 
@@ -258,9 +262,8 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   oop obj;
   
   // Allocate memory for the instance
-  if (alloc_cache == 0)
-  {
-      obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
+  if (alloc_cache == 0) {
+    obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
   } else {
       // Allocate object to Old Generation directly
       obj = klass->allocate_instance(true, CHECK);

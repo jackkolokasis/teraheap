@@ -3251,6 +3251,8 @@ void TemplateTable::_new() {
   // Check
   transition(vtos, atos);
   // Code generation: Obtain the index of the constant pool in rdx
+  // bcp is the rsi register, used to record the bytecode instruction address
+  // of the current interpreter
   __ get_unsigned_2_byte_index_at_bcp(rdx, 1);
   // Variable declaration
   Label slow_case;
@@ -3263,6 +3265,9 @@ void TemplateTable::_new() {
   // Code generation: "Get the constant pool corresponding to the
   // currently executing method
   // Also, get the tag corresponding to the new class object
+  // Get the first address of the constant pool and put it in the rcx register.
+  // Get the first address of the element type array _tags in the constant pool and
+  // put it in rax
   __ get_cpool_and_tags(rsi, rax);
 
   // Code generation:
@@ -3274,6 +3279,8 @@ void TemplateTable::_new() {
   // Make sure the class we're about to instantiate has been resolved.
   // This is done before loading InstanceKlass to be consistent with the order
   // how Constant Pool is updated (see ConstantPool::klass_at_put)
+  // Determine whether the corresponding element type in the _tags array is
+  // JVM_CONSTANT_Class, if not, skip to slow_case_no_pop.
   const int tags_offset = Array<u1>::base_offset_in_bytes();
   __ cmpb(Address(rax, rdx, Address::times_1, tags_offset),
           JVM_CONSTANT_Class);
@@ -3295,12 +3302,23 @@ void TemplateTable::_new() {
   // label
   // make sure klass is initialized & doesn't have finalizer
   // make sure klass is fully initialized
+  // Determine whether the class has been parsed. If not, jump
+  // directly to slow_case, slow_case is slow allocation. If the class
+  // to which the object belongs has been parsed, it will enter fast
+  // allocation, otherwise it will enter slow allocation and proceed
+  // to class Parse
   __ cmpb(Address(rsi,
                   InstanceKlass::init_state_offset()),
           InstanceKlass::fully_initialized);
   __ jcc(Assembler::notEqual, slow_case);
 
+  // here is the content 
+
   // get instance_size in InstanceKlass (scaled to a count of bytes)
+  // At this time, the memory address of the class InstanceKlass is
+  // stored in rcx. The size of the class instance is obtained by
+  // offset and stored in the rdx register. The size of the object has
+  // been determined as early as the class is loaded.
   __ movl(rdx,
           Address(rsi,
                   Klass::layout_helper_offset()));
@@ -3337,11 +3355,40 @@ void TemplateTable::_new() {
     Universe::heap()->supports_inline_contig_alloc() && !CMSIncrementalMode;
 
   if (UseTLAB) {
+      // Get the first address of the remaining space in the TLAB
+      // area and put it in the x rax register
     __ movptr(rax, Address(r15_thread, in_bytes(JavaThread::tlab_top_offset())));
+      // The size of the object has been recorded in the rdx
+      // register. Here and according to the first address of the TLAB
+      // free area, after calculating the object allocation, the object
+      // tail address is put into rbx
     __ lea(rbx, Address(rax, rdx, Address::times_1));
+      // Compare the content of rbx with the end address of TLAB
+      // free area.
     __ cmpptr(rbx, Address(r15_thread, in_bytes(JavaThread::tlab_end_offset())));
+
+      // If the result of the above comparison indicates that 
+      // rbx > the end address of the TLAB free area, 
+      // it means that the size
+      // of the free area of the TLAB area is not enough
+      // to allocate the object, 
+      // then in the case of
+      // allow_shared_alloc (allowing allocation in the Eden area),
+      // jump directly to the Eden area to allocate memory labels 
     __ jcc(Assembler::above, allow_shared_alloc ? allocate_shared : slow_case);
+      // Because the space of the TLAB area becomes smaller after
+      // the object is allocated, the first address of the TLAB free
+      // area is updated here to the end address of the object
     __ movptr(Address(r15_thread, in_bytes(JavaThread::tlab_top_offset())), rbx);
+
+      // If the TLAB area defaults to clearing the reclaimed free
+      // area, then there is no need to clear the object variable, and
+      // jump directly to the object header initialization. Some
+      // students may ask why it is necessary to perform a zeroing
+      // operation? Because the allocated memory may still retain the
+      // data when it was last allocated to other objects, although
+      // the memory block is recycled, the previous data has not been
+      // cleared, which will pollute the new object.
     if (ZeroTLAB) {
       // the fields have been already cleared
       __ jmp(initialize_header);
@@ -3355,8 +3402,11 @@ void TemplateTable::_new() {
   //
   // rdx: instance size in bytes
   if (allow_shared_alloc) {
+      // TLAB allocation failure will jump here
     __ bind(allocate_shared);
 
+    // Get the first address and end address of the remaining space in
+    // the Eden area.
     ExternalAddress top((address)Universe::heap()->top_addr());
     ExternalAddress end((address)Universe::heap()->end_addr());
 
@@ -3365,11 +3415,15 @@ void TemplateTable::_new() {
 
     __ lea(RtopAddr, top);
     __ lea(RendAddr, end);
+    // Put the first address of the free area into rax and use it as the beginning of object allocation.
     __ movptr(rax, Address(RtopAddr, 0));
 
     // For retries rax gets set by cmpxchgq
     Label retry;
     __ bind(retry);
+    // Calculate the tail address of the object, compare it with the
+    // tail address of the free area, and skip to slow allocation if
+    // there is insufficient memor
     __ lea(rbx, Address(rax, rdx, Address::times_1));
     __ cmpptr(rbx, Address(RendAddr, 0));
     __ jcc(Assembler::above, slow_case);
@@ -3381,9 +3435,14 @@ void TemplateTable::_new() {
     // rax: object begin
     // rbx: object end
     // rdx: instance size in bytes
+    //
+    //
     if (os::is_MP()) {
       __ lock();
     }
+    // Use the CAS operation to update the first address of the
+    // Eden free area to the tail address of the object. Because the
+    // Eden area is shared by threads, it needs to be locked.
     __ cmpxchgptr(rbx, Address(RtopAddr, 0));
 
     // if someone beat us on the allocation, try again, otherwise continue

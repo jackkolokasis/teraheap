@@ -1,0 +1,48 @@
+Classfile /home1/public/kolokasis/jvmMicroTests/annotation/tests/AllocateClass.class
+  Last modified Jun 21, 2020; size 607 bytes
+  MD5 checksum 612ee1db0d77f4b8caf5009fca456807
+  Compiled from "AllocateClass.scala"
+public final class AllocateClass
+  minor version: 0
+  major version: 50
+  flags: ACC_PUBLIC, ACC_FINAL, ACC_SUPER
+Constant pool:
+   #1 = Utf8               AllocateClass
+   #2 = Class              #1             // AllocateClass
+   #3 = Utf8               java/lang/Object
+   #4 = Class              #3             // java/lang/Object
+   #5 = Utf8               AllocateClass.scala
+   #6 = Utf8               Lscala/reflect/ScalaSignature;
+   #7 = Utf8               bytes
+   #8 = Utf8               :Q!\t\tQ\"7m_G/Z\"mCN(\"Aq*W;z}\rCa!I!!D!mY>\r^3DY8oA1BD)\tQ\"AtGd-\t1I\=SKDQ!EI\taP5oSRtD#A\tQ9AA\t5N-e\"aC\naa!B+oSRDQAG\nAm\tA!:hgB1\nua!!B!seLCA%#BA#aM\4\r\nAA[1wC&Q\t'RN\4
+   #9 = Utf8               main
+  #10 = Utf8               ([Ljava/lang/String;)V
+  #11 = Utf8               AllocateClass$
+  #12 = Class              #11            // AllocateClass$
+  #13 = Utf8               MODULE$
+  #14 = Utf8               LAllocateClass$;
+  #15 = NameAndType        #13:#14        // MODULE$:LAllocateClass$;
+  #16 = Fieldref           #12.#15        // AllocateClass$.MODULE$:LAllocateClass$;
+  #17 = NameAndType        #9:#10         // main:([Ljava/lang/String;)V
+  #18 = Methodref          #12.#17        // AllocateClass$.main:([Ljava/lang/String;)V
+  #19 = Utf8               Code
+  #20 = Utf8               SourceFile
+  #21 = Utf8               RuntimeVisibleAnnotations
+  #22 = Utf8               ScalaSig
+{
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=2, locals=1, args_size=1
+         0: getstatic     #16                 // Field AllocateClass$.MODULE$:LAllocateClass$;
+         3: aload_0
+         4: invokevirtual #18                 // Method AllocateClass$.main:([Ljava/lang/String;)V
+         7: return
+}
+SourceFile: "AllocateClass.scala"
+RuntimeVisibleAnnotations:
+  0: #6(#7=s#8)
+Error: unknown attribute
+  ScalaSig: length = 0x3
+   05 00 00
