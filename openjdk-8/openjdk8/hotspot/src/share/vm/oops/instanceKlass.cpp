@@ -2113,10 +2113,19 @@ template <class T> void assert_nothing(T *p) {}
 void InstanceKlass::oop_follow_contents(oop obj) {
   assert(obj != NULL, "can't follow the content of NULL object");
   MarkSweep::follow_klass(obj->klass());
-  InstanceKlass_OOP_MAP_ITERATE( \
-    obj, \
-    MarkSweep::mark_and_push(p), \
-    assert_is_in_closed_subset)
+  if (!obj->is_tera_cache())
+  {
+    InstanceKlass_OOP_MAP_ITERATE( \
+        obj, \
+        MarkSweep::mark_and_push(p), \
+        assert_is_in_closed_subset)
+  }
+  else {
+    InstanceKlass_OOP_MAP_ITERATE( \
+        obj, \
+        MarkSweep::tera_mark_and_push(p), \
+        assert_is_in_closed_subset)
+  }
 }
 
 #if INCLUDE_ALL_GCS

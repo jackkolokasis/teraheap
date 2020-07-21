@@ -69,17 +69,33 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
-#if DEBUG_PRINT
-    // Check if the heap is marked
-      std::cout << "TeraCache value = " << obj->mark()->is_teraCache() << std::endl;
-#endif
     if (!obj->mark()->is_marked()) {
       mark_object(obj);
-#if DEBUG_PRINT
-      std::cout << "TeraCache value = " << obj->mark()->is_teraCache() << std::endl;
-      std::cout << "Object = " << obj << " | " << obj->print_value_string() << std::endl;
+      _marking_stack.push(obj);
+    }
+  }
+}
+
+template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
+//  assert(Universe::heap()->is_in_reserved(p), "should be in object space");
+  T heap_oop = oopDesc::load_heap_oop(p);
+  if (!oopDesc::is_null(heap_oop)) {
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+#if DEBUG_TERA_MARK_SWEEP
+    // Check if the heap is marked
+      std::cerr << "TeraCache value = " << obj->is_tera_cache() << std::endl;
+#endif
+    if (!obj->mark()->is_marked()) {
+      obj->set_tera_cache();
+      mark_object(obj);
+#if DEBUG_TERA_MARK_SWEEP
+      std::cerr << "TeraCache value = " << obj->is_tera_cache() << std::endl;
+      std::cerr << "Object = " << obj << " | " << obj->print_value_string() << std::endl;
 #endif
       _marking_stack.push(obj);
+    }
+    else {
+      obj->set_tera_cache();
     }
   }
 }
@@ -94,7 +110,20 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj     = oopDesc::decode_heap_oop_not_null(heap_oop);
-    oop new_obj = oop(obj->mark()->decode_pointer());
+    //oop new_obj = oop(obj->mark()->decode_pointer());
+    oop new_obj;
+    if (obj->is_tera_cache())
+    {
+      std::cerr << "[ADJUST POINTERS] | &OBJ = " << &obj <<  " | OBJ = " << obj << " | MARK = " << obj->mark()->get_value() << std::endl;
+      new_obj = oop(obj->mark()->decode_pointer());
+      new_obj->set_tera_cache();
+      std::cerr << "[ADJUST POINTERS] | &NEW_OBJ = " << &new_obj <<  " | NEW_OBJ = " << new_obj << " | MARK = " << new_obj->mark()->get_value() << std::endl;
+    }
+    else
+    {
+      new_obj = oop(obj->mark()->decode_pointer());
+    }
+    
     assert(new_obj != NULL ||                         // is forwarding ptr?
            obj->mark() == markOopDesc::prototype() || // not gc marked?
            (UseBiasedLocking && obj->mark()->has_bias_pattern()),
@@ -103,7 +132,11 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
     if (new_obj != NULL) {
       assert(Universe::heap()->is_in_reserved(new_obj),
              "should be in object space");
-      oopDesc::encode_store_heap_oop_not_null(p, new_obj);
+      if (!new_obj->is_tera_cache())
+      {
+        // Last change
+        oopDesc::encode_store_heap_oop_not_null(p, new_obj);
+      }
     }
   }
 }

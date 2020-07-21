@@ -90,7 +90,8 @@ class oopDesc {
   friend class VMStructs;
  private:
   // Use for GC, lock etc.
-  volatile markOop  _mark;
+  volatile markOop  _mark;            // Object header. Use for GC, lock etc.
+  volatile unsigned int _tera_flag;   // Use for TeraCache objects
   union _metadata {
     Klass*      _klass;
     narrowKlass _compressed_klass;
@@ -102,6 +103,9 @@ class oopDesc {
  public:
   markOop  mark() const         { return _mark; }
   markOop* mark_addr() const    { return (markOop*) &_mark; }
+
+  void set_tera_cache() { _tera_flag = 1; }
+  unsigned int is_tera_cache() { return (_tera_flag == 1); }
 
   void set_mark(volatile markOop m)      { _mark = m;   }
 

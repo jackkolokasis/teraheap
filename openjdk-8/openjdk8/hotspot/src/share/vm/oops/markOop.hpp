@@ -384,6 +384,7 @@ class markOopDesc: public oopDesc {
 
   // Debugging
   void print_on(outputStream* st) const;
+  uintptr_t get_value() const {return (uintptr_t) this; }
 
   // Prepare address of oop for placement into mark
   inline static markOop encode_pointer_as_mark(void* p) { return markOop(p)->set_marked(); }

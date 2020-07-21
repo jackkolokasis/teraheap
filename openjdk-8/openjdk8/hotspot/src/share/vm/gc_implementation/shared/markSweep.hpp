@@ -166,6 +166,7 @@ class MarkSweep : AllStatic {
 
   // Check mark and maybe push on marking stack
   template <class T> static void mark_and_push(T* p);
+  template <class T> static void tera_mark_and_push(T* p);
 
   static inline void push_objarray(oop obj, size_t index);
 

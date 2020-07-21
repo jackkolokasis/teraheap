@@ -270,11 +270,12 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
 
       // obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
 #if DEBUG_EXTRA_FIELD_MARK
-      obj->set_mark(markOopDesc::prototype()->set_teraCache());
+      //obj->set_mark(markOopDesc::prototype()->set_teraCache());
+      obj->set_tera_cache();
 #endif
 
 #if DEBUG_PRINT
-      std::cout<< "\t Inter Objects = " << obj->mark()->is_teraCache() << std::endl;
+      std::cerr<< "\t Inter Objects = " << obj->is_tera_cache() << std::endl;
 #endif
   }
   // The secured result is stored in JavaThread with JavaThread and

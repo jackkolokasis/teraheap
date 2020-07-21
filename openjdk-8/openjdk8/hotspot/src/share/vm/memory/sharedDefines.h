@@ -20,6 +20,8 @@
 
 #define DEBUG_EXTRA_FIELD_MARK 1
 
-#define DEBUG_PRINT 0
+#define DEBUG_PRINT 1
+
+#define DEBUG_TERA_MARK_SWEEP 1
 
 #endif  // _SHARE_DEFINES_H_

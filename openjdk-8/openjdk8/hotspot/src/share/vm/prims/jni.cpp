@@ -1402,6 +1402,7 @@ static instanceOop alloc_object(jclass clazz, TRAPS) {
   else
   {
       ih = InstanceKlass::cast(k())->allocate_instance(true, THREAD);
+      ih->set_tera_cache();
   }
   return ih;
 }

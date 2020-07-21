@@ -115,6 +115,9 @@ void PSMarkSweepDecorator::precompact() {
 
   const intx interval = PrefetchScanIntervalInBytes;
 
+  ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
+  TeraCache* tc = heap->tera_cache();
+
   while (q < t) {
     assert(oop(q)->mark()->is_marked() || oop(q)->mark()->is_unlocked() ||
            oop(q)->mark()->has_bias_pattern(),
@@ -123,6 +126,17 @@ void PSMarkSweepDecorator::precompact() {
       /* prefetch beyond q */
       Prefetch::write(q, interval);
       size_t size = oop(q)->size();
+
+      if (oop(q)->is_tera_cache())
+      {
+        std::cerr << "[BEFORE TC] | Q = " << &q << " | OOP(Q) = " << oop(q);
+        HeapWord* region_top = (HeapWord*) tc->tc_region_top(oop(q), size);
+        std::cerr << " | REGION_TOP = " << region_top << std::endl;
+        oop(q)->forward_to(oop(region_top));
+        q += size;
+        end_of_live = q;
+        continue;
+      }
 
       size_t compaction_max_size = pointer_delta(compact_end, compact_top);
 

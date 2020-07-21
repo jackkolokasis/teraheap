@@ -50,6 +50,7 @@
 
 PSYoungGen*  ParallelScavengeHeap::_young_gen = NULL;
 PSOldGen*    ParallelScavengeHeap::_old_gen = NULL;
+TeraCache*  ParallelScavengeHeap::_tera_cache = NULL;
 PSAdaptiveSizePolicy* ParallelScavengeHeap::_size_policy = NULL;
 PSGCAdaptivePolicyCounters* ParallelScavengeHeap::_gc_policy_counters = NULL;
 ParallelScavengeHeap* ParallelScavengeHeap::_psh = NULL;
@@ -120,6 +121,9 @@ jint ParallelScavengeHeap::initialize() {
 
   _old_gen = _gens->old_gen();
   _young_gen = _gens->young_gen();
+  _tera_cache = new TeraCache();
+  _tera_cache->tc_new_region();
+  std::cerr << "[TERACACHE START] = " << _tera_cache->tc_get_addr_region() << std::endl;
 
   const size_t eden_capacity = _young_gen->eden_space()->capacity_in_bytes();
   const size_t old_capacity = _old_gen->capacity_in_bytes();
