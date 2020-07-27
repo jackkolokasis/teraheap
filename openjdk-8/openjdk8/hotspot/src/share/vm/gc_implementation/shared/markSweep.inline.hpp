@@ -32,6 +32,7 @@
 #include <iostream>
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/parallelScavenge/psParallelCompact.hpp"
+#include "gc_implementation/teraCache/teraCache.hpp"
 #endif // INCLUDE_ALL_GCS
 
 inline void MarkSweep::mark_object(oop obj) {
@@ -56,6 +57,7 @@ template <class T> inline void MarkSweep::follow_root(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
     if (!obj->mark()->is_marked()) {
       mark_object(obj);
       obj->follow_contents();
@@ -69,6 +71,10 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+		
+		if (Universe::teraCache()->tc_check(obj))
+      return;
+
     if (!obj->mark()->is_marked()) {
       mark_object(obj);
       _marking_stack.push(obj);
@@ -85,6 +91,10 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
     // Check if the heap is marked
       std::cerr << "TeraCache value = " << obj->is_tera_cache() << std::endl;
 #endif
+      if (Universe::teraCache()->tc_check(obj))
+        return;
+      
+
     if (!obj->mark()->is_marked()) {
       obj->set_tera_cache();
       mark_object(obj);
@@ -112,12 +122,22 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
     oop obj     = oopDesc::decode_heap_oop_not_null(heap_oop);
     //oop new_obj = oop(obj->mark()->decode_pointer());
     oop new_obj;
+		
+    if (Universe::teraCache()->tc_check(obj))
+    {
+      return;
+    }
+    
     if (obj->is_tera_cache())
     {
-      std::cerr << "[ADJUST POINTERS] | &OBJ = " << &obj <<  " | OBJ = " << obj << " | MARK = " << obj->mark()->get_value() << std::endl;
+#if DEBUG_PRINTS
+      std::cerr << "[ADJUST POINTERS] | " << " | OBJ     = " << obj    <<  " | MARK = " << obj->mark()->get_value() << std::endl;
+#endif
       new_obj = oop(obj->mark()->decode_pointer());
       new_obj->set_tera_cache();
-      std::cerr << "[ADJUST POINTERS] | &NEW_OBJ = " << &new_obj <<  " | NEW_OBJ = " << new_obj << " | MARK = " << new_obj->mark()->get_value() << std::endl;
+#if DEBUG_PRINTS
+      std::cerr << "[ADJUST POINTERS] | " << " | NEW_OBJ = " << new_obj << " | MARK = " << new_obj->mark()->get_value() << std::endl;
+#endif
     }
     else
     {
@@ -132,10 +152,16 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
     if (new_obj != NULL) {
       assert(Universe::heap()->is_in_reserved(new_obj),
              "should be in object space");
-      if (!new_obj->is_tera_cache())
+      if (!obj->is_tera_cache())
       {
         // Last change
         oopDesc::encode_store_heap_oop_not_null(p, new_obj);
+      }
+      else {
+        // Debug now !
+        // Check this again ! Something goes wrong here !!!
+        oopDesc::encode_store_heap_oop_not_null(p, new_obj);
+        //oopDesc::encode_store_heap_oop_not_null(p, new_obj);
       }
     }
   }

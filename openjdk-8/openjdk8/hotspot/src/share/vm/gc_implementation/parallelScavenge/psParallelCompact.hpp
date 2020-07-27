@@ -31,6 +31,7 @@
 #include "gc_implementation/shared/collectorCounters.hpp"
 #include "gc_implementation/shared/markSweep.hpp"
 #include "gc_implementation/shared/mutableSpace.hpp"
+#include "gc_implementation/teraCache/teraCache.hpp"
 #include "memory/sharedHeap.hpp"
 #include "oops/oop.hpp"
 

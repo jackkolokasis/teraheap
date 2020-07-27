@@ -105,7 +105,8 @@ class oopDesc {
   markOop* mark_addr() const    { return (markOop*) &_mark; }
 
   void set_tera_cache() { _tera_flag = 1; }
-  unsigned int is_tera_cache() { return (_tera_flag == 1); }
+  bool is_tera_cache() { return (_tera_flag == 1); }
+  void init_tera_cache() { _tera_flag = 0; }
 
   void set_mark(volatile markOop m)      { _mark = m;   }
 

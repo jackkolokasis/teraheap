@@ -37,8 +37,10 @@
 // support is provided. Allocation by the interpreter and compiled code is done inline
 // and bails out to Scavenge::invoke_and_allocate.
 
+class TeraCache;
 class CollectedHeap;
 class DeferredObjAllocEvent;
+
 
 
 // A helper class for caching a Method* when the user of the cache
@@ -179,6 +181,8 @@ class Universe: AllStatic {
 
   // The particular choice of collected heap.
   static CollectedHeap* _collectedHeap;
+
+  static TeraCache* _teraCache;
 
   static intptr_t _non_oop_bits;
 
@@ -335,6 +339,9 @@ class Universe: AllStatic {
 
   // The particular choice of collected heap.
   static CollectedHeap* heap() { return _collectedHeap; }
+
+  static TeraCache* teraCache() { return _teraCache;}
+
 
   // For UseCompressedOops
   // Narrow Oop encoding mode:

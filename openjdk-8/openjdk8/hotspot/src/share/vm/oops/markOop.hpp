@@ -390,7 +390,12 @@ class markOopDesc: public oopDesc {
   inline static markOop encode_pointer_as_mark(void* p) { return markOop(p)->set_marked(); }
 
   // Recover address of oop from encoded form used in mark
-  inline void* decode_pointer() { if (UseBiasedLocking && has_bias_pattern()) return NULL; return clear_lock_bits(); }
+  inline void* decode_pointer() { 
+    if (UseBiasedLocking && has_bias_pattern()) 
+      return NULL;  
+
+    return clear_lock_bits(); 
+  }
 
   // These markOops indicate cms free chunk blocks and not objects.
   // In 64 bit, the markOop is set to distinguish them from oops.

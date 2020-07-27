@@ -115,13 +115,13 @@ void PSMarkSweepDecorator::precompact() {
 
   const intx interval = PrefetchScanIntervalInBytes;
 
-  ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
-  TeraCache* tc = heap->tera_cache();
+	TeraCache* tc = Universe::teraCache();
 
   while (q < t) {
     assert(oop(q)->mark()->is_marked() || oop(q)->mark()->is_unlocked() ||
            oop(q)->mark()->has_bias_pattern(),
            "these are the only valid states during a mark sweep");
+
     if (oop(q)->is_gc_marked()) {
       /* prefetch beyond q */
       Prefetch::write(q, interval);
@@ -129,9 +129,7 @@ void PSMarkSweepDecorator::precompact() {
 
       if (oop(q)->is_tera_cache())
       {
-        std::cerr << "[BEFORE TC] | Q = " << &q << " | OOP(Q) = " << oop(q);
         HeapWord* region_top = (HeapWord*) tc->tc_region_top(oop(q), size);
-        std::cerr << " | REGION_TOP = " << region_top << std::endl;
         oop(q)->forward_to(oop(region_top));
         q += size;
         end_of_live = q;

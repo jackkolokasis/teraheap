@@ -22,6 +22,10 @@
 
 #define DEBUG_PRINT 1
 
-#define DEBUG_TERA_MARK_SWEEP 1
+#define DEBUG_TERA_MARK_SWEEP 0
+
+#define DEBUG_TERA_CACHE 0
+
+#define DEBUG_PRINTS 0 // remember to delete all these prints
 
 #endif  // _SHARE_DEFINES_H_

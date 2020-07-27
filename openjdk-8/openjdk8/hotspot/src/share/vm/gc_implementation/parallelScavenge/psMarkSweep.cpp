@@ -642,6 +642,7 @@ public:
 };
 static PSAlwaysTrueClosure always_true;
 
+// Update the reference address of the object
 void PSMarkSweep::mark_sweep_phase3() {
   // Adjust the pointers to reflect the new locations
   GCTraceTime tm("phase 3", PrintGCDetails && Verbose, true, _gc_timer);

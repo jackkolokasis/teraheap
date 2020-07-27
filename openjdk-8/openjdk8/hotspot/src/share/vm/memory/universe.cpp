@@ -76,6 +76,7 @@
 #include "gc_implementation/g1/g1CollectedHeap.inline.hpp"
 #include "gc_implementation/g1/g1CollectorPolicy.hpp"
 #include "gc_implementation/parallelScavenge/parallelScavengeHeap.hpp"
+#include "gc_implementation/teraCache/teraCache.hpp"
 #endif // INCLUDE_ALL_GCS
 //JK:
 #include <iostream>
@@ -143,6 +144,7 @@ size_t          Universe::_heap_capacity_at_last_gc;
 size_t          Universe::_heap_used_at_last_gc = 0;
 
 CollectedHeap*  Universe::_collectedHeap = NULL;
+TeraCache* 			Universe::_teraCache = NULL;
 
 NarrowPtrStruct Universe::_narrow_oop = { NULL, 0, true };
 NarrowPtrStruct Universe::_narrow_klass = { NULL, 0, true };
@@ -787,6 +789,8 @@ jint Universe::initialize_heap() {
 #if INCLUDE_ALL_GCS
     // We use this kind of heap for ParallelGC
     Universe::_collectedHeap = new ParallelScavengeHeap();
+    Universe::_teraCache = new TeraCache();
+    Universe::_teraCache->tc_new_region();
 #else  // INCLUDE_ALL_GCS
     fatal("UseParallelGC not supported in this VM.");
 #endif // INCLUDE_ALL_GCS

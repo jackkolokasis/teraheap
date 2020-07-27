@@ -49,7 +49,6 @@ class ParallelScavengeHeap : public CollectedHeap {
  private:
   static PSYoungGen* _young_gen;
   static PSOldGen*   _old_gen;
-  static TeraCache*  _tera_cache;
 
   // Sizing policy for entire heap
   static PSAdaptiveSizePolicy*       _size_policy;
@@ -96,7 +95,6 @@ class ParallelScavengeHeap : public CollectedHeap {
 
   static PSYoungGen* young_gen() { return _young_gen;  }
   static PSOldGen*   old_gen()   { return _old_gen;    }
-  static TeraCache*  tera_cache(){ return _tera_cache; }
 
   virtual PSAdaptiveSizePolicy* size_policy() { return _size_policy; }
 
