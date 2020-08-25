@@ -2416,6 +2416,9 @@ class CommandLineFlags {
   product(bool, DisableFullGC, false,                                       \
           "Disable Full GC in ParalellGC")                                  \
                                                                             \
+  product(bool, EnableTeraCache, false,                                     \
+          "Enable TeraCache")                                               \
+                                                                            \
   product(bool, CacheGenerationEnabled, false,                              \
           "Enable Cache generation in ParalellGC")                          \
                                                                             \

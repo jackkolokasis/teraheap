@@ -239,9 +239,6 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   // Make sure klass is initialized
   klass->initialize(CHECK);
   
-  
-  
-
   int alloc_cache = get_alloc_gen(pool, method(thread), bci(thread));
 
   // At this point the class may not be fully initialized
@@ -266,7 +263,8 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
     obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
   } else {
       // Allocate object to Old Generation directly
-      obj = klass->allocate_instance(true, CHECK);
+      obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
+     // obj = klass->allocate_instance(true, CHECK);
 
       // obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
 #if DEBUG_EXTRA_FIELD_MARK

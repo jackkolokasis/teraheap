@@ -1437,7 +1437,8 @@ void Arguments::set_use_compressed_oops() {
   if (max_heap_size <= max_heap_for_compressed_oops()) {
 #if !defined(COMPILER1) || defined(TIERED)
     if (FLAG_IS_DEFAULT(UseCompressedOops)) {
-      FLAG_SET_ERGO(bool, UseCompressedOops, true);
+      //FLAG_SET_ERGO(bool, UseCompressedOops, true);
+      FLAG_SET_ERGO(bool, UseCompressedOops, false);
     }
 #endif
 #ifdef _WIN64
@@ -1475,7 +1476,8 @@ void Arguments::set_use_compressed_klass_ptrs() {
   } else {
     // Turn on UseCompressedClassPointers too
     if (FLAG_IS_DEFAULT(UseCompressedClassPointers)) {
-      FLAG_SET_ERGO(bool, UseCompressedClassPointers, true);
+      //FLAG_SET_ERGO(bool, UseCompressedClassPointers, true);
+      FLAG_SET_ERGO(bool, UseCompressedClassPointers, false);
     }
     // Check the CompressedClassSpaceSize to make sure we use compressed klass ptrs.
     if (UseCompressedClassPointers) {

@@ -71,20 +71,20 @@ void MarkSweep::follow_class_loader(ClassLoaderData* cld) {
 }
 
 void MarkSweep::follow_stack() {
-  do {
-    while (!_marking_stack.is_empty()) {
-      oop obj = _marking_stack.pop();
-      assert (obj->is_gc_marked(), "p must be marked");
-      // Check if the content is skipped
-      obj->follow_contents();
-    }
-    // Process ObjArrays one at a time to avoid marking stack bloat.
-    if (!_objarray_stack.is_empty()) {
-      ObjArrayTask task = _objarray_stack.pop();
-      ObjArrayKlass* k = (ObjArrayKlass*)task.obj()->klass();
-      k->oop_follow_contents(task.obj(), task.index());
-    }
-  } while (!_marking_stack.is_empty() || !_objarray_stack.is_empty());
+	do {
+		while (!_marking_stack.is_empty()) {
+			oop obj = _marking_stack.pop();
+			assert (obj->is_gc_marked(), "p must be marked");
+			// Check if the content is skipped
+			obj->follow_contents();
+		}
+		// Process ObjArrays one at a time to avoid marking stack bloat.
+		if (!_objarray_stack.is_empty()) {
+			ObjArrayTask task = _objarray_stack.pop();
+			ObjArrayKlass* k = (ObjArrayKlass*)task.obj()->klass();
+			k->oop_follow_contents(task.obj(), task.index());
+		}
+	} while (!_marking_stack.is_empty() || !_objarray_stack.is_empty());
 }
 
 MarkSweep::FollowStackClosure MarkSweep::follow_stack_closure;

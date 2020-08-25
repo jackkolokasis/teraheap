@@ -444,9 +444,10 @@ HeapWord* ParallelScavengeHeap::direct_mem_allocate_old(
 
       // If certain conditions hold, try allocating from the old gen.
       result = mem_allocate_old_gen(size);
-      if (result != NULL) {
-        return result;
-      }
+      
+	  if (result != NULL) { 
+		  return result;
+	  }
 
       if (gclocker_stalled_count > GCLockerRetryAllocationCount) {
         return NULL;

@@ -157,8 +157,11 @@ inline bool oopDesc::is_typeArray()          const { return klass()->oop_is_type
 // Get the offset where data area starts
 inline void*     oopDesc::field_base(int offset)        const { return (void*)&((char*)this)[offset]; }
 
-template <class T> inline T* oopDesc::obj_field_addr(int offset) const { return (T*)field_base(offset); }
-inline Metadata** oopDesc::metadata_field_addr(int offset) const { return (Metadata**)field_base(offset); }
+
+template <class T> inline T* oopDesc::obj_field_addr(int offset) const {  return (T*)field_base(offset); }
+
+inline Metadata** oopDesc::metadata_field_addr(int offset) const {  return (Metadata**)field_base(offset); 
+}
 inline jbyte*    oopDesc::byte_field_addr(int offset)   const { return (jbyte*)   field_base(offset); }
 inline jchar*    oopDesc::char_field_addr(int offset)   const { return (jchar*)   field_base(offset); }
 inline jboolean* oopDesc::bool_field_addr(int offset)   const { return (jboolean*)field_base(offset); }
@@ -245,15 +248,22 @@ inline void oopDesc::store_heap_oop(narrowOop* p, narrowOop v)     { *p = v; }
 
 // Encode and store a heap oop.
 inline void oopDesc::encode_store_heap_oop_not_null(narrowOop* p, oop v) {
-  *p = encode_heap_oop_not_null(v);
+	*p = encode_heap_oop_not_null(v);
 }
-inline void oopDesc::encode_store_heap_oop_not_null(oop* p, oop v) { *p = v; }
+
+inline void oopDesc::encode_store_heap_oop_not_null(oop* p, oop v) 
+{ 
+	*p = v; 
+}
 
 // Encode and store a heap oop allowing for null.
 inline void oopDesc::encode_store_heap_oop(narrowOop* p, oop v) {
-  *p = encode_heap_oop(v);
+	*p = encode_heap_oop(v);
 }
-inline void oopDesc::encode_store_heap_oop(oop* p, oop v) { *p = v; }
+
+inline void oopDesc::encode_store_heap_oop(oop* p, oop v) { 
+	*p = v; 
+}
 
 // Store heap oop as is for volatile fields.
 inline void oopDesc::release_store_heap_oop(volatile oop* p, oop v) {

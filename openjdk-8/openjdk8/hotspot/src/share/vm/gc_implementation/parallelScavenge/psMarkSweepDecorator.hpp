@@ -26,7 +26,7 @@
 #define SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSMARKSWEEPDECORATOR_HPP
 
 #include "gc_implementation/shared/mutableSpace.hpp"
-
+#include <vector>
 //
 // A PSMarkSweepDecorator is used to add "ParallelScavenge" style mark sweep operations
 // to a MutableSpace.
@@ -41,10 +41,10 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
  protected:
   MutableSpace* _space;
   ObjectStartArray* _start_array;
-  HeapWord* _first_dead;
-  HeapWord* _end_of_live;
-  HeapWord* _compaction_top;
-  size_t _allowed_dead_ratio;
+  HeapWord* _first_dead;		/* First dead object		      */
+  HeapWord* _end_of_live;		/* End of live region 			  */
+  HeapWord* _compaction_top;	/* Compaction top pointer         */
+  size_t _allowed_dead_ratio;   /* Allowed dead ratio             */
 
   bool insert_deadspace(size_t& allowed_deadspace_words, HeapWord* q,
                         size_t word_len);

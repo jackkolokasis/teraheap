@@ -1391,20 +1391,35 @@ static void jni_invoke_nonstatic(JNIEnv *env, JavaValue* result, jobject receive
 
 
 static instanceOop alloc_object(jclass clazz, TRAPS) {
-  KlassHandle k(THREAD, java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz)));
-  k()->check_valid_for_instantiation(false, CHECK_NULL);
-  InstanceKlass::cast(k())->initialize(CHECK_NULL);
-  instanceOop ih = NULL;
-  if (!strstr(InstanceKlass::cast(k())->signature_name(), "DeserializedMemoryEntry"))
-  {
-      ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
-  }
-  else
-  {
-      ih = InstanceKlass::cast(k())->allocate_instance(true, THREAD);
-      ih->set_tera_cache();
-  }
-  return ih;
+	KlassHandle k(THREAD, java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz)));
+
+	k()->check_valid_for_instantiation(false, CHECK_NULL);
+	InstanceKlass::cast(k())->initialize(CHECK_NULL);
+	instanceOop ih = NULL;
+
+	if (EnableTeraCache)
+	{
+		if (!strstr(InstanceKlass::cast(k())->signature_name(), "DeserializedMemoryEntry")) 
+		{
+			ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
+		}
+		else 
+		{
+			// Direct allocate to old gen
+			//ih = InstanceKlass::cast(k())->allocate_instance(true, THREAD);
+
+			// Allocate object in the young gen
+			ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
+
+			// Mark Object to be transfered in teracache
+			ih->set_tera_cache();
+		}
+	}
+	else {
+		ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
+	}
+
+	return ih;
 }
 
 #ifndef USDT2

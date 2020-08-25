@@ -53,9 +53,11 @@ void CollectedHeap::post_allocation_setup_no_klass_install(KlassHandle klass,
   assert(obj != NULL, "NULL object pointer");
   if (UseBiasedLocking && (klass() != NULL)) {
     obj->set_mark(klass->prototype_header());
+	obj->init_tera_cache();
   } else {
     // May be bootstrapping
     obj->set_mark(markOopDesc::prototype());
+	obj->init_tera_cache();
   }
 }
 
@@ -250,23 +252,6 @@ HeapWord* CollectedHeap::mem_allocate_old_init(KlassHandle klass, size_t size, T
   init_obj(obj, size);
   return obj;
 }
-
-// JK: TeraCache allocation path
-//HeapWord* CollectedHeap::teraCache_allocate(KlassHandle klass, size_t size) {
-//      // Initialize allocator
-//      init();
-//
-//      // Get a region from the allocator to locate the object
-//      region_t myregion = new_region(NULL);
-//      printf("Region = %p\n", myregion);
-//
-//      // Calculate the header size and reserve this space to the
-//      // region
-//      size_t hdr_size = oopDesc::header_size();
-//      HeapWord *tmp = (HeapWord *)rc_rstralloc0(myregion, (hdr_size + size) * sizeof(HeapWord));
-//
-//      return tmp;
-//}
 
 // <jk> Allocation from tlab. Introduce if to select tlab
 HeapWord* CollectedHeap::allocate_from_tlab(KlassHandle klass, Thread* thread, size_t size) {

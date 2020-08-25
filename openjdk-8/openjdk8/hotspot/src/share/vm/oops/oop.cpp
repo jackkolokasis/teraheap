@@ -30,7 +30,7 @@
 #include "runtime/thread.inline.hpp"
 #include "utilities/copy.hpp"
 
-bool always_do_update_barrier = false;
+bool always_do_update_barrier    = false;
 
 BarrierSet* oopDesc::_bs = NULL;
 

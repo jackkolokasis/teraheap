@@ -52,6 +52,8 @@
 #ifdef TARGET_OS_FAMILY_bsd
 # include "os_bsd.inline.hpp"
 #endif
+#include "memory/sharedDefines.h"
+
 
 #if defined(__GNUC__)
   // Need to inhibit inlining for older versions of GCC to avoid build-time failures
@@ -263,7 +265,7 @@ void ObjectSynchronizer::slow_enter(Handle obj, BasicLock* lock, TRAPS) {
 // failed in the interpreter/compiler code. Simply use the heavy
 // weight monitor should be ok, unless someone find otherwise.
 void ObjectSynchronizer::slow_exit(oop object, BasicLock* lock, TRAPS) {
-  fast_exit (object, lock, THREAD) ;
+	fast_exit (object, lock, THREAD) ;
 }
 
 // -----------------------------------------------------------------------------

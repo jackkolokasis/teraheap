@@ -31,6 +31,8 @@
 #include "oops/metadata.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/top.hpp"
+#include <iostream>
+#include "memory/sharedDefines.h"
 
 // oopDesc is the top baseclass for objects classes.  The {name}Desc classes describe
 // the format of Java objects so the fields can be accessed from C++.
@@ -90,12 +92,12 @@ class oopDesc {
   friend class VMStructs;
  private:
   // Use for GC, lock etc.
-  volatile markOop  _mark;            // Object header. Use for GC, lock etc.
-  volatile unsigned int _tera_flag;   // Use for TeraCache objects
+  volatile markOop  _mark;          // Object header. Use for GC, lock etc.
   union _metadata {
-    Klass*      _klass;
-    narrowKlass _compressed_klass;
+    Klass*      _klass;	            // Uncompressed class pointer
+    narrowKlass _compressed_klass;  // Compressed class pointer
   } _metadata;
+  volatile uint64_t _tera_flag;     // MarkTeracache objects
 
   // Fast access to barrier set.  Must be initialized.
   static BarrierSet* _bs;
@@ -104,9 +106,47 @@ class oopDesc {
   markOop  mark() const         { return _mark; }
   markOop* mark_addr() const    { return (markOop*) &_mark; }
 
-  void set_tera_cache() { _tera_flag = 1; }
-  bool is_tera_cache() { return (_tera_flag == 1); }
-  void init_tera_cache() { _tera_flag = 0; }
+  /* Init TeraCache marking flag */
+  void init_tera_cache() 
+  {
+	  _tera_flag = 0; 
+  }
+
+  /* Mark an object to be moved in TeraCache */
+  void set_tera_cache() 
+  { 
+	  _tera_flag  = 1; 
+  }
+
+  /* Check if an object is marked to be moved in TeraCache */
+  bool is_tera_cache() 
+  { 
+	  return _tera_flag == 1; 
+  }
+  
+  /* Set a teracache object to be shadow */
+  void set_shadow_tera_object() 
+  { 
+	  _tera_flag = 2; 
+  }
+  
+  /* Check if a place is a shadow place */
+  bool is_shadow_tera_object() 
+  { 
+	  return _tera_flag == 2; 
+  }
+
+  /* Set this object as special to handle ajust pointers*/
+  void set_special_object()
+  {
+	  _tera_flag = 3;
+  }
+  
+  /* Chech if this object is special */
+  bool is_special_object()
+  {
+	  return (_tera_flag == 3);
+  }
 
   void set_mark(volatile markOop m)      { _mark = m;   }
 

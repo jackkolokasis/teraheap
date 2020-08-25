@@ -541,6 +541,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // General strong roots.
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
+    
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
 
@@ -564,6 +565,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 
     // Keep all the classes loaded by the Java system class loader, as well as the objects referenced by the static fields of the class.
     SystemDictionary::always_strong_oops_do(mark_and_push_closure());
+
     // May be uncomment this
     // ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(), follow_klass_closure(), true);
     
@@ -595,20 +597,31 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // This is the point where the entire marking should have completed.
   assert(_marking_stack.is_empty(), "Marking should have completed");
 
-  // Unload classes and purge the SystemDictionary.
-  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
+  // ektipwse unload klaseis -> poies kanei unload
+  // poia ekana unload kai ekei pou skas ekanes unload
+  // poia klasei exei ginei access kai einai unload
+  // comment out olo to unloading
+  // unload -> 
+  // otan skaei ti prospathei na kanei accesss
+  // apo pou ton diavase
+  if (!EnableTeraCache)
+  {
+	  // Unload classes and purge the SystemDictionary.
+	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
 
-  // Unload nmethods.
-  CodeCache::do_unloading(is_alive_closure(), purged_class);
+	  // Unload nmethods.
+	  CodeCache::do_unloading(is_alive_closure(), purged_class);
 
-  // Prune dead klasses from subklass/sibling/implementor lists.
-  Klass::clean_weak_klass_links(is_alive_closure());
+	  // Prune dead klasses from subklass/sibling/implementor lists.
+	  Klass::clean_weak_klass_links(is_alive_closure());
 
-  // Delete entries for dead interned strings.
-  StringTable::unlink(is_alive_closure());
+	  // Delete entries for dead interned strings.
+	  StringTable::unlink(is_alive_closure());
 
-  // Clean up unreferenced symbols in symbol table.
-  SymbolTable::unlink();
+	  // Clean up unreferenced symbols in symbol table.
+	  SymbolTable::unlink();
+  }
+
   _gc_tracer->report_object_count_after_gc(is_alive_closure());
 }
 
@@ -680,6 +693,7 @@ void PSMarkSweep::mark_sweep_phase3() {
   ref_processor()->weak_oops_do(adjust_pointer_closure());
   PSScavenge::reference_processor()->weak_oops_do(adjust_pointer_closure());
 
+  // Overflow stack and preserved marks
   adjust_marks();
 
   young_gen->adjust_pointers();

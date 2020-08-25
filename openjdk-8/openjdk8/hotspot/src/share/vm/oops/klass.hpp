@@ -36,6 +36,7 @@
 #include "trace/traceMacros.hpp"
 #include "utilities/accessFlags.hpp"
 #include "utilities/macros.hpp"
+#include "memory/sharedDefines.h"
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/concurrentMarkSweep/cmsOopClosures.hpp"
 #include "gc_implementation/g1/g1OopClosures.hpp"
@@ -251,7 +252,7 @@ class Klass : public Metadata {
 
   // size helper
   int layout_helper() const            { return _layout_helper; }
-  void set_layout_helper(int lh)       { _layout_helper = lh; }
+  void set_layout_helper(int lh)       {   _layout_helper = lh;  }
 
   // Note: for instances layout_helper() may include padding.
   // Use InstanceKlass::contains_field_offset to classify field offsets.
@@ -309,7 +310,9 @@ class Klass : public Metadata {
     _lh_element_type_mask       = right_n_bits(BitsPerByte),  // shifted mask
     _lh_header_size_shift       = BitsPerByte*2,
     _lh_header_size_mask        = right_n_bits(BitsPerByte),  // shifted mask
-    _lh_array_tag_bits          = 2,
+															  // 6bits
+															  // unused?
+    _lh_array_tag_bits          = 2,						  // high order bits
     _lh_array_tag_shift         = BitsPerInt - _lh_array_tag_bits,
     _lh_array_tag_type_value    = ~0x00,  // 0xC0000000 >> 30
     _lh_array_tag_obj_value     = ~0x01   // 0x80000000 >> 30
@@ -351,7 +354,9 @@ class Klass : public Metadata {
   }
   static int layout_helper_log2_element_size(jint lh) {
     assert(lh < (jint)_lh_neutral_value, "must be array");
+
     int l2esz = (lh >> _lh_log2_element_size_shift) & _lh_log2_element_size_mask;
+
     assert(l2esz <= LogBitsPerLong,
         err_msg("sanity. l2esz: 0x%x for lh: 0x%x", (uint)l2esz, (uint)lh));
     return l2esz;

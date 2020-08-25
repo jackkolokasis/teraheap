@@ -46,6 +46,7 @@
 //  --------
 //  unused:25 hash:31 -->| unused:1   age:4    biased_lock:1 lock:2 (normal object)
 //  JavaThread*:54 epoch:2 unused:1   age:4    biased_lock:1 lock:2 (biased object)
+//  /////////////////////////////////////////////////////////////////////////////////////
 //  PromotedObject*:61 --------------------->| promo_bits:3 ----->| (CMS promoted object)
 //  size:64 ----------------------------------------------------->| (CMS free block)
 //
@@ -117,7 +118,7 @@ class markOopDesc: public oopDesc {
          cms_bits                 = LP64_ONLY(1) NOT_LP64(0),
          epoch_bits               = 2
 #ifdef DEBUG_EXTRA_FIELD_MARK
-         ,tera_bits          = 1
+         ,tera_bits               = 1
 #endif
   };
 

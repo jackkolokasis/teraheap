@@ -32,6 +32,7 @@
 #include "gc_implementation/shared/markSweep.inline.hpp"
 #include "gc_implementation/shared/spaceDecorator.hpp"
 #include "oops/oop.inline.hpp"
+#include <cstring>
 
 PSMarkSweepDecorator* PSMarkSweepDecorator::_destination_decorator = NULL;
 
@@ -79,206 +80,289 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
 // finish by compacting into our own space.
 
 void PSMarkSweepDecorator::precompact() {
-  // Reset our own compact top.
-  set_compaction_top(space()->bottom());
+	// Reset our own compact top.
+	set_compaction_top(space()->bottom());
 
-  /* We allow some amount of garbage towards the bottom of the space, so
-   * we don't start compacting before there is a significant gain to be made.
-   * Occasionally, we want to ensure a full compaction, which is determined
-   * by the MarkSweepAlwaysCompactCount parameter. This is a significant
-   * performance improvement!
-   */
-  bool skip_dead = ((PSMarkSweep::total_invocations() % MarkSweepAlwaysCompactCount) != 0);
+	/* We allow some amount of garbage towards the bottom of the space, so
+	 * we don't start compacting before there is a significant gain to be made.
+	 * Occasionally, we want to ensure a full compaction, which is determined
+	 * by the MarkSweepAlwaysCompactCount parameter. This is a significant
+	 * performance improvement!
+	 */
+	bool skip_dead = ((PSMarkSweep::total_invocations() % MarkSweepAlwaysCompactCount) != 0);
 
-  size_t allowed_deadspace = 0;
-  if (skip_dead) {
-    const size_t ratio = allowed_dead_ratio();
-    allowed_deadspace = space()->capacity_in_words() * ratio / 100;
-  }
+	// Number of allowed space
+	size_t allowed_deadspace = 0;
 
-  // Fetch the current destination decorator
-  PSMarkSweepDecorator* dest = destination_decorator();
-  ObjectStartArray* start_array = dest->start_array();
+	if (skip_dead) {
+		const size_t ratio = allowed_dead_ratio();
+		allowed_deadspace = space()->capacity_in_words() * ratio / 100;
+	}
 
-  HeapWord* compact_top = dest->compaction_top();
-  HeapWord* compact_end = dest->space()->end();
+	// Fetch the current destination decorator
+	PSMarkSweepDecorator* dest = destination_decorator();
+	ObjectStartArray* start_array = dest->start_array();
 
-  HeapWord* q = space()->bottom();
-  HeapWord* t = space()->top();
+	/* Compaction area start address */
+	HeapWord* compact_top = dest->compaction_top();
 
-  HeapWord*  end_of_live= q;    /* One byte beyond the last byte of the last
-                                   live object. */
-  HeapWord*  first_dead = space()->end(); /* The first dead object. */
-  LiveRange* liveRange  = NULL; /* The current live range, recorded in the
-                                   first header of preceding free area. */
-  _first_dead = first_dead;
+	/* Compaction area end address */
+	HeapWord* compact_end = dest->space()->end();
 
-  const intx interval = PrefetchScanIntervalInBytes;
+	/* Start address of the space */
+	HeapWord* q = space()->bottom();
+	/* End address of the space */
+	HeapWord* t = space()->top();
 
+	/* One byte beyond the last byte of the last live object. */
+	HeapWord*  end_of_live= q;    
+
+	/* The first dead object */
+	HeapWord*  first_dead = space()->end();
+
+	/* The current live range, recorded in the first header of proceding free
+	 * area
+	 */
+	LiveRange* liveRange  = NULL;
+
+	/* First dead object */
+	_first_dead = first_dead;
+
+	/* Prefetch interval */
+	const intx interval = PrefetchScanIntervalInBytes;
+
+	/* Get TeraCache instance */
 	TeraCache* tc = Universe::teraCache();
 
-  while (q < t) {
-    assert(oop(q)->mark()->is_marked() || oop(q)->mark()->is_unlocked() ||
-           oop(q)->mark()->has_bias_pattern(),
-           "these are the only valid states during a mark sweep");
+	/* Previous object */
+	HeapWord* prev_q = NULL;
 
-    if (oop(q)->is_gc_marked()) {
-      /* prefetch beyond q */
-      Prefetch::write(q, interval);
-      size_t size = oop(q)->size();
+	while (q < t) {
+		assert(oop(q)->mark()->is_marked() || oop(q)->mark()->is_unlocked() ||
+				oop(q)->mark()->has_bias_pattern(),
+				"these are the only valid states during a mark sweep");
 
-      if (oop(q)->is_tera_cache())
-      {
-        HeapWord* region_top = (HeapWord*) tc->tc_region_top(oop(q), size);
-        oop(q)->forward_to(oop(region_top));
-        q += size;
-        end_of_live = q;
-        continue;
-      }
+		// Check if this object is marked
+		if (oop(q)->is_gc_marked()) 
+		{
+			/* Prefetch beyond q */
+			Prefetch::write(q, interval);
 
-      size_t compaction_max_size = pointer_delta(compact_end, compact_top);
+			/* Size of the object */
+			size_t size = oop(q)->size();
 
-      // This should only happen if a space in the young gen overflows the
-      // old gen. If that should happen, we null out the start_array, because
-      // the young spaces are not covered by one.
-      while(size > compaction_max_size) {
-        // First record the last compact_top
-        dest->set_compaction_top(compact_top);
+			// Debug prints
+			if (EnableTeraCache)
+			{
+				std::cerr << "[PRECOMPACT]"  << " | OBJECT = "  << oop(q) << " | CLASS = "
+					<< oop(q)->klass()->signature_name() << " | MARK = " << oop(q)->mark() 
+					<< std::endl;
+			}
 
-        // Advance to the next compaction decorator
-        advance_destination_decorator();
-        dest = destination_decorator();
+			// Check if the object is marked to be moved to teracache
+			if (EnableTeraCache && oop(q)->is_tera_cache())
+			{
+				// Take a pointer from the region
+				HeapWord* region_top = (HeapWord*) tc->tc_region_top(oop(q), size);
 
-        // Update compaction info
-        start_array = dest->start_array();
-        compact_top = dest->compaction_top();
-        compact_end = dest->space()->end();
-        assert(compact_top == dest->space()->bottom(), "Advanced to space already in use");
-        assert(compact_end > compact_top, "Must always be space remaining");
-        compaction_max_size =
-          pointer_delta(compact_end, compact_top);
-      }
+				// Store the forwarding pointer into the mark word
+				oop(q)->forward_to(oop(region_top));
 
-      // store the forwarding pointer into the mark word
-      if (q != compact_top) {
-        oop(q)->forward_to(oop(compact_top));
-        assert(oop(q)->is_gc_marked(), "encoding the pointer should preserve the mark");
-      } else {
-        // if the object isn't moving we can just set the mark to the default
-        // mark and handle it specially later on.
-        oop(q)->init_mark();
-        assert(oop(q)->forwardee() == NULL, "should be forwarded to NULL");
-      }
+				/* Previous object */
+				prev_q = q;
 
-      // Update object start array
-      if (start_array) {
-        start_array->allocate_block(compact_top);
-      }
+				/* Move to the next object */
+				q += size;
 
-      compact_top += size;
-      assert(compact_top <= dest->space()->end(),
-        "Exceeding space in destination");
+				/* Set this object as live in the in the precompact space */
+				end_of_live = q;
+				/* Continue with the next object */
+				continue;
+			}
 
-      q += size;
-      end_of_live = q;
-    } else {
-      /* run over all the contiguous dead objects */
-      HeapWord* end = q;
-      do {
-        /* prefetch beyond end */
-        Prefetch::write(end, interval);
-        end += oop(end)->size();
-      } while (end < t && (!oop(end)->is_gc_marked()));
+			size_t compaction_max_size = pointer_delta(compact_end, compact_top);
+			// This should only happen if a space in the young gen overflows the
+			// old gen. If that should happen, we null out the start_array, because
+			// the young spaces are not covered by one.
+			while(size > compaction_max_size) {
+				// First record the last compact_top
+				dest->set_compaction_top(compact_top);
 
-      /* see if we might want to pretend this object is alive so that
-       * we don't have to compact quite as often.
-       */
-      if (allowed_deadspace > 0 && q == compact_top) {
-        size_t sz = pointer_delta(end, q);
-        if (insert_deadspace(allowed_deadspace, q, sz)) {
-          size_t compaction_max_size = pointer_delta(compact_end, compact_top);
+				// Advance to the next compaction decorator
+				advance_destination_decorator();
+				dest = destination_decorator();
 
-          // This should only happen if a space in the young gen overflows the
-          // old gen. If that should happen, we null out the start_array, because
-          // the young spaces are not covered by one.
-          while (sz > compaction_max_size) {
-            // First record the last compact_top
-            dest->set_compaction_top(compact_top);
+				// Update compaction info
+				start_array = dest->start_array();
+				compact_top = dest->compaction_top();
+				compact_end = dest->space()->end();
+				assert(compact_top == dest->space()->bottom(), "Advanced to space already in use");
+				assert(compact_end > compact_top, "Must always be space remaining");
+				compaction_max_size = pointer_delta(compact_end, compact_top);
+			}
 
-            // Advance to the next compaction decorator
-            advance_destination_decorator();
-            dest = destination_decorator();
+			if (q != compact_top) 
+			{
+				if (EnableTeraCache)
+				{
+				std::cerr << "[PRECOMPACT_1]"  << " | OBJECT = "  << oop(q) << " | COMPACTION_TOP = "
+					<< compact_top << "PREV_Q = " << prev_q << std::endl;
+				}
+				oop(q)->forward_to(oop(compact_top));
+				assert(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
+			} 
+			else 
+			{
+				/*
+				 * In this case objects will not change posision in the heap. As
+				 * a result their new location should be the same as the current
+				 * location and forwardee() should return NULL
+				 *
+				 * If the object isn't moving we can just set the mark to the
+				 * default mark and handle it specially later on. Check this
+				 * maybe we do not need to do init_mark() again
+				 */
+				if (EnableTeraCache)
+				{
+					std::cerr << "[B_PRECOMPACT_2] " << " | O = " << q << " | MARK = " << oop(q)->mark() << std::endl; 
+					oop(q)->init_mark();
+					std::cerr << "[A_PRECOMPACT_2] " << " | O = " << q << " | MARK = " << oop(q)->mark() << std::endl; 
+				}
+				else 
+				{
+					oop(q)->init_mark();
+				}
 
-            // Update compaction info
-            start_array = dest->start_array();
-            compact_top = dest->compaction_top();
-            compact_end = dest->space()->end();
-            assert(compact_top == dest->space()->bottom(), "Advanced to space already in use");
-            assert(compact_end > compact_top, "Must always be space remaining");
-            compaction_max_size =
-              pointer_delta(compact_end, compact_top);
-          }
+				assert(oop(q)->forwardee() == NULL,  "should be forwarded to NULL");
+			}
 
-          // store the forwarding pointer into the mark word
-          if (q != compact_top) {
-            oop(q)->forward_to(oop(compact_top));
-            assert(oop(q)->is_gc_marked(), "encoding the pointer should preserve the mark");
-          } else {
-            // if the object isn't moving we can just set the mark to the default
-            // mark and handle it specially later on.
-            oop(q)->init_mark();
-            assert(oop(q)->forwardee() == NULL, "should be forwarded to NULL");
-          }
+			/* Update object start array */
+			if (start_array) {
+				start_array->allocate_block(compact_top);
+			}
 
-          // Update object start array
-          if (start_array) {
-            start_array->allocate_block(compact_top);
-          }
+			/* Increase compation pointer */
+			compact_top += size;
+			if (compact_top > dest->space()->end())
+				std::cerr << "Exceeding space in destination!!!" << std::endl;
+			assert(compact_top <= dest->space()->end(), "Exceeding space in destination");
 
-          compact_top += sz;
-          assert(compact_top <= dest->space()->end(),
-            "Exceeding space in destination");
+			/* Set the pointer to the previous object */
+			prev_q = q;
 
-          q = end;
-          end_of_live = end;
-          continue;
-        }
-      }
+			/* Move to the next object */
+			q += size;
 
-      /* for the previous LiveRange, record the end of the live objects. */
-      if (liveRange) {
-        liveRange->set_end(q);
-      }
+			/* Mark this object as the last lived object */
+			end_of_live = q;
+		} 
+		else  {
 
-      /* record the current LiveRange object.
-       * liveRange->start() is overlaid on the mark word.
-       */
-      liveRange = (LiveRange*)q;
-      liveRange->set_start(end);
-      liveRange->set_end(end);
+			/* Run over all the contiguous dead objects */
+			HeapWord* end = q;
+			do {
+				/* Prefetch beyond end */
+				Prefetch::write(end, interval);
+				prev_q = end;
+				end += oop(end)->size();
 
-      /* see if this is the first dead region. */
-      if (q < first_dead) {
-        first_dead = q;
-      }
+				// teracache 
+				// add code for teracache
 
-      /* move on to the next object */
-      q = end;
-    }
-  }
+			} while (end < t && (!oop(end)->is_gc_marked()));// || oop(end)->is_tera_cache()));
 
-  assert(q == t, "just checking");
-  if (liveRange != NULL) {
-    liveRange->set_end(q);
-  }
-  _end_of_live = end_of_live;
-  if (end_of_live < first_dead) {
-    first_dead = end_of_live;
-  }
-  _first_dead = first_dead;
 
-  // Update compaction top
-  dest->set_compaction_top(compact_top);
+			/* See if we might want to pretend this object is alive so that
+			 * we don't have to compact quite as often.
+			 */
+			if (allowed_deadspace > 0 && q == compact_top) {
+				size_t sz = pointer_delta(end, q);
+				if (insert_deadspace(allowed_deadspace, q, sz)) {
+					size_t compaction_max_size = pointer_delta(compact_end, compact_top);
+
+					// This should only happen if a space in the young gen overflows the
+					// old gen. If that should happen, we null out the start_array, because
+					// the young spaces are not covered by one.
+					while (sz > compaction_max_size) {
+						// First record the last compact_top
+						dest->set_compaction_top(compact_top);
+
+						// Advance to the next compaction decorator
+						advance_destination_decorator();
+						dest = destination_decorator();
+
+						// Update compaction info
+						start_array = dest->start_array();
+						compact_top = dest->compaction_top();
+						compact_end = dest->space()->end();
+						assert(compact_top == dest->space()->bottom(), "Advanced to space already in use");
+						assert(compact_end > compact_top, "Must always be space remaining");
+						compaction_max_size =
+							pointer_delta(compact_end, compact_top);
+					}
+
+					// store the forwarding pointer into the mark word
+					if (q != compact_top) {
+						oop(q)->forward_to(oop(compact_top));
+						assert(oop(q)->is_gc_marked(), "encoding the pointer should preserve the mark");
+					} else {
+						// if the object isn't moving we can just set the mark to the default
+						// mark and handle it specially later on.
+						oop(q)->init_mark();
+						assert(oop(q)->forwardee() == NULL, "should be forwarded to NULL");
+					}
+
+					// Update object start array
+					if (start_array) {
+						start_array->allocate_block(compact_top);
+					}
+
+					compact_top += sz;
+					assert(compact_top <= dest->space()->end(), "Exceeding space in destination");
+
+					q = end;
+					end_of_live = end;
+					continue;
+				}
+			}
+
+
+			/* For the previous LiveRange, record the end of the live objects. */
+			if (liveRange) {
+				liveRange->set_end(q);
+			}
+
+			/* Record the current LiveRange object.
+			 * liveRange->start() is overlaid on the mark word.
+			 */
+			liveRange = (LiveRange*)q;
+			liveRange->set_start(end);
+			liveRange->set_end(end);
+
+			/* See if this is the first dead region. */
+			if (q < first_dead) {
+				first_dead = q;
+
+			}
+
+			/* Move on to the next object */
+			q = end;
+		} /*< End of else  */
+	}     /*< End of while */
+
+	assert(q == t, "just checking");
+	if (liveRange != NULL) {
+		liveRange->set_end(q);
+	}
+	_end_of_live = end_of_live;
+	if (end_of_live < first_dead) {
+		first_dead = end_of_live;
+	}
+
+	_first_dead = first_dead;
+
+	// Update compaction top
+	dest->set_compaction_top(compact_top);
 }
 
 bool PSMarkSweepDecorator::insert_deadspace(size_t& allowed_deadspace_words,
@@ -297,57 +381,56 @@ bool PSMarkSweepDecorator::insert_deadspace(size_t& allowed_deadspace_words,
 }
 
 void PSMarkSweepDecorator::adjust_pointers() {
-  // adjust all the interior pointers to point at the new locations of objects
-  // Used by MarkSweep::mark_sweep_phase3()
+	// adjust all the interior pointers to point at the new locations of objects
+	// Used by MarkSweep::mark_sweep_phase3()
 
-  HeapWord* q = space()->bottom();
-  HeapWord* t = _end_of_live;  // Established by "prepare_for_compaction".
+	HeapWord* q = space()->bottom();
+	HeapWord* t = _end_of_live;  // Established by "prepare_for_compaction".
 
-  assert(_first_dead <= _end_of_live, "Stands to reason, no?");
+	assert(_first_dead <= _end_of_live, "Stands to reason, no?");
 
-  if (q < t && _first_dead > q &&
-      !oop(q)->is_gc_marked()) {
-    // we have a chunk of the space which hasn't moved and we've
-    // reinitialized the mark word during the previous pass, so we can't
-    // use is_gc_marked for the traversal.
-    HeapWord* end = _first_dead;
+	if (q < t && _first_dead > q && !oop(q)->is_gc_marked()) {
+		// We have a chunk of the space which hasn't moved and we've
+		// reinitialized the mark word during the previous pass, so we can't
+		// use is_gc_marked for the traversal.
+		HeapWord* end = _first_dead;
 
-    while (q < end) {
-      // point all the oops to the new location
-      size_t size = oop(q)->adjust_pointers();
-      q += size;
-    }
+		while (q < end) {
+			// point all the oops to the new location
+			size_t size = oop(q)->adjust_pointers();
+			q += size;
+		}
 
-    if (_first_dead == t) {
-      q = t;
-    } else {
-      // $$$ This is funky.  Using this to read the previously written
-      // LiveRange.  See also use below.
-      q = (HeapWord*)oop(_first_dead)->mark()->decode_pointer();
-    }
-  }
-  const intx interval = PrefetchScanIntervalInBytes;
+		if (_first_dead == t) {
+			q = t;
+		} else {
+			// $$$ This is funky.  Using this to read the previously written
+			// LiveRange.  See also use below.
+			q = (HeapWord*)oop(_first_dead)->mark()->decode_pointer();
+		}
+	}
+	const intx interval = PrefetchScanIntervalInBytes;
 
-  debug_only(HeapWord* prev_q = NULL);
-  while (q < t) {
-    // prefetch beyond q
-    Prefetch::write(q, interval);
-    if (oop(q)->is_gc_marked()) {
-      // q is alive
-      // point all the oops to the new location
-      size_t size = oop(q)->adjust_pointers();
-      debug_only(prev_q = q);
-      q += size;
-    } else {
-      // q is not a live object, so its mark should point at the next
-      // live object
-      debug_only(prev_q = q);
-      q = (HeapWord*) oop(q)->mark()->decode_pointer();
-      assert(q > prev_q, "we should be moving forward through memory");
-    }
-  }
+	debug_only(HeapWord* prev_q = NULL);
+	while (q < t) {
+		// prefetch beyond q
+		Prefetch::write(q, interval);
+		if (oop(q)->is_gc_marked()) {
+			// q is alive
+			// point all the oops to the new location
+			size_t size = oop(q)->adjust_pointers();
+			debug_only(prev_q = q);
+			q += size;
+		} else {
+			// q is not a live object, so its mark should point at the next
+			// live object
+			debug_only(prev_q = q);
+			q = (HeapWord*) oop(q)->mark()->decode_pointer();
+			assert(q > prev_q, "we should be moving forward through memory");
+		}
+	}
 
-  assert(q == t, "just checking");
+	assert(q == t, "just checking");
 }
 
 void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
@@ -358,10 +441,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   HeapWord* const t = _end_of_live;
   debug_only(HeapWord* prev_q = NULL);
 
-  if (q < t && _first_dead > q &&
-      !oop(q)->is_gc_marked()) {
+  if (q < t && _first_dead > q && !oop(q)->is_gc_marked()) {
+
 #ifdef ASSERT
-    // we have a chunk of the space which hasn't moved and we've reinitialized the
+    // We have a chunk of the space which hasn't moved and we've reinitialized the
     // mark word during the previous pass, so we can't use is_gc_marked for the
     // traversal.
     HeapWord* const end = _first_dead;
@@ -374,43 +457,132 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
     }
 #endif
 
-    if (_first_dead == t) {
-      q = t;
-    } else {
-      // $$$ Funky
-      q = (HeapWord*) oop(_first_dead)->mark()->decode_pointer();
-    }
+	// There are some cases that the new object are marked but the are not
+	// compact because the first_dead object is equall to the end_of_live.
+	// As a result of that, GC ignores these objects and there is a corruption
+	// in the heap. In this space there are objects that need to move in
+	// teracache.
+
+	if (EnableTeraCache)
+	{
+		HeapWord* const end = _first_dead;
+		while (q < end)
+		{
+			/* Get the size of the object */
+			size_t size = oop(q)->size();
+
+			/* Check if this object have to be moved in TeraCache */
+			std::cerr << "COMPACT_0 | " << q << " " << oop(q)->mark() << " " << oop(q)->is_tera_cache() << std::endl;
+			if(oop(q)->is_gc_marked() && oop(q)->forwardee() != NULL)
+			{
+				HeapWord* compaction_top = (HeapWord*)oop(q)->forwardee();
+
+				/* Copy object to the new destination */
+				Copy::aligned_conjoint_words(q, compaction_top, size);
+
+				/* Initialize mark word of the destination */
+				oop(compaction_top)->init_mark();
+
+				/* Initialize teracache word to zero */
+				oop(compaction_top)->init_tera_cache();
+			}
+
+			/* Move to the next object */
+			q += size;
+		}
+	}
+
+	/* 
+	 * +----------------------------------------------------+
+	 * |													|
+	 * +----------------------------------------------------+
+	 * v													v
+	 * q												last_lived_object
+	 *														v
+	 *													_first_dead_object
+	 *														
+	 * _first_dead_object is equall with the last_live_object
+	 * As a result of that, the space is already compacted and the objects will
+	 * not copy to a new place 
+	 */
+	if (_first_dead == t) 
+	{
+		std::cerr << "[COMPACT_1]"  << " | OBJECT = "  << oop(q) << std::endl;
+		q = t;
+	} 
+	/* 
+	 * +----------------------------------------------------+
+	 * |			     |	     							|
+	 * +----------------------------------------------------+
+	 * v				 |									v
+	 * q			     |							last_lived_object
+	 *					 v
+	 *			_first_dead_object
+	 *
+	 * _first_dead_object is not equall with the last_live_object but the
+	 * _first_dead_object is greater than the start of the space. In the mark
+	 * word of the _first_dead_object is placed the address of the next live
+	 * range.
+	 * Between q and _first_dead_object there are objects that need to be moved
+	 * in TeraCache
+	 */
+	else 
+	{
+		// $$$ Funky
+		std::cerr << "[COMPACT_2]"  << " | OBJECT = "  << q << std::endl;
+		std::cerr << "[COMPACT_2]"  << " | FIRST_DEAD = "  << _first_dead << std::endl;
+		q = (HeapWord*) oop(_first_dead)->mark()->decode_pointer();
+		std::cerr << "[COMPACT_2]"  << " | NEW_OBJ = "  << q << std::endl;
+	}
   }
 
   const intx scan_interval = PrefetchScanIntervalInBytes;
   const intx copy_interval = PrefetchCopyIntervalInBytes;
 
   while (q < t) {
-    if (!oop(q)->is_gc_marked()) {
-      // mark is pointer to next marked oop
-      debug_only(prev_q = q);
-      q = (HeapWord*) oop(q)->mark()->decode_pointer();
-      assert(q > prev_q, "we should be moving forward through memory");
-    } else {
-      // prefetch beyond q
-      Prefetch::read(q, scan_interval);
+	  if (EnableTeraCache)
+	  {
+	  std::cerr << "[COMPACT]" 
+	      << " | OBJECT = " 
+	      << oop(q)
+	      << std::endl;
+	  }
 
-      // size and destination
-      size_t size = oop(q)->size();
-      HeapWord* compaction_top = (HeapWord*)oop(q)->forwardee();
+	  if (!oop(q)->is_gc_marked()) {
 
-      // prefetch beyond compaction_top
-      Prefetch::write(compaction_top, copy_interval);
+		  // mark is pointer to next marked oop
+		  debug_only(prev_q = q);
 
-      // copy object and reinit its mark
-      assert(q != compaction_top, "everything in this pass should be moving");
-      Copy::aligned_conjoint_words(q, compaction_top, size);
-      oop(compaction_top)->init_mark();
-      assert(oop(compaction_top)->klass() != NULL, "should have a class");
+		  // Get the object from the next live range
+		  q = (HeapWord*) oop(q)->mark()->decode_pointer();
 
-      debug_only(prev_q = q);
-      q += size;
-    }
+		  assert(q > prev_q, "we should be moving forward through memory");
+
+	  } 
+	  else 
+	  {
+		  // prefetch beyond q
+		  Prefetch::read(q, scan_interval);
+
+		  // size and destination
+		  size_t size = oop(q)->size();
+		  HeapWord* compaction_top = (HeapWord*)oop(q)->forwardee();
+
+		  // prefetch beyond compaction_top
+		  Prefetch::write(compaction_top, copy_interval);
+
+		  // copy object and reinit its mark
+		  assert(q != compaction_top, "everything in this pass should be moving");
+
+		  Copy::aligned_conjoint_words(q, compaction_top, size);
+		  oop(compaction_top)->init_mark();
+		  oop(compaction_top)->init_tera_cache();
+
+		  assert(oop(compaction_top)->klass() != NULL, "should have a class");
+
+		  debug_only(prev_q = q);
+		  q += size;
+	  }
   }
 
   assert(compaction_top() >= space()->bottom() && compaction_top() <= space()->end(),
