@@ -1259,6 +1259,12 @@ inline int build_int_from_shorts( jushort low, jushort high ) {
   return ((int)((unsigned int)high << 16) | (unsigned int)low);
 }
 
+// Convert pointer to intptr_t, fo use in printing pointers
+inline intptr_t p2i (const void *p)
+{
+	return (intptr_t) p;
+}
+
 // Printf-style formatters for fixed- and variable-width types as pointers and
 // integers.  These are derived from the definitions in inttypes.h.  If the platform
 // doesn't provide appropriate definitions, they should be provided in

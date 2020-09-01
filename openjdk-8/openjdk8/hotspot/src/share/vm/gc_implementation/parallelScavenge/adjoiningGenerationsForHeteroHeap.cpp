@@ -161,6 +161,8 @@ void AdjoiningGenerationsForHeteroHeap::HeteroVirtualSpaces::initialize(size_t i
 bool AdjoiningGenerationsForHeteroHeap::HeteroVirtualSpaces::adjust_boundary_up(size_t change_in_bytes) {
     assert(UseAdaptiveSizePolicy && UseAdaptiveGCBoundary, "runtime check");
 
+	size_t total_size_before = young_vs()->reserved_size() + old_vs()->reserved_size();
+
     size_t bytes_needed = change_in_bytes;  // Number of needed bytes
     // Uncommitted space in old generation
     size_t uncommitted_in_old = MIN2(old_vs()->uncommitted_size(), bytes_needed);
@@ -223,11 +225,9 @@ bool AdjoiningGenerationsForHeteroHeap::HeteroVirtualSpaces::adjust_boundary_up(
         return false;
     }
 
-    // jk: Prints for debugging
-    // Total Heap size must be the same
     size_t total_size_after = young_vs()->reserved_size() + old_vs()->reserved_size();
 
-    std::cout << "Total Size After = " << total_size_after << std::endl;
+	/* The size before and after must be the same */
     assert(total_size_after == total_size_before, "should be equal");
 
     return true;
@@ -237,9 +237,8 @@ bool AdjoiningGenerationsForHeteroHeap::HeteroVirtualSpaces::adjust_boundary_up(
 // Increase young generation size and decrease old generation by the same amount
 bool AdjoiningGenerationsForHeteroHeap::HeteroVirtualSpaces::adjust_boundary_down(size_t change_in_bytes) {
     assert(UseAdaptiveSizePolicy && UseAdaptiveGCBoundary, "runtime check");
-    std::cout << "Total Size Before = " << young_vs()->reserved_size() +
-                                           old_vs()->reserved_size() << std::endl;
 
+    size_t total_size_before = young_vs()->reserved_size() + old_vs()->reserved_size();
     size_t bytes_needed = change_in_bytes;
     size_t uncommitted_in_young = MIN2(young_vs()->uncommitted_size(), bytes_needed);
     bool young_expanded = false;

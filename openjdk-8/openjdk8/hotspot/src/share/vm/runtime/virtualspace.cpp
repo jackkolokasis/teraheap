@@ -408,7 +408,8 @@ void ReservedHeapSpace::establish_noaccess_prefix() {
             //         PTR_FORMAT " / " INTX_FORMAT " bytes",
             //         p2i(_base),
             //         _noaccess_prefix);
-            assert(CompressedOops::use_implicit_null_checks() == true, "not initialized?");
+            //assert(CompressedOops::use_implicit_null_checks() == true, "not initialized?");
+            //assert(CompressedOops::use_implicit_null_checks() == true, "not initialized?");
         } else {
             // CompressedOops::set_use_implicit_null_checks(false);
         }    
@@ -462,12 +463,12 @@ void ReservedHeapSpace::try_reserve_heap(size_t size,
     if (special) {
         base = os::reserve_memory_special(size, alignment, requested_address, false);
 
-        if (base != NULL) {
+        if (base != NULL) 
+		{
             // Check alignment constraints
             assert((uintptr_t) base % alignment == 0,
                     "Large pages returned a non-aligned address, base: "
-                    PTR_FORMAT " alignment: " SIZE_FORMAT_HEX,
-                    p2i(base), alignment);
+                    PTR_FORMAT " alignment: " SIZE_FORMAT, p2i(base), alignment);
             _special = true;
         }
     }

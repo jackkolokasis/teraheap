@@ -215,7 +215,7 @@ bool error_is_suppressed(const char* file_name, int line_no) {
 #endif // !PRODUCT
 
 void report_vm_error(const char* file, int line, const char* error_msg,
-                     const char* detail_msg)
+                     const char* detail_msg, ...)
 {
   if (Debugging || error_is_suppressed(file, line)) return;
   Thread* const thread = ThreadLocalStorage::get_thread_slow();

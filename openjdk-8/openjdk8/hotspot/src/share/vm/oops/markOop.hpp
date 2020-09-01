@@ -117,9 +117,6 @@ class markOopDesc: public oopDesc {
          hash_bits                = max_hash_bits > 31 ? 31 : max_hash_bits,
          cms_bits                 = LP64_ONLY(1) NOT_LP64(0),
          epoch_bits               = 2
-#ifdef DEBUG_EXTRA_FIELD_MARK
-         ,tera_bits               = 1
-#endif
   };
 
   // The biased locking code currently requires that the age bits be
@@ -130,10 +127,6 @@ class markOopDesc: public oopDesc {
          cms_shift                = age_shift + age_bits,           // 7 
          hash_shift               = cms_shift + cms_bits,           // 8
          epoch_shift              = hash_shift                      // 8
-         //epoch_shift              = hash_shift + epoch_bits,      // 10
-#ifdef DEBUG_EXTRA_FIELD_MARK
-         ,tera_shift              = epoch_shift + hash_bits         // 11
-#endif
   };
 
   enum { lock_mask                = right_n_bits(lock_bits),        // 0x011
@@ -150,11 +143,6 @@ class markOopDesc: public oopDesc {
 #ifndef _WIN64
          ,hash_mask               = right_n_bits(hash_bits),        
          hash_mask_in_place       = (address_word)hash_mask << hash_shift
-#endif
-
-#if DEBUG_EXTRA_FIELD_MARK
-         ,tera_mask          = right_n_bits(tera_bits),
-         tera_mask_in_place  = tera_mask << tera_shift
 #endif
   };
 
@@ -174,11 +162,6 @@ class markOopDesc: public oopDesc {
          monitor_value            = 2,  // 0x0010
          marked_value             = 3,  // 0x0011
          biased_lock_pattern      = 5   // 0x0101
-#if DEBUG_EXTRA_FIELD_MARK
-         ,tera_value              = 549755813888
-
-#endif
-
   };
 
   enum { no_hash                  = 0 };  // no hash value assigned
@@ -241,12 +224,6 @@ class markOopDesc: public oopDesc {
     return (mask_bits(value(), lock_mask_in_place) == marked_value);
   }
   bool is_neutral()  const { return (mask_bits(value(), biased_lock_mask_in_place) == unlocked_value); }
-
-  // JK: Check if it is set to teraCache
-  // teraCache_mask_in_place
-  bool is_teraCache() const { return (mask_bits(value(), tera_mask_in_place) == tera_value); }
-
-  markOop set_teraCache() { return markOop((value() & ~tera_mask_in_place) | tera_value); }
 
   // Special temporary state of the markOop while being inflated.
   // Code that looks at mark outside a lock need to take this into account.

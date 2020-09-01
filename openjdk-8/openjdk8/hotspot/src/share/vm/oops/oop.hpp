@@ -106,46 +106,52 @@ class oopDesc {
   markOop  mark() const         { return _mark; }
   markOop* mark_addr() const    { return (markOop*) &_mark; }
 
+  /* Get the object state */
+  uint64_t get_object_state() 
+  {
+	  return _tera_flag;
+  }
+
   /* Init TeraCache marking flag */
   void init_tera_cache() 
   {
-	  _tera_flag = 0; 
+	  _tera_flag = INIT_VALUE; 
   }
 
   /* Mark an object to be moved in TeraCache */
   void set_tera_cache() 
   { 
-	  _tera_flag  = 1; 
+	  _tera_flag  = MOVE_TO_TERA; 
   }
 
   /* Check if an object is marked to be moved in TeraCache */
   bool is_tera_cache() 
   { 
-	  return _tera_flag == 1; 
+	  return _tera_flag == MOVE_TO_TERA; 
   }
-  
-  /* Set a teracache object to be shadow */
-  void set_shadow_tera_object() 
-  { 
-	  _tera_flag = 2; 
-  }
-  
-  /* Check if a place is a shadow place */
-  bool is_shadow_tera_object() 
-  { 
-	  return _tera_flag == 2; 
-  }
+ 
+  /*
+   * For Debugging purposes
+   * During the GC, we need to find the state of the objects in the heap between the
+   * different phases.
+   *
+   * The following functions use the tera_flag word to store the object state
+   * during the GC.
+   *
+   * Object states:
+   *
+   */
 
-  /* Set this object as special to handle ajust pointers*/
-  void set_special_object()
-  {
-	  _tera_flag = 3;
+  /* Set the state of the bject */
+  void set_obj_state(int state) 
+  { 
+	  _tera_flag  = state; 
   }
   
-  /* Chech if this object is special */
-  bool is_special_object()
-  {
-	  return (_tera_flag == 3);
+  /* Get the state of the bject */
+  uint64_t get_obj_state() 
+  { 
+	  return _tera_flag;
   }
 
   void set_mark(volatile markOop m)      { _mark = m;   }

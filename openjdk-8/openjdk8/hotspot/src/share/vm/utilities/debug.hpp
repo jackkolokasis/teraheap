@@ -237,7 +237,7 @@ enum VMErrorType {
 
 // error reporting helper functions
 void report_vm_error(const char* file, int line, const char* error_msg,
-                     const char* detail_msg = NULL);
+                     const char* detail_msg = NULL, ...);
 void report_fatal(const char* file, int line, const char* message);
 void report_vm_out_of_memory(const char* file, int line, size_t size,
                              VMErrorType vm_err_type, const char* message);

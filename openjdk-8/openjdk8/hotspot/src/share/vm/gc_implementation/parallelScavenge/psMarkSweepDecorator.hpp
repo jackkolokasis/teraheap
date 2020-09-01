@@ -41,13 +41,30 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
  protected:
   MutableSpace* _space;
   ObjectStartArray* _start_array;
-  HeapWord* _first_dead;		/* First dead object		      */
-  HeapWord* _end_of_live;		/* End of live region 			  */
-  HeapWord* _compaction_top;	/* Compaction top pointer         */
-  size_t _allowed_dead_ratio;   /* Allowed dead ratio             */
+  HeapWord* _first_dead;			   /* First dead object								     	*/
+  HeapWord* _end_of_live;			   /* End of live region 			  						*/
+  HeapWord* _compaction_top;		   /* Compaction top pointer         						*/
+  size_t _allowed_dead_ratio;          /* Allowed dead ratio									*/
 
-  bool insert_deadspace(size_t& allowed_deadspace_words, HeapWord* q,
-                        size_t word_len);
+  /* Debugging */
+
+  /* Use this vector to check if all copied objects are not corrupted and
+   * contains a valid information
+   *
+   * In this vecto we store the destination adresses of the object and then we
+   * check the tera_flag field to have a valid value.
+   */
+  std::vector<HeapWord *> _verify_objects;
+
+  /* Use this vector during precompact phase to check if all the objects that
+   * will not move in a new location will contain valid mark words.
+   *
+   * Accepted mark words:
+   * 0x1 or 0x5
+   */
+  std::vector<HeapWord *> _verify_headers;
+  
+  bool insert_deadspace(size_t& allowed_deadspace_words, HeapWord* q, size_t word_len);
 
  public:
   PSMarkSweepDecorator(MutableSpace* space, ObjectStartArray* start_array,
@@ -76,6 +93,10 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
   void adjust_pointers();
   void precompact();
   void compact(bool mangle_free_space);
+
+  // Debugging
+  void verify_compacted_objects();
+  void verify_precompact_headers();
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSMARKSWEEPDECORATOR_HPP

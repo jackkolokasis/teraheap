@@ -202,6 +202,11 @@ public:
   void restore() {
     _obj->set_mark(_mark);
   }
+
+  void print_object()
+  {
+	  std::cerr << "[PRESERVED_MARKS] | O = " << _obj <<  " | MARK = " << _obj->mark() << "| STATE = "  << _obj->get_obj_state() << std::endl;
+  }
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_SHARED_MARKSWEEP_HPP

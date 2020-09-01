@@ -618,17 +618,17 @@ intptr_t ObjectSynchronizer::FastHashCode (Thread * Self, oop obj) {
              "biases should not be seen by VM thread here");
       BiasedLocking::revoke_and_rebias(hobj, false, JavaThread::current());
       obj = hobj() ;
-      assert(!obj->mark()->has_bias_pattern(), "biases should be revoked by now");
+      assertf(!obj->mark()->has_bias_pattern(), "biases should be revoked by now");
     }
   }
 
   // hashCode() is a heap mutator ...
   // Relaxing assertion for bug 6320749.
-  assert (Universe::verify_in_progress() ||
+  assertf (Universe::verify_in_progress() ||
           !SafepointSynchronize::is_at_safepoint(), "invariant") ;
-  assert (Universe::verify_in_progress() ||
+  assertf (Universe::verify_in_progress() ||
           Self->is_Java_thread() , "invariant") ;
-  assert (Universe::verify_in_progress() ||
+  assertf (Universe::verify_in_progress() ||
          ((JavaThread *)Self)->thread_state() != _thread_blocked, "invariant") ;
 
   ObjectMonitor* monitor = NULL;

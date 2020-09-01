@@ -72,6 +72,21 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
   return _destination_decorator;
 }
 
+void PSMarkSweepDecorator::verify_precompact_headers()
+{
+	for (size_t i = 0; i < _verify_headers.size(); i++)
+	{
+		if ((oop(_verify_headers[i])->mark() != (void *)0x1) 
+			&& (oop(_verify_headers[i])->mark() != (void *)0x5))
+		{
+			std::cerr << "[VERIFY_ERROR] | O = " << _verify_headers[i] 
+				      << " | MARK = " << oop(_verify_headers[i])->mark() << std::endl; 
+			os::abort();
+		}
+
+	}
+}
+
 // FIX ME FIX ME FIX ME FIX ME!!!!!!!!!
 // The object forwarding code is duplicated. Factor this out!!!!!
 //
@@ -138,7 +153,7 @@ void PSMarkSweepDecorator::precompact() {
 	HeapWord* prev_q = NULL;
 
 	while (q < t) {
-		assert(oop(q)->mark()->is_marked() || oop(q)->mark()->is_unlocked() ||
+		assertf(oop(q)->mark()->is_marked() || oop(q)->mark()->is_unlocked() ||
 				oop(q)->mark()->has_bias_pattern(),
 				"these are the only valid states during a mark sweep");
 
@@ -154,9 +169,9 @@ void PSMarkSweepDecorator::precompact() {
 			// Debug prints
 			if (EnableTeraCache)
 			{
-				std::cerr << "[PRECOMPACT]"  << " | OBJECT = "  << oop(q) << " | CLASS = "
-					<< oop(q)->klass()->signature_name() << " | MARK = " << oop(q)->mark() 
-					<< std::endl;
+				std::cerr << "[PRECOMPACT]"  << " | OBJECT = "  << (HeapWord*) oop(q) 
+					      << " | MARK = " << (HeapWord*) oop(q)->mark() 
+					      << std::endl;
 			}
 
 			// Check if the object is marked to be moved to teracache
@@ -167,6 +182,7 @@ void PSMarkSweepDecorator::precompact() {
 
 				// Store the forwarding pointer into the mark word
 				oop(q)->forward_to(oop(region_top));
+				verify_precompact_headers();
 
 				/* Previous object */
 				prev_q = q;
@@ -176,6 +192,7 @@ void PSMarkSweepDecorator::precompact() {
 
 				/* Set this object as live in the in the precompact space */
 				end_of_live = q;
+			
 				/* Continue with the next object */
 				continue;
 			}
@@ -196,8 +213,9 @@ void PSMarkSweepDecorator::precompact() {
 				start_array = dest->start_array();
 				compact_top = dest->compaction_top();
 				compact_end = dest->space()->end();
-				assert(compact_top == dest->space()->bottom(), "Advanced to space already in use");
-				assert(compact_end > compact_top, "Must always be space remaining");
+
+				assertf(compact_top == dest->space()->bottom(), "Advanced to space already in use");
+				assertf(compact_end > compact_top, "Must always be space remaining");
 				compaction_max_size = pointer_delta(compact_end, compact_top);
 			}
 
@@ -205,11 +223,13 @@ void PSMarkSweepDecorator::precompact() {
 			{
 				if (EnableTeraCache)
 				{
-				std::cerr << "[PRECOMPACT_1]"  << " | OBJECT = "  << oop(q) << " | COMPACTION_TOP = "
-					<< compact_top << "PREV_Q = " << prev_q << std::endl;
+				std::cerr << "[PRECOMPACT_1]"  << " | OBJECT = "  <<(HeapWord*) oop(q) << " | COMPACTION_TOP = "
+					<<(HeapWord*) compact_top << "PREV_Q = " <<(HeapWord*) prev_q << std::endl;
 				}
 				oop(q)->forward_to(oop(compact_top));
-				assert(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
+				verify_precompact_headers();
+				oop(q)->set_obj_state(VALID_PRECOMPACT);
+				assertf(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
 			} 
 			else 
 			{
@@ -224,16 +244,22 @@ void PSMarkSweepDecorator::precompact() {
 				 */
 				if (EnableTeraCache)
 				{
-					std::cerr << "[B_PRECOMPACT_2] " << " | O = " << q << " | MARK = " << oop(q)->mark() << std::endl; 
+					std::cerr << "[B_PRECOMPACT_2] " << " | O = " <<(HeapWord*) q << " | MARK = " <<(HeapWord*) oop(q)->mark() << std::endl; 
 					oop(q)->init_mark();
-					std::cerr << "[A_PRECOMPACT_2] " << " | O = " << q << " | MARK = " << oop(q)->mark() << std::endl; 
+					oop(q)->set_obj_state(VALID_PRECOMPACT);
+
+					_verify_headers.push_back(q);
+					verify_precompact_headers();
+
+					std::cerr << "[A_PRECOMPACT_2] " << " | O = " <<(HeapWord*) q << " | MARK = " <<(HeapWord*) oop(q)->mark() << std::endl; 
 				}
 				else 
 				{
 					oop(q)->init_mark();
+					oop(q)->set_obj_state(VALID_PRECOMPACT);
 				}
 
-				assert(oop(q)->forwardee() == NULL,  "should be forwarded to NULL");
+				assertf(oop(q)->forwardee() == NULL,  "should be forwarded to NULL");
 			}
 
 			/* Update object start array */
@@ -243,8 +269,7 @@ void PSMarkSweepDecorator::precompact() {
 
 			/* Increase compation pointer */
 			compact_top += size;
-			if (compact_top > dest->space()->end())
-				std::cerr << "Exceeding space in destination!!!" << std::endl;
+
 			assert(compact_top <= dest->space()->end(), "Exceeding space in destination");
 
 			/* Set the pointer to the previous object */
@@ -264,13 +289,10 @@ void PSMarkSweepDecorator::precompact() {
 				/* Prefetch beyond end */
 				Prefetch::write(end, interval);
 				prev_q = end;
+				oop(end)->set_obj_state(VALID_DEAD);
 				end += oop(end)->size();
 
-				// teracache 
-				// add code for teracache
-
 			} while (end < t && (!oop(end)->is_gc_marked()));// || oop(end)->is_tera_cache()));
-
 
 			/* See if we might want to pretend this object is alive so that
 			 * we don't have to compact quite as often.
@@ -297,19 +319,31 @@ void PSMarkSweepDecorator::precompact() {
 						compact_end = dest->space()->end();
 						assert(compact_top == dest->space()->bottom(), "Advanced to space already in use");
 						assert(compact_end > compact_top, "Must always be space remaining");
-						compaction_max_size =
-							pointer_delta(compact_end, compact_top);
+						compaction_max_size = pointer_delta(compact_end, compact_top);
 					}
 
 					// store the forwarding pointer into the mark word
 					if (q != compact_top) {
 						oop(q)->forward_to(oop(compact_top));
-						assert(oop(q)->is_gc_marked(), "encoding the pointer should preserve the mark");
+
+						if (EnableTeraCache)
+						{
+							verify_precompact_headers();
+						}
+
+						assertf(oop(q)->is_gc_marked(), "encoding the pointer should preserve the mark");
 					} else {
 						// if the object isn't moving we can just set the mark to the default
 						// mark and handle it specially later on.
 						oop(q)->init_mark();
-						assert(oop(q)->forwardee() == NULL, "should be forwarded to NULL");
+
+						if (EnableTeraCache)
+						{
+						   _verify_headers.push_back(q);
+							verify_precompact_headers();
+						}
+
+						assertf(oop(q)->forwardee() == NULL, "should be forwarded to NULL");
 					}
 
 					// Update object start array
@@ -342,11 +376,13 @@ void PSMarkSweepDecorator::precompact() {
 			/* See if this is the first dead region. */
 			if (q < first_dead) {
 				first_dead = q;
-
 			}
 
 			/* Move on to the next object */
 			q = end;
+
+			/* Set the end of objects live */
+			//end_of_live = end;
 		} /*< End of else  */
 	}     /*< End of while */
 
@@ -363,6 +399,7 @@ void PSMarkSweepDecorator::precompact() {
 
 	// Update compaction top
 	dest->set_compaction_top(compact_top);
+	_verify_headers.clear();
 }
 
 bool PSMarkSweepDecorator::insert_deadspace(size_t& allowed_deadspace_words,
@@ -397,6 +434,10 @@ void PSMarkSweepDecorator::adjust_pointers() {
 
 		while (q < end) {
 			// point all the oops to the new location
+			if (EnableTeraCache)
+			{
+				std::cerr << "[ADJUST_CHECK] | Q = " << q << " | MARK " << oop(q)->mark() << " | STATE = " << oop(q)->get_obj_state() << std::endl;
+			}
 			size_t size = oop(q)->adjust_pointers();
 			q += size;
 		}
@@ -431,6 +472,18 @@ void PSMarkSweepDecorator::adjust_pointers() {
 	}
 
 	assert(q == t, "just checking");
+}
+
+void PSMarkSweepDecorator::verify_compacted_objects()
+{
+	for(std::size_t i=0; i<_verify_objects.size(); ++i)   
+	{
+		if (oop(_verify_objects[i])->get_obj_state() != INVALID_PLACE_TO_MOVE)
+		{
+			std::cerr << "[VERIFY_ERROR] | O = " << _verify_objects[i] <<  " | STATE = "
+					  << oop(_verify_objects[i])->get_obj_state() << std::endl;
+		}
+	}
 }
 
 void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
@@ -472,10 +525,16 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			size_t size = oop(q)->size();
 
 			/* Check if this object have to be moved in TeraCache */
-			std::cerr << "COMPACT_0 | " << q << " " << oop(q)->mark() << " " << oop(q)->is_tera_cache() << std::endl;
+			//std::cerr << "COMPACT_0 | " <<(HeapWord*) q << " " <<(HeapWord*) oop(q)->mark() << " " << oop(q)->is_tera_cache() << std::endl;
+			
 			if(oop(q)->is_gc_marked() && oop(q)->forwardee() != NULL)
 			{
 				HeapWord* compaction_top = (HeapWord*)oop(q)->forwardee();
+		  
+				// Check if this object is precompacted correctly 
+				std::cerr << "[COMPACT] | " << "O = " << q <<  " | STATE = " << oop(q)->get_obj_state() 
+					      << "=> NEW_ADDR = " << compaction_top << " | STATE = " 
+						  << oop(compaction_top)->get_obj_state() << " | SIZE = " << oop(q)->size() << std::endl;
 
 				/* Copy object to the new destination */
 				Copy::aligned_conjoint_words(q, compaction_top, size);
@@ -484,7 +543,25 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 				oop(compaction_top)->init_mark();
 
 				/* Initialize teracache word to zero */
-				oop(compaction_top)->init_tera_cache();
+				oop(compaction_top)->set_obj_state(INVALID_PLACE_TO_MOVE);
+
+				_verify_objects.push_back(compaction_top);
+				verify_compacted_objects();
+			}
+			else {
+				// Check if this object is precompacted correctly 
+				std::cerr << "[COMPACT] | " << "O = " << q <<  " | STATE = " << oop(q)->get_obj_state() 
+					      << "=> NO_MOVE"   << std::endl;
+
+				/* 
+				 * Set the object state to show that this place holds a valid
+				 * object
+				 */
+				oop(q)->init_mark();
+				oop(q)->set_obj_state(INVALID_PLACE_TO_MOVE);
+				_verify_objects.push_back(q);
+				verify_compacted_objects();
+
 			}
 
 			/* Move to the next object */
@@ -507,7 +584,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 	 */
 	if (_first_dead == t) 
 	{
-		std::cerr << "[COMPACT_1]"  << " | OBJECT = "  << oop(q) << std::endl;
+		std::cerr << "[COMPACT_1]"  << " | OBJECT = "  <<(HeapWord*) oop(q) << std::endl;
 		q = t;
 	} 
 	/* 
@@ -529,10 +606,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 	else 
 	{
 		// $$$ Funky
-		std::cerr << "[COMPACT_2]"  << " | OBJECT = "  << q << std::endl;
-		std::cerr << "[COMPACT_2]"  << " | FIRST_DEAD = "  << _first_dead << std::endl;
+		std::cerr << "[COMPACT_2]"  << " | OBJECT = "  <<(HeapWord*) q << std::endl;
+		std::cerr << "[COMPACT_2]"  << " | FIRST_DEAD = "  <<(HeapWord*) _first_dead << std::endl;
 		q = (HeapWord*) oop(_first_dead)->mark()->decode_pointer();
-		std::cerr << "[COMPACT_2]"  << " | NEW_OBJ = "  << q << std::endl;
+		std::cerr << "[COMPACT_2]"  << " | NEW_OBJ = "  <<(HeapWord*) q << std::endl;
 	}
   }
 
@@ -540,13 +617,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   const intx copy_interval = PrefetchCopyIntervalInBytes;
 
   while (q < t) {
-	  if (EnableTeraCache)
-	  {
-	  std::cerr << "[COMPACT]" 
-	      << " | OBJECT = " 
-	      << oop(q)
-	      << std::endl;
-	  }
 
 	  if (!oop(q)->is_gc_marked()) {
 
@@ -574,9 +644,23 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  // copy object and reinit its mark
 		  assert(q != compaction_top, "everything in this pass should be moving");
 
+		  // Check if this object is precompacted correctly 
+		  if (EnableTeraCache)
+		  {
+			  std::cerr << "[COMPACT] | " << "O = " << q <<  " | STATE = " << oop(q)->get_obj_state() 
+				  << "=> NEW_ADDR = " << compaction_top << " | STATE = " 
+				  << oop(compaction_top)->get_obj_state() << " | SIZE = " << oop(q)->size() << std::endl;
+		  }
+
 		  Copy::aligned_conjoint_words(q, compaction_top, size);
 		  oop(compaction_top)->init_mark();
-		  oop(compaction_top)->init_tera_cache();
+		  oop(compaction_top)->set_obj_state(INVALID_PLACE_TO_MOVE);
+
+		  if (EnableTeraCache)
+		  {
+			  _verify_objects.push_back(compaction_top);
+			  verify_compacted_objects();
+		  }
 
 		  assert(oop(compaction_top)->klass() != NULL, "should have a class");
 
@@ -584,6 +668,15 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  q += size;
 	  }
   }
+  
+  for (size_t i = 0; i < _verify_objects.size(); i++)
+  {
+      std::cerr << "[VERIFY_VECTOR] | O = " << _verify_objects[i] << " | MARK = " 
+    	        << oop(_verify_objects[i])->mark() << " | CLASS = " 
+    			<< oop(_verify_objects[i])->get_obj_state() << std::endl;
+  }
+		
+  _verify_objects.clear();
 
   assert(compaction_top() >= space()->bottom() && compaction_top() <= space()->end(),
          "should point inside space");

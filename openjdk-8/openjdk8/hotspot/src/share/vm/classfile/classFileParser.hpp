@@ -386,7 +386,7 @@ class ClassFileParser VALUE_OBJ_CLASS_SPEC {
   char* skip_over_field_signature(char* signature, bool void_ok, unsigned int length, TRAPS);
 
   bool is_anonymous() {
-    assert(EnableInvokeDynamic || _host_klass.is_null(), "");
+    assertf(EnableInvokeDynamic || _host_klass.is_null(), "");
     return _host_klass.not_null();
   }
   bool has_cp_patch_at(int index) {

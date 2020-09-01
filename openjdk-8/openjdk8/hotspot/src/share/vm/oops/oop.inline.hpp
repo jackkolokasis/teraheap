@@ -704,9 +704,10 @@ inline intptr_t oopDesc::identity_hash() {
 }
 
 inline int oopDesc::adjust_pointers() {
-  debug_only(int check_size = size());
+  //debug_only(int check_size = size());
+  int check_size = size();
   int s = klass()->oop_adjust_pointers(this);
-  assert(s == check_size, "should be the same");
+  assertf(s == check_size, "should be the same");
   return s;
 }
 

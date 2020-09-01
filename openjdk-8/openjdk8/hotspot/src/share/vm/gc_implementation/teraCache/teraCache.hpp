@@ -1,5 +1,6 @@
 #ifndef SHARE_VM_GC_IMPLEMENTATION_TERACACHE_TERACACHE_HPP
 #define SHARE_VM_GC_IMPLEMENTATION_TERACACHE_TERACACHE_HPP
+#include "gc_interface/collectedHeap.inline.hpp"
 #include "oops/oop.hpp"
 #include <regions.h>
 

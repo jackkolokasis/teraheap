@@ -42,6 +42,7 @@ inline void MarkSweep::mark_object(oop obj) {
   markOop mark = obj->mark();
   obj->set_mark(markOopDesc::prototype()->set_marked());
 
+
   if (mark->must_be_preserved(obj)) {
     preserve_mark(obj, mark);
   }
@@ -73,32 +74,24 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-		//if (EnableTeraCache && obj->is_shadow_tera_object())
-		//{
-		//	std::cerr << "MARK_AND_PUSH_SHADOW_OBJECT | O = " << obj << " | META_PTR = " << obj->klass()
-		//		      << " | CLASS = " << obj->klass()->signature_name() << std::endl;
-		//}
-
 		if (EnableTeraCache)
 		{
 			std::cerr <<"[MARK_AND_PUSH]" 
 				  << " | OBJECT = " 
-				  << obj
+				  << (HeapWord*)obj
 				  << " | MARKED = "
 				  << obj->mark()->is_marked()
 				  << " | TERA = "
 				  << obj->is_tera_cache()
 				  << " | META_PTR = "
-				  << obj->klass()
-				  << " | CLASS = "
-				  << obj->klass()->signature_name()
+				  << (HeapWord*)obj->klass()
 				  << std::endl;
 		}
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
-			std::cerr << "OBJECT IN TERACACHE | O = " << obj  << " | META_PTR = " << obj->klass()
-				      << " | CLASS "  << obj->klass()->signature_name() << std::endl;
+			std::cerr << "OBJECT IN TERACACHE | O = " << (HeapWord*)obj  << " | META_PTR = " << (HeapWord*)obj->klass()
+				      << std::endl;
 			return;
 		}
 
@@ -116,32 +109,23 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-		//if (EnableTeraCache && obj->is_shadow_tera_object())
-		//{
-		//	std::cerr << "MARK_AND_PUSH_SHADOW_OBJECT | O = " << obj << " | META_PTR = " << obj->klass()
-		//		      << " | CLASS = " << obj->klass()->signature_name() << std::endl;
-		//}
-
 		if (EnableTeraCache)
 		{
 			std::cerr << "[TERA_MARK_AND_PUSH]" 
 				  << " | OBJECT = " 
-				  << obj
+				  << (HeapWord*)obj
 				  << " | MARKED = "
 				  << obj->mark()->is_marked()
 				  << " | TERA = "
 				  << obj->is_tera_cache()
 				  << " | META_PTR = "
-				  << obj->klass()
-				  << " | CLASS = "
-				  << obj->klass()->signature_name()
+				  << (HeapWord*)obj->klass()
 				  << std::endl;
 		}
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
-			std::cerr << "OBJECT IN TERACACHE | O = " << obj  << " | META_PTR = " << obj->klass()
-				      << " | CLASS "  << obj->klass()->signature_name() << std::endl;
+			std::cerr << "OBJECT IN TERACACHE | O = " << (HeapWord*) obj  << " | META_PTR = " << (HeapWord*) obj->klass() << std::endl;
 			return;
 		}
 
@@ -172,18 +156,16 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
 
 		if (EnableTeraCache)
 		{
-			std::cerr << "[A_ADJUST] " << " | O = " << obj << " | MARK = " << obj->mark() 
-				<< " | NEW_OBJ = " << new_obj << std::endl; 
-		}
+			std::cerr << "[A_ADJUST] " << " | O = " << (HeapWord*) obj << " | MARK = " << (HeapWord*)obj->mark()
+				<< " | STATE = "   <<  obj->get_obj_state() 
+				<< " | NEW_OBJ = " << (HeapWord*) new_obj << std::endl; 
 
-		//if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
-		//{
-		//	std::cerr << "[ADJUST_TERA]"  << " | OBJECT = "  << obj << " | CLASS = " 
-		//		      << obj->klass()->signature_name() << " | NEW OBJECT = " 
-		//			  << new_obj << std::endl;
-		//	new_obj = obj;
-		//	return;
-		//}
+			if((obj->mark() < (void *) 0x6f6e00000000) && (obj->mark() != (void *) 0x1) 
+			    && (obj->mark() != (void *) 0x5)) 
+			{
+				os::abort();
+			}
+		}
 
 		assert(new_obj != NULL ||                                      // is forwarding ptr?
 				obj->mark() == markOopDesc::prototype() ||             // not gc marked?

@@ -137,7 +137,7 @@ void MarkSweep::restore_marks() {
                            _preserved_count + _preserved_oop_stack.size());
   }
 
-  // restore the marks we saved earlier
+  // Restore the marks we saved earlier
   for (size_t i = 0; i < _preserved_count; i++) {
     _preserved_marks[i].restore();
   }

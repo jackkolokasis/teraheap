@@ -6,12 +6,6 @@
 #include "memory/sharedDefines.h"
 #include "runtime/mutexLocker.hpp"         // std::mutex
 
-
-#define clean_errno() (errno == 0 ? "None" : strerror(errno))
-#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
-#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A);}
-
-//Stack<oop, mtGC>              TeraCache::_tera_root_stack;
 char*        TeraCache::_start_addr = NULL; // Address shows where TeraCache start
 char*        TeraCache::_stop_addr = NULL;  // Address shows where TeraCache ends
 region_t     TeraCache::_region = NULL;
@@ -37,7 +31,7 @@ bool TeraCache::tc_check(oop ptr)
 	printf("[TC_CHECK] | OOP(PTR) = %p | START_ADDR = %p | STOP_ADDR = %p | start = %p \n", ptr, _start_addr, _stop_addr, (char *) ptr);
 #endif
 
-	if ((char *)ptr >= _start_addr && (char*) ptr < _stop_addr)
+	if (((HeapWord *)ptr >= (HeapWord *) _start_addr) && ((HeapWord *) ptr < (HeapWord *)_stop_addr))
 	{
 #if DEBUG_TERA_CACHE
 		std::cerr << "[TC CHECK] = TRUE" << std::endl; 
@@ -78,7 +72,7 @@ void TeraCache::tc_new_region(void)
 
 char* TeraCache::tc_get_addr_region(void)
 {
-	assertf((char *)(_start_pos_region) != NULL, "[TERA CACHE] Region is not allocated");
+	assertf((char *)(_start_pos_region) != NULL, "Region is not allocated");
 	return (char *) _start_pos_region;
 }
 
@@ -99,7 +93,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 	total_objects ++;
 	char *tmp = _next_pos_region;
 
-	printf("[BEFORE TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %d\n", obj, tmp, size);
+	printf("[BEFORE TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %d\n", (HeapWord *)obj, tmp, size);
 	// make heapwordsize
 	_next_pos_region = (char *) (((uint64_t) _next_pos_region) + size*sizeof(char*));
 
