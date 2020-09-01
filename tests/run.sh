@@ -74,7 +74,6 @@ function delete()
 	rm core.*
 	rm hs_err_pid*
 	rm err out
-	rm *.class
 }
 
 while getopts ":crpdgh" opt

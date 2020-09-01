@@ -70,33 +70,33 @@ public class List_Large {
 		System.out.println("Str = " + str);
 		System.out.println("Hashcode Element = " + x);
 		
-		//System.out.println("=========================================");
-		//System.out.println("Call GC");
-		//System.gc();
-		//System.out.println("=========================================");
+		System.out.println("=========================================");
+		System.out.println("Call GC");
+		System.gc();
+		System.out.println("=========================================");
 
 
-		//System.out.println("=========================================");
-		//System.out.println("Memory After\n");
-		//for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
-		//	System.out.println(memoryPoolMXBean.getName());
-		//	System.out.println(memoryPoolMXBean.getUsage().getUsed());
-		//}
-		//System.out.println("=========================================");
+		System.out.println("=========================================");
+		System.out.println("Memory After\n");
+		for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
+			System.out.println(memoryPoolMXBean.getName());
+			System.out.println(memoryPoolMXBean.getUsage().getUsed());
+		}
+		System.out.println("=========================================");
 
 
-		//System.out.println("=========================================");
-		//System.out.println("Call GC");
-		//System.gc();
-		//System.out.println("=========================================");
+		System.out.println("=========================================");
+		System.out.println("Call GC");
+		System.gc();
+		System.out.println("=========================================");
 
 
-		//System.out.println("=========================================");
-		//System.out.println("Memory After\n");
-		//for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
-		//	System.out.println(memoryPoolMXBean.getName());
-		//	System.out.println(memoryPoolMXBean.getUsage().getUsed());
-		//}
-		//System.out.println("=========================================");
+		System.out.println("=========================================");
+		System.out.println("Memory After\n");
+		for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
+			System.out.println(memoryPoolMXBean.getName());
+			System.out.println(memoryPoolMXBean.getUsage().getUsed());
+		}
+		System.out.println("=========================================");
 	}
 }

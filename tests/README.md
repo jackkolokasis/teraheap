@@ -17,6 +17,7 @@ $ make run
 3. List_Small
 4. List_Large
 5. MultiList
+6. Simple_Lambda
 
 ## Validation Scripts
 There are two validation tests.
