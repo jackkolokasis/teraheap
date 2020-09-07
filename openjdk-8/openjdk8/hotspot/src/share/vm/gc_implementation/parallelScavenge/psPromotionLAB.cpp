@@ -70,8 +70,8 @@ void PSPromotionLAB::initialize(MemRegion lab) {
 // Fill all remaining lab space with an unreachable object.
 // The goal is to leave a contiguous parseable span of objects.
 void PSPromotionLAB::flush() {
-  assert(_state != flushed, "Attempt to flush PLAB twice");
-  assert(top() <= end(), "pointers out of order");
+  assertf(_state != flushed, "Attempt to flush PLAB twice");
+  assertf(top() <= end(), "pointers out of order");
 
   // If we were initialized to a zero sized lab, there is
   // nothing to flush
@@ -86,7 +86,7 @@ void PSPromotionLAB::flush() {
   filler_oop->set_klass(Universe::intArrayKlassObj());
   const size_t array_length =
     pointer_delta(tlab_end, top()) - typeArrayOopDesc::header_size(T_INT);
-  assert( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, "array too big in PSPromotionLAB");
+  assertf( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, "array too big in PSPromotionLAB");
   filler_oop->set_length((int)(array_length * (HeapWordSize/sizeof(jint))));
 
 #ifdef ASSERT

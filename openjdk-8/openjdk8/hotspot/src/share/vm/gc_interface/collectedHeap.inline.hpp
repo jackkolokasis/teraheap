@@ -50,7 +50,7 @@ void CollectedHeap::post_allocation_setup_no_klass_install(KlassHandle klass,
 
   oop obj = (oop)objPtr;
 
-  assert(obj != NULL, "NULL object pointer");
+  assertf(obj != NULL, "NULL object pointer");
   if (UseBiasedLocking && (klass() != NULL)) {
     obj->set_mark(klass->prototype_header());
 	obj->init_tera_cache();
@@ -65,12 +65,11 @@ void CollectedHeap::post_allocation_install_obj_klass(KlassHandle klass,
                                                    oop obj) {
   // These asserts are kind of complicated because of klassKlass
   // and the beginning of the world.
-  assert(klass() != NULL || !Universe::is_fully_initialized(), "NULL klass");
-  assert(klass() == NULL || klass()->is_klass(), "not a klass");
-  assert(obj != NULL, "NULL object pointer");
+  assertf(klass() != NULL || !Universe::is_fully_initialized(), "NULL klass");
+  assertf(klass() == NULL || klass()->is_klass(), "not a klass");
+  assertf(obj != NULL, "NULL object pointer");
   obj->set_klass(klass());
-  assert(!Universe::is_fully_initialized() || obj->klass() != NULL,
-         "missing klass");
+  assertf(!Universe::is_fully_initialized() || obj->klass() != NULL, "missing klass");
 }
 
 // Support for jvmti and dtrace
@@ -104,10 +103,10 @@ void CollectedHeap::post_allocation_setup_array(KlassHandle klass,
   // Set array length before setting the _klass field
   // in post_allocation_setup_common() because the klass field
   // indicates that the object is parsable by concurrent GC.
-  assert(length >= 0, "length should be non-negative");
+  assertf(length >= 0, "length should be non-negative");
   ((arrayOop)obj)->set_length(length);
   post_allocation_setup_common(klass, obj);
-  assert(((oop)obj)->is_array(), "must be an array");
+  assertf(((oop)obj)->is_array(), "must be an array");
   // notify jvmti and dtrace (must be after length is set for dtrace)
   post_allocation_notify(klass, (oop)obj);
 }

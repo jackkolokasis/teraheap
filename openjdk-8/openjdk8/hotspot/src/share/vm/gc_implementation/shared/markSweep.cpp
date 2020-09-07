@@ -74,7 +74,8 @@ void MarkSweep::follow_stack() {
 	do {
 		while (!_marking_stack.is_empty()) {
 			oop obj = _marking_stack.pop();
-			assert (obj->is_gc_marked(), "p must be marked");
+			assertf (obj->is_gc_marked(), "p must be marked");
+
 			// Check if the content is skipped
 			obj->follow_contents();
 		}

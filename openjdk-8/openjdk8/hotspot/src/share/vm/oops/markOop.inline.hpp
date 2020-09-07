@@ -31,13 +31,15 @@
 
 // Should this header be preserved during GC (when biased locking is enabled)?
 inline bool markOopDesc::must_be_preserved_with_bias(oop obj_containing_mark) const {
-  assert(UseBiasedLocking, "unexpected");
+  assertf(UseBiasedLocking, "unexpected");
   if (has_bias_pattern()) {
     // Will reset bias at end of collection
     // Mark words of biased and currently locked objects are preserved separately
     return false;
   }
+
   markOop prototype_header = prototype_for_object(obj_containing_mark);
+
   if (prototype_header->has_bias_pattern()) {
     // Individual instance which has its bias revoked; must return
     // true for correctness

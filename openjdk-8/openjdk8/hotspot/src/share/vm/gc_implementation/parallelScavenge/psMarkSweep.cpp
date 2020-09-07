@@ -79,9 +79,9 @@ void PSMarkSweep::initialize() {
 // are being taken to free space.
 
 void PSMarkSweep::invoke(bool maximum_heap_compaction) {
-  assert(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
-  assert(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
-  assert(!Universe::heap()->is_gc_active(), "not reentrant");
+  assertf(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+  assertf(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
+  assertf(!Universe::heap()->is_gc_active(), "not reentrant");
 
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
   GCCause::Cause gc_cause = heap->gc_cause();
@@ -106,8 +106,8 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 // This method contains no policy. You should probably
 // be calling invoke() instead.
 bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
-  assert(SafepointSynchronize::is_at_safepoint(), "must be at a safepoint");
-  assert(ref_processor() != NULL, "Sanity");
+  assertf(SafepointSynchronize::is_at_safepoint(), "must be at a safepoint");
+  assertf(ref_processor() != NULL, "Sanity");
 
   if (GC_locker::check_active_before_gc()) {
     return false;
@@ -566,16 +566,9 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     // Keep all the classes loaded by the Java system class loader, as well as the objects referenced by the static fields of the class.
     SystemDictionary::always_strong_oops_do(mark_and_push_closure());
 
-    // May be uncomment this
+    // Keep this comment!!
     // ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(), follow_klass_closure(), true);
     
-    // This is a bit unclear to me. I think this is a class loader that is not a
-    // Java system class loader, that is, it covers classes (and their static fields)
-    // that are loaded by different class loaders.
-    //
-    // ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(),
-    // follow_klass_closure(), true);
-
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
   }
@@ -595,7 +588,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   }
 
   // This is the point where the entire marking should have completed.
-  assert(_marking_stack.is_empty(), "Marking should have completed");
+  assertf(_marking_stack.is_empty(), "Marking should have completed");
 
   // ektipwse unload klaseis -> poies kanei unload
   // poia ekana unload kai ekei pou skas ekanes unload

@@ -63,11 +63,11 @@ bool is_power_of_2_t(T x) {
 
 template <typename T, typename A>
 inline T align_up(T size, A alignment) {
-    assert(is_power_of_2_t(alignment), 
+    assertf(is_power_of_2_t(alignment), 
             "must be a power of 2: " UINT64_FORMAT, (uint64_t)alignment);
 
     T ret = align_up_(size, alignment);
-    assert(is_aligned_(ret, alignment), 
+    assertf(is_aligned_(ret, alignment), 
             "must be aligned: " UINT64_FORMAT, (uint64_t)ret);
 
     return ret;
@@ -75,11 +75,11 @@ inline T align_up(T size, A alignment) {
 
 template <typename T, typename A>
 inline T align_down(T size, A alignment) {
-    assert(is_power_of_2_t(alignment), 
+    assertf(is_power_of_2_t(alignment), 
             "must be a power of 2: " UINT64_FORMAT, (uint64_t)alignment);
     
     T ret = align_down_(size, alignment);
-    assert(is_aligned_(ret, alignment), 
+    assertf(is_aligned_(ret, alignment), 
             "must be aligned: " UINT64_FORMAT, (uint64_t)ret);
 
     return ret;
@@ -87,7 +87,7 @@ inline T align_down(T size, A alignment) {
 
 template <typename T, typename A>
 inline bool is_aligned(T size, A alignment) {
-    assert(is_power_of_2_t(alignment), 
+    assertf(is_power_of_2_t(alignment), 
             "must be a power of 2: " UINT64_FORMAT, (uint64_t)alignment);
 
     return is_aligned_(size, alignment);

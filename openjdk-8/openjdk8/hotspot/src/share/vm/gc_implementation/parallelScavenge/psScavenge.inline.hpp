@@ -71,11 +71,17 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 
 	oop o = oopDesc::load_decode_heap_oop_not_null(p);
 
-	//TeraCache* tc = Universe::teraCache();
-	//if (tc->tc_check(o))
-	//{
-	//	return;
-	//}
+	if (EnableTeraCache)
+	{
+		if (Universe::teraCache()->tc_check(o))
+		{
+			std::cerr << "I am here" << std::endl;
+			oop new_obj = o;
+			oopDesc::encode_store_heap_oop_not_null(p, new_obj);
+			return;
+		}
+	}
+	
 
 	oop new_obj = o->is_forwarded()
 		? o->forwardee()
@@ -96,8 +102,7 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	// We cannot mark without test, as some code passes us pointers
 	// that are outside the heap. These pointers are either from roots
 	// or from metadata.
-	if ((!PSScavenge::is_obj_in_young((HeapWord*)p)) &&
-			Universe::heap()->is_in_reserved(p)) {
+	if ((!PSScavenge::is_obj_in_young((HeapWord*)p)) && Universe::heap()->is_in_reserved(p)) {
 		if (PSScavenge::is_obj_in_young(new_obj)) {
 			card_table()->inline_write_ref_field_gc(p, new_obj);
 		}
@@ -144,6 +149,18 @@ class PSScavengeFromKlassClosure: public OopClosure {
 
       oop o = *p;
       oop new_obj;
+
+	  if (EnableTeraCache)
+	  {
+		TeraCache* tc = Universe::teraCache();
+		if (tc->tc_check(o))
+		{
+			std::cerr << "I am here 2" << std::endl;
+			new_obj = o;
+			oopDesc::encode_store_heap_oop_not_null(p, new_obj);
+			return;
+		}
+	  }
       if (o->is_forwarded()) {
         new_obj = o->forwardee();
       } else {

@@ -5075,7 +5075,7 @@ void MacroAssembler::encode_klass_not_null(Register dst, Register src) {
 // when (Universe::heap() != NULL).  Hence, if the instructions they
 // generate change, then this method needs to be updated.
 int MacroAssembler::instr_size_for_decode_klass_not_null() {
-  assert (UseCompressedClassPointers, "only for compressed klass ptrs");
+  assertf (UseCompressedClassPointers, "only for compressed klass ptrs");
   if (Universe::narrow_klass_base() != NULL) {
     // mov64 + addq + shlq? + mov64  (for reinit_heapbase()).
     return (Universe::narrow_klass_shift() == 0 ? 20 : 24);

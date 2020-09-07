@@ -617,7 +617,7 @@ inline bool oopDesc::is_unlocked_oop() const {
 #endif // PRODUCT
 
 inline void oopDesc::follow_contents(void) {
-  assert (is_gc_marked(), "should be marked");
+  assertf (is_gc_marked(), "should be marked");
   klass()->oop_follow_contents(this);
 }
 
@@ -631,12 +631,10 @@ inline bool oopDesc::is_forwarded() const {
 
 // Used by scavengers
 inline void oopDesc::forward_to(oop p) {
-  assert(check_obj_alignment(p),
-         "forwarding to something not aligned");
-  assert(Universe::heap()->is_in_reserved(p),
-         "forwarding to something not in heap");
+  assertf(check_obj_alignment(p), "forwarding to something not aligned");
+  assertf(Universe::heap()->is_in_reserved(p) || Universe::teraCache()->tc_check(p), "forwarding to something not in heap");
   markOop m = markOopDesc::encode_pointer_as_mark(p);
-  assert(m->decode_pointer() == p, "encoding must be reversable");
+  assertf(m->decode_pointer() == p, "encoding must be reversable");
   set_mark(m);
 }
 
@@ -688,7 +686,6 @@ inline void oopDesc::incr_age() {
     set_mark(mark()->incr_age());
   }
 }
-
 
 inline intptr_t oopDesc::identity_hash() {
   // Fast case; if the object is unlocked and the hash value is set, no locking is needed

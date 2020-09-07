@@ -191,10 +191,10 @@ void PSYoungGen::set_space_boundaries(size_t eden_size, size_t survivor_size) {
   char *from_start = to_start   + survivor_size;
   char *from_end   = from_start + survivor_size;
 
-  assert(from_end == virtual_space()->high(), "just checking");
-  assert(is_object_aligned((intptr_t)eden_start), "checking alignment");
-  assert(is_object_aligned((intptr_t)to_start),   "checking alignment");
-  assert(is_object_aligned((intptr_t)from_start), "checking alignment");
+  assertf(from_end == virtual_space()->high(), "just checking");
+  assertf(is_object_aligned((intptr_t)eden_start), "checking alignment");
+  assertf(is_object_aligned((intptr_t)to_start),   "checking alignment");
+  assertf(is_object_aligned((intptr_t)from_start), "checking alignment");
 
   MemRegion eden_mr((HeapWord*)eden_start, (HeapWord*)to_start);
   MemRegion to_mr  ((HeapWord*)to_start, (HeapWord*)from_start);

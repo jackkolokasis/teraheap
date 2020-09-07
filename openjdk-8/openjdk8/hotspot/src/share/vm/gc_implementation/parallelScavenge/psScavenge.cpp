@@ -258,11 +258,11 @@ bool PSScavenge::invoke() {
 // This method contains no policy. You should probably
 // be calling invoke() instead.
 bool PSScavenge::invoke_no_policy() {
-  assert(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
-  assert(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
+  assertf(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+  assertf(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
 
-  assert(_preserved_mark_stack.is_empty(), "should be empty");
-  assert(_preserved_oop_stack.is_empty(), "should be empty");
+  assertf(_preserved_mark_stack.is_empty(), "should be empty");
+  assertf(_preserved_oop_stack.is_empty(), "should be empty");
 
   _gc_timer.register_gc_start();
 
