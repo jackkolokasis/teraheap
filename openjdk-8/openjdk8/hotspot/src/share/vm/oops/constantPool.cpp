@@ -770,13 +770,14 @@ oop ConstantPool::resolve_constant_at_impl(constantPoolHandle this_oop, int inde
 oop ConstantPool::uncached_string_at(int which, TRAPS) {
   Symbol* sym = unresolved_string_at(which);
   oop str = StringTable::intern(sym, CHECK_(NULL));
-  assert(java_lang_String::is_instance(str), "must be string");
+  assertf(str != NULL, "String is null");
+  assertf(java_lang_String::is_instance(str), "must be string");
   return str;
 }
 
 
 oop ConstantPool::resolve_bootstrap_specifier_at_impl(constantPoolHandle this_oop, int index, TRAPS) {
-  assert(this_oop->tag_at(index).is_invoke_dynamic(), "Corrupted constant pool");
+  assertf(this_oop->tag_at(index).is_invoke_dynamic(), "Corrupted constant pool");
 
   Handle bsm;
   int argc;
@@ -819,8 +820,9 @@ oop ConstantPool::string_at_impl(constantPoolHandle this_oop, int which, int obj
   if (str != NULL) return str;
   Symbol* sym = this_oop->unresolved_string_at(which);
   str = StringTable::intern(sym, CHECK_(NULL));
+  assertf(str != NULL, "String is null");
   this_oop->string_at_put(which, obj_index, str);
-  assert(java_lang_String::is_instance(str), "must be string");
+  assertf(java_lang_String::is_instance(str), "must be string");
   return str;
 }
 

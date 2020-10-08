@@ -56,10 +56,40 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
   )
   if (!oopDesc::is_null(heap_oop)) {
     oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+#if !DISABLE_TERACACHE
+
+	if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
+	{
+		std::cerr << __func__     << " | O = " << referent 
+			      << " | TC = "  << referent->is_tera_cache() 
+				  << " | MARK = " << referent->is_gc_marked() 
+				  << " | TCR = " << Universe::teraCache()->tc_check(referent)
+				  << std::endl;
+		
+    
+		if (!referent->is_gc_marked() &&
+				MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
+			// reference was discovered, referent will be traversed later
+			// TODO check if we are here
+
+			ref->InstanceKlass::oop_follow_contents(obj);
+		}
+		
+		return;
+
+	}
+#endif
+
+	
     if (!referent->is_gc_marked() &&
         MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
       // reference was discovered, referent will be traversed later
+	  // TODO check if we are here
+	  
       ref->InstanceKlass::oop_follow_contents(obj);
+	  
+
       debug_only(
         if(TraceReferenceGC && PrintGCDetails) {
           gclog_or_tty->print_cr("       Non NULL enqueued " INTPTR_FORMAT, (void *)obj);
@@ -73,9 +103,20 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
           gclog_or_tty->print_cr("       Non NULL normal " INTPTR_FORMAT, (void *)obj);
         }
       )
-      MarkSweep::mark_and_push(referent_addr);
+#if !DISABLE_TERACACHE
+	  if (EnableTeraCache && referent->is_tera_cache()) {
+		  MarkSweep::tera_mark_and_push(referent_addr);
+	  }
+	  else {
+		  MarkSweep::mark_and_push(referent_addr);
+	  }
+#else
+	  MarkSweep::mark_and_push(referent_addr);
+
+#endif
     }
   }
+
   T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
   if (ReferenceProcessor::pending_list_uses_discovered_field()) {
     // Treat discovered as normal oop, if ref is not "active",
@@ -89,6 +130,8 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
                                  INTPTR_FORMAT, discovered_addr);
         }
       )
+
+	  // TODO: JK: We might add tera_mark_and_push call
       MarkSweep::mark_and_push(discovered_addr);
     }
   } else {
@@ -109,6 +152,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
       gclog_or_tty->print_cr("   Process next as normal " INTPTR_FORMAT, next_addr);
     }
   )
+
   MarkSweep::mark_and_push(next_addr);
   ref->InstanceKlass::oop_follow_contents(obj);
 }

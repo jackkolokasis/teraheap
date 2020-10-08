@@ -1200,7 +1200,7 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
 
   HeapWord* const discovered_addr = java_lang_ref_Reference::discovered_addr(obj);
   const oop  discovered = java_lang_ref_Reference::discovered(obj);
-  assert(discovered->is_oop_or_null(), "bad discovered field");
+  assertf(discovered->is_oop_or_null(), "bad discovered field");
   if (discovered != NULL) {
     // The reference has already been discovered...
     if (TraceReferenceGC) {

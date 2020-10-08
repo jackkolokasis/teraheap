@@ -1412,7 +1412,9 @@ static instanceOop alloc_object(jclass clazz, TRAPS) {
 			ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
 
 			// Mark Object to be transfered in teracache
+#if TERA_FLAG
 			ih->set_tera_cache();
+#endif
 		}
 	}
 	else {

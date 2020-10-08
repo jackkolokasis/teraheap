@@ -209,6 +209,12 @@ void TypeArrayKlass::oop_follow_contents(oop obj) {
   // know that Universe::TypeArrayKlass never moves.
 }
 
+void TypeArrayKlass::oop_follow_contents_tera_cache(oop obj) {
+  assert(obj->is_typeArray(),"must be a type array");
+  // Performance tweak: We skip iterating over the klass pointer since we
+  // know that Universe::TypeArrayKlass never moves.
+}
+
 #if INCLUDE_ALL_GCS
 void TypeArrayKlass::oop_follow_contents(ParCompactionManager* cm, oop obj) {
   assert(obj->is_typeArray(),"must be a type array");

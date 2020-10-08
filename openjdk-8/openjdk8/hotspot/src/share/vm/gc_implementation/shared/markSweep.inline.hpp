@@ -54,6 +54,12 @@ inline void MarkSweep::follow_klass(Klass* klass) {
   MarkSweep::mark_and_push(&op);
 }
 
+inline void MarkSweep::follow_klass_tera_cache(Klass* klass) {
+  oop op = klass->klass_holder();
+  MarkSweep::trace_tera_cache(&op);
+}
+
+
 template <class T> inline void MarkSweep::follow_root(T* p) {
 	assert(!Universe::heap()->is_in_reserved(p),
 			"roots shouldn't be things within the heap");
@@ -75,7 +81,14 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
+#if CLOSURE
+		if (EnableTeraCache)
+		{
+			assertf(obj->get_obj_state() != DEAD && obj->get_obj_state() != INVALID, 
+					"Object is invalide state");
+		}
 
+#if DEBUG_TERACACHE
 		if (EnableTeraCache)
 		{
 			std::cerr <<"[MARK_AND_PUSH]" 
@@ -89,18 +102,37 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 				  << (HeapWord*)obj->klass()
 				  << " | STATE = "
 				  << obj->get_obj_state()
+				  << " | NAME OF THE CLASS"
 				  << std::endl;
 		}
+#endif
+
+
 
 		if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
 		{
 			return;
 		}
+#endif
 
 		if (!obj->mark()->is_marked()) {
 			mark_object(obj);
 			_marking_stack.push(obj);
 		}
+	}
+}
+
+// Debug Trace TeraCache objects to check if they point back to heap
+template <class T> inline void MarkSweep::trace_tera_cache(T* p) {
+	//assertf(Universe::heap()->is_in_reserved(p), "should be in object space");
+	T heap_oop = oopDesc::load_heap_oop(p);
+	if (!oopDesc::is_null(heap_oop)) {
+		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+		// The object must belong to TeraCache only. If the object points back
+		// to the heap, then we have backward pointers.
+		std::cerr << __func__ << " | OBJ = " << obj << std::endl;
+		assertf(!Universe::heap()->is_in_reserved(obj), "Not allowed backward pointers");
 	}
 }
 
@@ -110,6 +142,7 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
 
 		if (EnableTeraCache)
 		{
@@ -124,12 +157,18 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 				  << (HeapWord*)obj->klass()
 				  << std::endl;
 		}
+		
+#if CLOSURE
+		if (EnableTeraCache)
+		{
+		assertf(obj->get_obj_state() != DEAD && obj->get_obj_state() != INVALID, 
+				"Object is invalide state");
+		}
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
 			return;
 		}
-
 
 		if (!obj->mark()->is_marked() || !obj->is_tera_cache()) {
 			if (!obj->mark()->is_marked())
@@ -140,26 +179,43 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 			obj->set_tera_cache();
 			_marking_stack.push(obj);
 		}
+#endif
 	}
 }
 
 void MarkSweep::push_objarray(oop obj, size_t index) {
+  assertf(!obj->is_tera_cache(), "Object should not be marked to move in TeraCache");
   ObjArrayTask task(obj, index);
   assert(task.is_valid(), "bad ObjArrayTask");
   _objarray_stack.push(task);
 }
 
-// Adust the 
+// Adust the pointers to the new location
 template <class T> inline void MarkSweep::adjust_pointer(T* p) {
 	T heap_oop = oopDesc::load_heap_oop(p);
 	if (!oopDesc::is_null(heap_oop) ) {
 		oop obj     = oopDesc::decode_heap_oop_not_null(heap_oop);
-		oop new_obj = oop(obj->mark()->decode_pointer());
+		oop new_obj = NULL;
 
-		if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
-		{
+#if !DISABLE_TERACACHE
+		if (EnableTeraCache && Universe::teraCache()->tc_check(obj)) {
 			new_obj = obj;
 		}
+		else {
+			new_obj = oop(obj->mark()->decode_pointer());
+		}
+#else
+		new_obj = oop(obj->mark()->decode_pointer());
+
+#endif
+			
+#if DEBUG_TERACACHE
+		if (EnableTeraCache)
+		{
+			std::cerr << "[ADJUST_CHECK] | P = " << p << " | O = "  << obj 
+				      << " | NEW_OBJ = " << new_obj << std::endl;
+		}
+#endif
 
 		assertf(new_obj != NULL ||                                     // is forwarding ptr?
 				obj->mark() == markOopDesc::prototype() ||             // not gc marked?

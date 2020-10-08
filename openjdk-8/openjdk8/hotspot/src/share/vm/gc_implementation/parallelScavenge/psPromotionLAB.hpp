@@ -99,6 +99,10 @@ class PSYoungPromotionLAB : public PSPromotionLAB {
     // assert(_state != flushed, "Sanity");
     HeapWord* obj = top();
     HeapWord* new_top = obj + size;
+
+	assertf(new_top == (obj + size), "Not valid operation");
+
+
     // The 'new_top>obj' check is needed to detect overflow of obj+size.
     if (new_top > obj && new_top <= end()) {
       set_top(new_top);
@@ -128,19 +132,26 @@ class PSOldPromotionLAB : public PSPromotionLAB {
   // Not MT safe
   HeapWord* allocate(size_t size) {
     // Cannot test for this now that we're doing promotion failures
-    // assert(_state != flushed, "Sanity");
-    assert(_start_array != NULL, "Sanity");
+    assertf(_state != flushed, "Sanity");
+    assertf(_start_array != NULL, "Sanity");
+	
     HeapWord* obj = top();
     HeapWord* new_top = obj + size;
+	
+	assertf(new_top == (obj + size), "Not valid operation");
+	
+	
     // The 'new_top>obj' check is needed to detect overflow of obj+size.
     if (new_top > obj && new_top <= end()) {
       set_top(new_top);
-      assert(is_object_aligned((intptr_t)obj) && is_object_aligned((intptr_t)new_top),
-             "checking alignment");
-      _start_array->allocate_block(obj);
-      return obj;
-    }
 
+      assertf(is_object_aligned((intptr_t)obj) && is_object_aligned((intptr_t)new_top),
+             "checking alignment");
+
+      _start_array->allocate_block(obj);
+
+	  return obj;
+    }
     return NULL;
   }
 

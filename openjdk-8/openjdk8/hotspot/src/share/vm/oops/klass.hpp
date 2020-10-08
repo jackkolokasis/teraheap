@@ -492,6 +492,7 @@ class Klass : public Metadata {
   // garbage collection support
   virtual void oop_follow_contents(oop obj) = 0;
   virtual int  oop_adjust_pointers(oop obj) = 0;
+  virtual void oop_follow_contents_tera_cache(oop obj) = 0;
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS_PV

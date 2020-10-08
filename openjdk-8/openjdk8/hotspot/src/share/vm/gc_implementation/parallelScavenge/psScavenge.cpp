@@ -56,7 +56,6 @@
 #include "services/memoryService.hpp"
 #include "utilities/stack.inline.hpp"
 
-
 HeapWord*                  PSScavenge::_to_space_top_before_gc = NULL;
 int                        PSScavenge::_consecutive_skipped_scavenges = 0;
 ReferenceProcessor*        PSScavenge::_ref_processor = NULL;
@@ -76,6 +75,15 @@ CollectorCounters*         PSScavenge::_counters = NULL;
 class PSIsAliveClosure: public BoolObjectClosure {
 public:
   bool do_object_b(oop p) {
+
+#if !DISABLE_TERACACHE
+	// XXX TODO Check this case again
+	if (EnableTeraCache && Universe::teraCache()->tc_check(p))
+	{
+		return true;
+	}
+	assertf(!Universe::teraCache()->tc_check(p), "Object is in teraCache");
+#endif
     return (!PSScavenge::is_obj_in_young(p)) || p->is_forwarded();
   }
 };
@@ -98,8 +106,7 @@ public:
 
   template <class T> void do_oop_work(T* p) {
     assert (!oopDesc::is_null(*p), "expected non-null ref");
-    assert ((oopDesc::load_decode_heap_oop_not_null(p))->is_oop(),
-            "expected an oop while scanning weak refs");
+    assert ((oopDesc::load_decode_heap_oop_not_null(p))->is_oop(), "expected an oop while scanning weak refs");
 
     // Weak refs may be visited more than once.
     if (PSScavenge::should_scavenge(p, _to_space)) {
@@ -126,6 +133,7 @@ class PSEvacuateFollowersClosure: public VoidClosure {
 
 class PSPromotionFailedClosure : public ObjectClosure {
   virtual void do_object(oop obj) {
+	assertf(!Universe::teraCache()->tc_check(obj), "Object should not be in teracache");
     if (obj->is_forwarded()) {
       obj->init_mark();
     }
@@ -218,12 +226,12 @@ void PSRefProcTaskExecutor::execute(EnqueueTask& task)
 // Note that this method should only be called from the vm_thread while
 // at a safepoint!
 bool PSScavenge::invoke() {
-  assert(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
-  assert(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
-  assert(!Universe::heap()->is_gc_active(), "not reentrant");
+  assertf(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+  assertf(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
+  assertf(!Universe::heap()->is_gc_active(), "not reentrant");
 
   ParallelScavengeHeap* const heap = (ParallelScavengeHeap*)Universe::heap();
-  assert(heap->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+  assertf(heap->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
 
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
@@ -400,6 +408,7 @@ bool PSScavenge::invoke_no_policy() {
       GCTraceTime tm("Scavenge", false, false, &_gc_timer);
       ParallelScavengeHeap::ParStrongRootsScope psrs;
 
+	  // Create the task queu for the scavengers
       GCTaskQueue* q = GCTaskQueue::create();
 
       if (!old_gen->object_space()->is_empty()) {
@@ -423,6 +432,7 @@ bool PSScavenge::invoke_no_policy() {
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::jvmti));
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::code_cache));
 
+	  // End the scavengers
       ParallelTaskTerminator terminator(
         active_workers,
                   (TaskQueueSetSuper*) promotion_manager->stack_array_depth());
@@ -437,40 +447,43 @@ bool PSScavenge::invoke_no_policy() {
 
     scavenge_midpoint.update();
 
-    // Process reference objects discovered during scavenge
-    {
-      GCTraceTime tm("References", false, false, &_gc_timer);
+	// Process reference objects discovered during scavenge
+	{
+		GCTraceTime tm("References", false, false, &_gc_timer);
 
-      reference_processor()->setup_policy(false); // not always_clear
-      reference_processor()->set_active_mt_degree(active_workers);
-      PSKeepAliveClosure keep_alive(promotion_manager);
-      PSEvacuateFollowersClosure evac_followers(promotion_manager);
-      ReferenceProcessorStats stats;
-      if (reference_processor()->processing_is_mt()) {
-        PSRefProcTaskExecutor task_executor;
-        stats = reference_processor()->process_discovered_references(
-          &_is_alive_closure, &keep_alive, &evac_followers, &task_executor,
-          &_gc_timer);
-      } else {
-        stats = reference_processor()->process_discovered_references(
-          &_is_alive_closure, &keep_alive, &evac_followers, NULL, &_gc_timer);
-      }
+		reference_processor()->setup_policy(false); // not always_clear
+		reference_processor()->set_active_mt_degree(active_workers);
+		PSKeepAliveClosure keep_alive(promotion_manager);
+		PSEvacuateFollowersClosure evac_followers(promotion_manager);
 
-      _gc_tracer.report_gc_reference_stats(stats);
+		ReferenceProcessorStats stats;
+		if (reference_processor()->processing_is_mt()) {
+			PSRefProcTaskExecutor task_executor;
+			stats = reference_processor()->process_discovered_references(
+					&_is_alive_closure, &keep_alive, &evac_followers, &task_executor,
+					&_gc_timer);
+		} else {
+			stats = reference_processor()->process_discovered_references(
+					&_is_alive_closure, &keep_alive, &evac_followers, NULL, &_gc_timer);
+		}
 
-      // Enqueue reference objects discovered during scavenge.
-      if (reference_processor()->processing_is_mt()) {
-        PSRefProcTaskExecutor task_executor;
-        reference_processor()->enqueue_discovered_references(&task_executor);
-      } else {
-        reference_processor()->enqueue_discovered_references(NULL);
-      }
-    }
+		_gc_tracer.report_gc_reference_stats(stats);
 
-    GCTraceTime tm("StringTable", false, false, &_gc_timer);
-    // Unlink any dead interned Strings and process the remaining live ones.
-    PSScavengeRootsClosure root_closure(promotion_manager);
-    StringTable::unlink_or_oops_do(&_is_alive_closure, &root_closure);
+		// Enqueue reference objects discovered during scavenge.
+		if (reference_processor()->processing_is_mt()) {
+			PSRefProcTaskExecutor task_executor;
+			reference_processor()->enqueue_discovered_references(&task_executor);
+		} else {
+			reference_processor()->enqueue_discovered_references(NULL);
+		}
+	}
+
+	GCTraceTime tm("StringTable", false, false, &_gc_timer);
+	// Unlink any dead interned Strings and process the remaining live ones.
+	PSScavengeRootsClosure root_closure(promotion_manager);
+
+	StringTable::unlink_or_oops_do(&_is_alive_closure, &root_closure);
+	
 
     // Finally, flush the promotion_manager's labs, and deallocate its stacks.
     promotion_failure_occurred = PSPromotionManager::post_scavenge(_gc_tracer);

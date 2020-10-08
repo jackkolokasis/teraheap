@@ -39,7 +39,7 @@ void PSPromotionLAB::initialize(MemRegion lab) {
 
   HeapWord* bottom = lab.start();
   HeapWord* end    = lab.end();
-
+		
   set_bottom(bottom);
   set_end(end);
   set_top(bottom);
@@ -55,7 +55,7 @@ void PSPromotionLAB::initialize(MemRegion lab) {
     }
 
     // NOTE! We need to allow space for a filler object.
-    assert(lab.word_size() >= filler_header_size, "lab is too small");
+    assertf(lab.word_size() >= filler_header_size, "lab is too small");
     end = end - filler_header_size;
     set_end(end);
 
@@ -64,7 +64,7 @@ void PSPromotionLAB::initialize(MemRegion lab) {
     _state = zero_size;
   }
 
-  assert(this->top() <= this->end(), "pointers out of order");
+  assertf(this->top() <= this->end(), "pointers out of order");
 }
 
 // Fill all remaining lab space with an unreachable object.
@@ -81,13 +81,23 @@ void PSPromotionLAB::flush() {
   // PLAB's never allocate the last aligned_header_size
   // so they can always fill with an array.
   HeapWord* tlab_end = end() + filler_header_size;
+
+  //assertf(tlab_end == bottom() + OldPLABSize, "Not valid tlab_end")
   typeArrayOop filler_oop = (typeArrayOop) top();
+
   filler_oop->set_mark(markOopDesc::prototype());
+
   filler_oop->set_klass(Universe::intArrayKlassObj());
+
   const size_t array_length =
     pointer_delta(tlab_end, top()) - typeArrayOopDesc::header_size(T_INT);
-  assertf( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, "array too big in PSPromotionLAB");
+
+  assertf( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, 
+		  "array too big in PSPromotionLAB");
+
   filler_oop->set_length((int)(array_length * (HeapWordSize/sizeof(jint))));
+
+  assertf(top() + filler_oop->size() == tlab_end, "TLAB overflow")
 
 #ifdef ASSERT
   // Note that we actually DO NOT want to use the aligned header size!
@@ -103,11 +113,11 @@ void PSPromotionLAB::flush() {
 }
 
 bool PSPromotionLAB::unallocate_object(HeapWord* obj, size_t obj_size) {
-  assert(Universe::heap()->is_in(obj), "Object outside heap");
+  assertf(Universe::heap()->is_in(obj), "Object outside heap");
 
   if (contains(obj)) {
     HeapWord* object_end = obj + obj_size;
-    assert(object_end == top(), "Not matching last allocation");
+    assertf(object_end == top(), "Not matching last allocation");
 
     set_top(obj);
     return true;
@@ -129,7 +139,7 @@ void PSOldPromotionLAB::flush() {
 
   PSPromotionLAB::flush();
 
-  assert(_start_array != NULL, "Sanity");
+  assertf(_start_array != NULL, "Sanity");
 
   _start_array->allocate_block(obj);
 }

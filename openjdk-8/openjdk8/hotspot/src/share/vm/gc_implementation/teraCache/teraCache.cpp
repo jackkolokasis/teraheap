@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include "gc_implementation/teraCache/teraCache.hpp"
 #include "memory/sharedDefines.h"
-#include "runtime/mutexLocker.hpp"         // std::mutex
+#include "runtime/mutexLocker.hpp"          // std::mutex
+#include "oops/oop.inline.hpp"
 
 char*        TeraCache::_start_addr = NULL; // Address shows where TeraCache start
 char*        TeraCache::_stop_addr = NULL;  // Address shows where TeraCache ends
@@ -27,22 +28,17 @@ TeraCache::TeraCache()
 bool TeraCache::tc_check(oop ptr)
 {
 
-#if DEBUG_TERA_CACHE
-	printf("[TC_CHECK] | OOP(PTR) = %p | START_ADDR = %p | STOP_ADDR = %p | start = %p \n", ptr, _start_addr, _stop_addr, (char *) ptr);
+#if DEBUG_TERACACHE
+	printf("[TC_CHECK] | OOP(PTR) = %p | START_ADDR = %p | STOP_ADDR = %p | start = %p \n", 
+			ptr, _start_addr, _stop_addr, (char *) ptr);
 #endif
 
 	if (((HeapWord *)ptr >= (HeapWord *) _start_addr) && ((HeapWord *) ptr < (HeapWord *)_stop_addr))
 	{
-#if DEBUG_TERA_CACHE
-		std::cerr << "[TC CHECK] = TRUE" << std::endl; 
-#endif
 		return true;
 	}
 	else 
 	{
-#if DEBUG_TERA_CACHE
-		std::cerr << "[TC CHECK] = FALSE" << std::endl; 
-#endif
 		return false;
 	}
 }
@@ -78,9 +74,9 @@ char* TeraCache::tc_get_addr_region(void)
 
 char* TeraCache::tc_region_top(oop obj, size_t size)
 {
-#if DEBUG_TERA_CACHE
-	printf("[TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p \n", obj, _next_pos_region);
-	std::cout << "SIZE =" << " " << size << std::endl;
+#if DEBUG_TERACACHE
+	printf("[TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %p\n", 
+			obj, _next_pos_region, size);
 #endif
 
 #if STATISTICS
@@ -121,4 +117,54 @@ char* TeraCache::tc_region_cur_ptr(void)
 	assertf((char *)(_next_pos_region) != (char *) NULL, "Invalid pointer");
 	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is full");
 	return (char *) _next_pos_region;
+}
+
+
+void TeraCache::tc_adjust_pointers()
+{
+	
+	if (_start_pos_region == _next_pos_region)
+	{
+		return;
+	}
+
+	HeapWord* q  = (HeapWord *) _start_pos_region;
+	HeapWord* t  = (HeapWord *) _next_pos_region;
+
+	// Point all the oops to the new location
+	while (q < t) {
+		if (oop(q)->klass() == NULL)
+		{
+			return;
+		}
+
+		std::cerr << "Ajust pointers in the teraCache" << std::endl;
+		size_t size = oop(q)->adjust_pointers();
+		q += size;
+	}
+}
+
+
+// Check for backward pointers
+void TeraCache::tc_check_back_pointers()
+{
+	if (_start_pos_region == _next_pos_region)
+	{
+		return;
+	}
+
+	HeapWord* q  = (HeapWord *) _start_pos_region;
+	HeapWord* t  = (HeapWord *) _next_pos_region;
+
+	while (q < t)
+	{
+		// Get the size of the object
+		size_t size = oop(q)->size();
+
+		// Follow the contents of the object
+		oop(q)->follow_contents_tera_cache();
+
+		// Move to the next object
+		q+=size;
+	}
 }

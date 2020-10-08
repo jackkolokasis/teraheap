@@ -46,19 +46,24 @@ void CollectedHeap::post_allocation_setup_common(KlassHandle klass,
 }
 
 void CollectedHeap::post_allocation_setup_no_klass_install(KlassHandle klass,
-                                                           HeapWord* objPtr) {
+		HeapWord* objPtr) {
 
-  oop obj = (oop)objPtr;
+	oop obj = (oop)objPtr;
 
-  assertf(obj != NULL, "NULL object pointer");
-  if (UseBiasedLocking && (klass() != NULL)) {
-    obj->set_mark(klass->prototype_header());
-	obj->init_tera_cache();
-  } else {
-    // May be bootstrapping
-    obj->set_mark(markOopDesc::prototype());
-	obj->init_tera_cache();
-  }
+	assertf(obj != NULL, "NULL object pointer");
+
+	if (UseBiasedLocking && (klass() != NULL)) {
+		obj->set_mark(klass->prototype_header());
+#if TERA_FLAG
+		//obj->init_tera_cache();
+#endif
+	} else {
+		// May be bootstrapping
+		obj->set_mark(markOopDesc::prototype());
+#if TERA_FLAG
+		//obj->init_tera_cache();
+#endif
+	}
 }
 
 void CollectedHeap::post_allocation_install_obj_klass(KlassHandle klass,
@@ -126,14 +131,10 @@ HeapWord* CollectedHeap::common_mem_allocate_noinit(KlassHandle klass, size_t si
 
   HeapWord* result = NULL;
 
-  // Check if this object have to be promoted in TeraCache
-  // First allocate this object to the OldGen and then in the first
-  // FGC will promote it to TeraCache
-  // <jk> UseTLAB is a runtime flag. It should be always be on.
   if (UseTLAB) {
       result = allocate_from_tlab(klass, THREAD, size);
       if (result != NULL) {
-          assert(!HAS_PENDING_EXCEPTION,
+          assertf(!HAS_PENDING_EXCEPTION,
                   "Unexpected exception, will result in uninitialized storage");
           return result;
       }
@@ -258,6 +259,7 @@ HeapWord* CollectedHeap::allocate_from_tlab(KlassHandle klass, Thread* thread, s
 
   HeapWord* obj = thread->tlab().allocate(size);
 
+
   if (obj != NULL) {
     return obj;
   }
@@ -272,6 +274,9 @@ void CollectedHeap::init_obj(HeapWord* obj, size_t size) {
   const size_t hs = oopDesc::header_size();
   assert(size >= hs, "unexpected object size");
   ((oop)obj)->set_klass_gap(0);
+//#if TERA_FLAG
+//  (oop(obj))->set_obj_state(INIT);
+//#endif
   Copy::fill_to_aligned_words(obj + hs, size - hs);
 }
 

@@ -105,8 +105,10 @@ class ObjArrayKlass : public ArrayKlass {
 
   // Garbage collection
   void oop_follow_contents(oop obj);
+  void oop_follow_contents_tera_cache(oop obj);
   inline void oop_follow_contents(oop obj, int index);
   template <class T> inline void objarray_follow_contents(oop obj, int index);
+  template <class T> inline void objarray_follow_contents_tera_cache(oop obj, int index);
 
   int  oop_adjust_pointers(oop obj);
 

@@ -9,45 +9,59 @@
  ***************************************************
  */
 
+// JK: Remember code that nee to be tested is marked with TODO XX: TESTED
+
 #ifndef _SHARE_DEFINES_H_
 #define _SHARE_DEFINES_H_
 
 #include <csignal>
 
-//#define BREAKPOINT asm volatile("int3;");
+/***********************************
+ * DEBUG
+ **********************************/
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
-#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
+
+#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__,\
+						  clean_errno(), ##__VA_ARGS__) 
+
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 
-#define DEBUG_SLOWPATH_INTR 0
+#define DEBUG_SLOWPATH_INTR		 0	//< Use only interpreter for object allocation
 
-#define DEBUG_ANNO_INTR 1
+#define DEBUG_ANNO_INTR     	 1	//< Debug @Cache annotation, TODO Disable in experiments
 
-#define DEBUG_EXTRA_FIELD_MARK 1
+#define DEBUG_TERACACHE     	 0	//< Debug prints for teraCache, TODO Disable in experiments
 
-#define DEBUG_PRINT 1
+#define DEBUG_CLOSURE     	     0	//< Debug prints for teraCache, TODO Disable in experiments
 
-#define DEBUG_TERA_MARK_SWEEP 0
+#define DISABLE_TERACACHE		 0  //< Disable teraCache
 
-#define DEBUG_TERA_CACHE 0
+#define TERA_FLAG				 1  //< Define teraFlag word, TODO Set to 1
 
-#define DEBUG_PRINTS 0		 // Remember to delete all these prints
+#define CLOSURE					 1  //< Closure Calculation
 
-/* States of the object */
-#define MOVE_TO_TERA			255	// Move this object to tera cache
+#define DISABLE_TERACACHE_2		 1  //< Disable teraCache
+
+/***********************************
+ * States of the objects  
+ **********************************/
+#define MOVE_TO_TERA			255	//< Move this object to tera cache
 		
-#define INIT_VALUE      		325	// Initial object state
+#define INIT					325	//< Initial object state
 
-#define VALID_DEAD      		425 // Object found as dead during precompaction
+#define DEAD      		        425 //< Object found as dead during precompaction
 
-#define VALID_PRECOMPACT		525 // Object found at precompact phase and need to be move in new location
+#define PRECOMPACT		        525 //< Object in precompact phase and need to be move in new location
 
-#define INVALID_PLACE_TO_MOVE	655	// The place contains an already copied object that has been moved by this GC
+#define VALID	                655	//< The place contains an already copied object that has been moved by this GC
 
+#define INVALID					755	//< The place contains an old object
 
-////////////////////////////////////////
-// Statistics
-///////////////////////////////////////
-#define STATISTICS			0 // Count regions
+#define FLUSHED					575	//< The place contains a dummy object
+
+/***********************************
+ * Statistics
+ **********************************/
+#define STATISTICS			      0  //< Enable statistics for TeraCache
 
 #endif  // _SHARE_DEFINES_H_

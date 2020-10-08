@@ -28,22 +28,20 @@
 static void pd_conjoint_words(HeapWord* from, HeapWord* to, size_t count) {
 #ifdef AMD64
 
+#if DEBUG_TERACACHE
 	if (EnableTeraCache)
 	{
 		uint64_t end = (((uint64_t) to) + (count*HeapWordSize));
 		uint64_t start = (uint64_t) to;
 
-		if ((uint64_t) (end - start) != (uint64_t) (count * HeapWordSize))
-		{
-			std::cerr << "[MEMMOVE] | FROM = " << from 
-				  << " | TO = " << (uint64_t) to 
-				  << " | NEXT_ΤΟ  = " << (((uint64_t) to) + (count*HeapWordSize)) 
-				  << " | COUNT = " << count << std::endl;
-		}
+		assertf((uint64_t) (end - start) == (uint64_t) (count * HeapWordSize), 
+				"Memmove Error");
+
 		std::cerr << "[MEMMOVE] | FROM = " << from 
-			  << " | TO = " << to 
-			  << " | COUNT = " << count << std::endl;
+			<< " | TO = " << to 
+			<< " | COUNT = " << count << std::endl;
 	}
+#endif
   (void)memmove(to, from, count * HeapWordSize);
 #else
   // Includes a zero-count check.

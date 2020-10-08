@@ -97,7 +97,10 @@ class oopDesc {
     Klass*      _klass;	            // Uncompressed class pointer
     narrowKlass _compressed_klass;  // Compressed class pointer
   } _metadata;
+
+#if TERA_FLAG
   volatile uint64_t _tera_flag;     // MarkTeracache objects
+#endif
 
   // Fast access to barrier set.  Must be initialized.
   static BarrierSet* _bs;
@@ -106,16 +109,11 @@ class oopDesc {
   markOop  mark() const         { return _mark; }
   markOop* mark_addr() const    { return (markOop*) &_mark; }
 
-  /* Get the object state */
-  uint64_t get_object_state() 
-  {
-	  return _tera_flag;
-  }
-
+#if TERA_FLAG
   /* Init TeraCache marking flag */
   void init_tera_cache() 
   {
-	  _tera_flag = INIT_VALUE; 
+	  _tera_flag = INIT; 
   }
 
   /* Mark an object to be moved in TeraCache */
@@ -153,6 +151,8 @@ class oopDesc {
   { 
 	  return _tera_flag;
   }
+
+#endif
 
   void set_mark(volatile markOop m)      { _mark = m;   }
 
@@ -374,6 +374,8 @@ class oopDesc {
   // Apply "MarkSweep::mark_and_push" to (the address of) every non-NULL
   // reference field in "this".
   void follow_contents(void);
+
+  void follow_contents_tera_cache(void);
 
 #if INCLUDE_ALL_GCS
   // Parallel Scavenge

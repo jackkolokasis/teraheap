@@ -78,6 +78,7 @@ class TypeArrayKlass : public ArrayKlass {
 
   // Garbage collection
   void oop_follow_contents(oop obj);
+  void oop_follow_contents_tera_cache(oop obj);
   int  oop_adjust_pointers(oop obj);
 
   // Parallel Scavenge and Parallel Old
@@ -101,7 +102,8 @@ class TypeArrayKlass : public ArrayKlass {
   static const char* external_name(BasicType type);
 
   // Sizing
-  static int header_size()  { return sizeof(TypeArrayKlass)/HeapWordSize; }
+  static int header_size()  { return sizeof(TypeArrayKlass)/HeapWordSize;  }
+
   int size() const          { return ArrayKlass::static_size(header_size()); }
 
   // Initialization (virtual from Klass)

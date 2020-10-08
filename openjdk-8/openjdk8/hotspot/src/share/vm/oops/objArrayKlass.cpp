@@ -462,6 +462,16 @@ void ObjArrayKlass::oop_follow_contents(oop obj) {
   }
 }
 
+void ObjArrayKlass::oop_follow_contents_tera_cache(oop obj) {
+  assert (obj->is_array(), "obj must be array");
+  MarkSweep::follow_klass_tera_cache(obj->klass());
+  if (UseCompressedOops) {
+    objarray_follow_contents<narrowOop>(obj, 0);
+  } else {
+    objarray_follow_contents<oop>(obj, 0);
+  }
+}
+
 #if INCLUDE_ALL_GCS
 void ObjArrayKlass::oop_follow_contents(ParCompactionManager* cm,
                                         oop obj) {
@@ -564,7 +574,7 @@ ALL_OOP_OOP_ITERATE_CLOSURES_1(ObjArrayKlass_OOP_OOP_ITERATE_DEFN_r)
 ALL_OOP_OOP_ITERATE_CLOSURES_2(ObjArrayKlass_OOP_OOP_ITERATE_DEFN_r)
 
 int ObjArrayKlass::oop_adjust_pointers(oop obj) {
-  assert(obj->is_objArray(), "obj must be obj array");
+  assertf(obj->is_objArray(), "obj must be obj array");
   objArrayOop a = objArrayOop(obj);
   // Get size before changing pointers.
   // Don't call size() or oop_size() since that is a virtual call.

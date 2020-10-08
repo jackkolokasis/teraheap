@@ -46,23 +46,19 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
   HeapWord* _compaction_top;		   /* Compaction top pointer         						*/
   size_t _allowed_dead_ratio;          /* Allowed dead ratio									*/
 
+#if DEBUG_TERACACHE
   /* Debugging */
 
   /* Use this vector to check if all copied objects are not corrupted and
    * contains a valid information
    *
-   * In this vecto we store the destination adresses of the object and then we
+   * In this vector we store the destination adresses of the object and then we
    * check the tera_flag field to have a valid value.
+   *
+   * Also, we check if thes objects do not overlap.
    */
   std::vector<HeapWord *> _verify_objects;
-
-  /* Use this vector during precompact phase to check if all the objects that
-   * will not move in a new location will contain valid mark words.
-   *
-   * Accepted mark words:
-   * 0x1 or 0x5
-   */
-  std::vector<HeapWord *> _verify_headers;
+#endif
   
   bool insert_deadspace(size_t& allowed_deadspace_words, HeapWord* q, size_t word_len);
 
@@ -94,9 +90,10 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
   void precompact();
   void compact(bool mangle_free_space);
 
+#if DEBUG_TERACACHE
   // Debugging
   void verify_compacted_objects();
-  void verify_precompact_headers();
+#endif
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSMARKSWEEPDECORATOR_HPP

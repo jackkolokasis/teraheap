@@ -193,18 +193,15 @@ int get_alloc_gen(ConstantPool* pool, Method* method, int bci, int n_dims=0) {
 			u2 anno_type_index = Bytes::get_Java_u2(data + 4 + dsize*2);
 			// Get char* (type name, should be Ljava/lang/Gen;)
 			Symbol* type_name = pool->symbol_at(anno_type_index);
-
+			
 			// Note: If anno_bco == bci, then they both point to the same bc. In this
 			// situation there is no need to fix the bci. Only if they differ, we
 			// should look into the size of make sure that both bcis are a match.
 			int anno_bc_len = 0;
 
-            for (int j = 0; j < n_dims; i++) {
-                anno_bc_len += Bytecodes::length_for(Bytecodes::code_at(method, anno_bci + anno_bc_len));
-            }
-
             // 68 ----> NEW op. byte code
             // 17 ----> NEW op. byte code
+			//
             if (anno_target == 68 && (anno_bci + anno_bc_len) == bci && type_name->equals("Ljava/lang/Cache;", 17)) 
             {
                 aac->at_put(next_centry, bci);
@@ -262,19 +259,18 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   if (alloc_cache == 0) {
     obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
   } else {
-      // Allocate object to Old Generation directly
-      obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
-     // obj = klass->allocate_instance(true, CHECK);
+	  // The interpreter establishes the object strength entrance
+      obj = klass->allocate_instance(CHECK); 
 
-      // obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
-#if DEBUG_EXTRA_FIELD_MARK
-      //obj->set_mark(markOopDesc::prototype()->set_teraCache());
+      // Allocate object to Old Generation directly
+      // obj = klass->allocate_instance(true, CHECK);
+
+#if DEBUG_ANNO_INTR
+#if TERA_FLAG
       obj->set_tera_cache();
 #endif
-
-#if DEBUG_PRINT
-      std::cerr<< "\t Inter Objects = " << obj->is_tera_cache() << std::endl;
 #endif
+
   }
   // The secured result is stored in JavaThread with JavaThread and
   // return
@@ -284,6 +280,7 @@ IRT_END
 
 IRT_ENTRY(void, InterpreterRuntime::newarray(JavaThread* thread, BasicType type, jint size))
   oop obj = oopFactory::new_typeArray(type, size, CHECK);
+
   thread->set_vm_result(obj);
 IRT_END
 
@@ -294,6 +291,7 @@ IRT_ENTRY(void, InterpreterRuntime::anewarray(JavaThread* thread, ConstantPool* 
   //       (This may have to change if this code changes!)
   Klass*    klass = pool->klass_at(index, CHECK);
   objArrayOop obj = oopFactory::new_objArray(klass, size, CHECK);
+
   thread->set_vm_result(obj);
 IRT_END
 

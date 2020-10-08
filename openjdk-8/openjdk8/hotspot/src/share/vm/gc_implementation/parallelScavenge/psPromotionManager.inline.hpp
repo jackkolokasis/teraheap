@@ -39,14 +39,43 @@ template <class T>
 inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
   if (p != NULL) { // XXX: error if p != NULL here
     oop o = oopDesc::load_decode_heap_oop_not_null(p);
+	//assertf(!Universe::teraCache()->tc_check(o), "Object should not be in TC");
+
+#if !DISABLE_TERACACHE
+	 // XXX TODO Check this case again
+	if (EnableTeraCache && Universe::teraCache()->tc_check(o))
+	{
+		oopDesc::encode_store_heap_oop_not_null(p, o);
+		return;
+	}
+#endif
+	
     if (o->is_forwarded()) {
       o = o->forwardee();
       // Card mark
       if (PSScavenge::is_obj_in_young(o)) {
         PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
       }
+
+	  // How oopDesc::encode_store_heap_oop_not_null works
+	  
+	  //				 ______forwarded____
+	  //				|					V
+	  //  +----------------------------------------+
+	  //  |            [c]		|	       [c']	   |
+	  //  +----------------------------------------+
+	  //				^			      	^
+	  //				|					|
+	  //	[p]------->[o]-------------------
+
+	  // Save the forward pointer to the location pointed by p
       oopDesc::encode_store_heap_oop_not_null(p, o);
     } else {
+
+	  
+	  // If it has not been forwarded, the copy is not done immediately, but
+	  // placed on a stack. All GC threads will start from here.
+	  // Take the task from the stack. After taking it out, traverse and copy.
       push_depth(p);
     }
   }
@@ -54,10 +83,9 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
 
 template <class T>
 inline void PSPromotionManager::claim_or_forward_depth(T* p) {
-  assert(PSScavenge::should_scavenge(p, true), "revisiting object?");
-  assert(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap,
-         "Sanity");
-  assert(Universe::heap()->is_in(p), "pointer outside heap");
+  assertf(PSScavenge::should_scavenge(p, true), "revisiting object?");
+  assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+  assertf(Universe::heap()->is_in(p), "pointer outside heap");
 
   claim_or_forward_internal_depth(p);
 }
@@ -69,7 +97,8 @@ inline void PSPromotionManager::claim_or_forward_depth(T* p) {
 //
 template<bool promote_immediately>
 oop PSPromotionManager::copy_to_survivor_space(oop o) {
-  assert(PSScavenge::should_scavenge(&o), "Sanity");
+  assertf(PSScavenge::should_scavenge(&o), "Sanity");
+  assertf(!Universe::teraCache()->tc_check(o), "Object should not be belonged to teracache space");
 
   oop new_obj = NULL;
 
@@ -81,7 +110,7 @@ oop PSPromotionManager::copy_to_survivor_space(oop o) {
   // The same test as "o->is_forwarded()"
   if (!test_mark->is_marked()) {
     bool new_obj_is_tenured = false;
-    size_t new_obj_size = o->size();
+		size_t new_obj_size = o->size();
 
     if (!promote_immediately) {
       // Find the objects age, MT safe.
@@ -129,12 +158,17 @@ oop PSPromotionManager::copy_to_survivor_space(oop o) {
           // Do we allocate directly, or flush and refill?
           if (new_obj_size > (OldPLABSize / 2)) {
             // Allocate this object directly
+			
             new_obj = (oop)old_gen()->cas_allocate(new_obj_size);
+	         
           } else {
-            // Flush and fill
-            _old_lab.flush();
 
-            HeapWord* lab_base = old_gen()->cas_allocate(OldPLABSize);
+            // Flush and fill with unused object the PLAB
+				_old_lab.flush();
+
+			// Allocate new PLAB in Old generation
+			HeapWord* lab_base = old_gen()->cas_allocate(OldPLABSize);
+
             if(lab_base != NULL) {
 #ifdef ASSERT
               // Delay the initialization of the promotion lab (plab).
@@ -163,9 +197,10 @@ oop PSPromotionManager::copy_to_survivor_space(oop o) {
       }
     }
 
-    assert(new_obj != NULL, "allocation should have succeeded");
+    assertf(new_obj != NULL, "allocation should have succeeded");
 
-    // Copy obj
+
+    // Copy the old object to the new address
     Copy::aligned_disjoint_words((HeapWord*)o, (HeapWord*)new_obj, new_obj_size);
 
     // Now we have to CAS in the header.

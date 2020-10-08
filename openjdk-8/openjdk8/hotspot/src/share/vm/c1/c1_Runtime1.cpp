@@ -630,6 +630,12 @@ JRT_END
 JRT_ENTRY(void, Runtime1::throw_class_cast_exception(JavaThread* thread, oopDesc* object))
   NOT_PRODUCT(_throw_class_cast_exception_count++;)
   ResourceMark rm(thread);
+
+#if DEBUG_TERACACHE
+  std::cerr << "[CAST ERROR] | O = " << object 
+            << " | STATE = " << object->get_obj_state() << std::endl;
+#endif
+
   char* message = SharedRuntime::generate_class_cast_message(
     thread, object->klass()->external_name());
   SharedRuntime::throw_and_post_jvmti_exception(

@@ -143,9 +143,9 @@ inline oop oopDesc::list_ptr_from_klass() {
   }
 }
 
-inline void   oopDesc::init_mark()                 { set_mark(markOopDesc::prototype_for_object(this)); }
+inline void   oopDesc::init_mark()           { set_mark(markOopDesc::prototype_for_object(this)); }
 
-inline bool oopDesc::is_a(Klass* k)        const { return klass()->is_subtype_of(k); }
+inline bool oopDesc::is_a(Klass* k)          const { return klass()->is_subtype_of(k); }
 
 inline bool oopDesc::is_instance()           const { return klass()->oop_is_instance(); }
 inline bool oopDesc::is_instanceMirror()     const { return klass()->oop_is_instanceMirror(); }
@@ -505,7 +505,7 @@ inline int oopDesc::size()  {
 }
 
 inline void update_barrier_set(void* p, oop v) {
-  assert(oopDesc::bs() != NULL, "Uninitialized bs in oop!");
+  assertf(oopDesc::bs() != NULL, "Uninitialized bs in oop!");
   oopDesc::bs()->write_ref_field(p, v);
 }
 
@@ -514,13 +514,14 @@ template <class T> inline void update_barrier_set_pre(T* p, oop v) {
 }
 
 template <class T> inline void oop_store(T* p, oop v) {
-  if (always_do_update_barrier) {
-    oop_store((volatile T*)p, v);
-  } else {
-    update_barrier_set_pre(p, v);
-    oopDesc::encode_store_heap_oop(p, v);
-    update_barrier_set((void*)p, v);  // cast away type
-  }
+
+	if (always_do_update_barrier) {
+		oop_store((volatile T*)p, v);
+	} else {
+		update_barrier_set_pre(p, v);
+		oopDesc::encode_store_heap_oop(p, v);
+		update_barrier_set((void*)p, v);  // cast away type
+	}
 }
 
 template <class T> inline void oop_store(volatile T* p, oop v) {
@@ -619,6 +620,11 @@ inline bool oopDesc::is_unlocked_oop() const {
 inline void oopDesc::follow_contents(void) {
   assertf (is_gc_marked(), "should be marked");
   klass()->oop_follow_contents(this);
+}
+
+inline void oopDesc::follow_contents_tera_cache(void) {
+  assertf (Universe::teraCache()->tc_check(this), "Object should be in TeraCache");
+  klass()->oop_follow_contents_tera_cache(this);
 }
 
 // Used by scavengers

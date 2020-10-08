@@ -38,7 +38,7 @@
 
 int ArrayKlass::static_size(int header_size) {
   // size of an array klass object
-  assert(header_size <= InstanceKlass::header_size(), "bad header size");
+  assertf(header_size <= InstanceKlass::header_size(), "bad header size");
   // If this assert fails, see comments in base_create_array_klass.
   header_size = InstanceKlass::header_size();
   int vtable_len = Universe::base_vtable_size();

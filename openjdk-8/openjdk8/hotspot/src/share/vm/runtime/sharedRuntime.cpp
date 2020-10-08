@@ -871,7 +871,7 @@ address SharedRuntime::continuation_for_implicit_exception(JavaThread* thread,
       default: ShouldNotReachHere();
     }
 
-    assert(exception_kind == IMPLICIT_NULL || exception_kind == IMPLICIT_DIVIDE_BY_ZERO, "wrong implicit exception kind");
+    assertf(exception_kind == IMPLICIT_NULL || exception_kind == IMPLICIT_DIVIDE_BY_ZERO, "wrong implicit exception kind");
 
     // for AbortVMOnException flag
     NOT_PRODUCT(Exceptions::debug_check_abort("java.lang.NullPointerException"));

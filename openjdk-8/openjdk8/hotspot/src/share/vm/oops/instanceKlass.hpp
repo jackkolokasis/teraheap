@@ -946,6 +946,7 @@ class InstanceKlass: public Klass {
   // Garbage collection
   void oop_follow_contents(oop obj);
   int  oop_adjust_pointers(oop obj);
+  void oop_follow_contents_tera_cache(oop obj);
 
   void clean_implementors_list(BoolObjectClosure* is_alive);
   void clean_method_data(BoolObjectClosure* is_alive);
