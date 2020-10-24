@@ -54,15 +54,9 @@ void CollectedHeap::post_allocation_setup_no_klass_install(KlassHandle klass,
 
 	if (UseBiasedLocking && (klass() != NULL)) {
 		obj->set_mark(klass->prototype_header());
-#if TERA_FLAG
-		//obj->init_tera_cache();
-#endif
 	} else {
 		// May be bootstrapping
 		obj->set_mark(markOopDesc::prototype());
-#if TERA_FLAG
-		//obj->init_tera_cache();
-#endif
 	}
 }
 
@@ -274,9 +268,6 @@ void CollectedHeap::init_obj(HeapWord* obj, size_t size) {
   const size_t hs = oopDesc::header_size();
   assert(size >= hs, "unexpected object size");
   ((oop)obj)->set_klass_gap(0);
-//#if TERA_FLAG
-//  (oop(obj))->set_obj_state(INIT);
-//#endif
   Copy::fill_to_aligned_words(obj + hs, size - hs);
 }
 

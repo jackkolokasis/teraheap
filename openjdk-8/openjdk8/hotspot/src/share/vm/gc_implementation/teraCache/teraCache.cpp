@@ -74,10 +74,10 @@ char* TeraCache::tc_get_addr_region(void)
 
 char* TeraCache::tc_region_top(oop obj, size_t size)
 {
-#if DEBUG_TERACACHE
+//#if DEBUG_TERACACHE
 	printf("[TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %p\n", 
 			obj, _next_pos_region, size);
-#endif
+//#endif
 
 #if STATISTICS
 	std::cerr << "[STATISTICS] | OBJECT_SIZE  = " << size << std::endl;

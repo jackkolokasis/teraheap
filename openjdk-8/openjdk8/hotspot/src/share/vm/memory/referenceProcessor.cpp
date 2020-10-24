@@ -1200,6 +1200,7 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
 
   HeapWord* const discovered_addr = java_lang_ref_Reference::discovered_addr(obj);
   const oop  discovered = java_lang_ref_Reference::discovered(obj);
+  assertf(!Universe::teraCache()->tc_check(discovered), "Should not be in TeraCache");
   assertf(discovered->is_oop_or_null(), "bad discovered field");
   if (discovered != NULL) {
     // The reference has already been discovered...
@@ -1213,12 +1214,12 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
       // generation's discovered list; so we won't discover it.
       return false;
     } else {
-      assert(RefDiscoveryPolicy == ReferenceBasedDiscovery,
+      assertf(RefDiscoveryPolicy == ReferenceBasedDiscovery,
              "Unrecognized policy");
       // Check assumption that an object is not potentially
       // discovered twice except by concurrent collectors that potentially
       // trace the same Reference object twice.
-      assert(UseConcMarkSweepGC || UseG1GC,
+      assertf(UseConcMarkSweepGC || UseG1GC,
              "Only possible with a concurrent marking collector");
       return true;
     }
@@ -1237,7 +1238,7 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
       return false;
     }
   } else {
-    assert(RefDiscoveryPolicy == ReferenceBasedDiscovery &&
+    assertf(RefDiscoveryPolicy == ReferenceBasedDiscovery &&
            _span.contains(obj_addr), "code inconsistency");
   }
 
@@ -1261,8 +1262,8 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
     // As in the case further above, since we are over-writing a NULL
     // pre-value, we can safely elide the pre-barrier here for the case of G1.
     // e.g.:- _bs->write_ref_field_pre((oop* or narrowOop*)discovered_addr, next_discovered);
-    assert(discovered == NULL, "control point invariant");
-    assert(!_discovered_list_needs_barrier || UseG1GC,
+    assertf(discovered == NULL, "control point invariant");
+    assertf(!_discovered_list_needs_barrier || UseG1GC,
            "For non-G1 collector, may need a pre-write-barrier for CAS from NULL below");
     oop_store_raw(discovered_addr, next_discovered);
     if (_discovered_list_needs_barrier) {
@@ -1276,7 +1277,7 @@ bool ReferenceProcessor::discover_reference(oop obj, ReferenceType rt) {
                                 (void *)obj, obj->klass()->internal_name());
     }
   }
-  assert(obj->is_oop(), "Discovered a bad reference");
+  assertf(obj->is_oop(), "Discovered a bad reference");
   verify_referent(obj);
   return true;
 }

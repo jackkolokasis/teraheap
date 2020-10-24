@@ -430,7 +430,7 @@ bool CompactibleSpace::insert_deadspace(size_t& allowed_deadspace_words,
     allowed_deadspace_words -= deadlength;
     CollectedHeap::fill_with_object(q, deadlength);
     oop(q)->set_mark(oop(q)->mark()->set_marked());
-    assert((int) deadlength == oop(q)->size(), "bad filler object size");
+    assertf((int) deadlength == oop(q)->size(), "bad filler object size");
     // Recall that we required "q == compaction_top".
     return true;
   } else {
@@ -901,6 +901,7 @@ void ContiguousSpace::allocate_temporary_filler(int factor) {
     t->set_mark(markOopDesc::prototype());
     t->set_klass(Universe::intArrayKlassObj());
     t->set_length((int)length);
+
   } else {
     assert(size == CollectedHeap::min_fill_size(),
            "size for smallest fake object doesn't match");

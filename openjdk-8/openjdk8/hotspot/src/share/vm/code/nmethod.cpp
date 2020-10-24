@@ -579,10 +579,14 @@ nmethod* nmethod::new_nmethod(methodHandle method,
 )
 {
   assert(debug_info->oop_recorder() == code_buffer->oop_recorder(), "shared OR");
+  // Find all code in code_buffer and assign handler to them
   code_buffer->finalize_oop_references(method);
   // create nmethod
   nmethod* nm = NULL;
+
+  // Acquire the lock CodeCache_lock
   { MutexLockerEx mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+	  // Calculate the size of nmethod
     int nmethod_size =
       allocation_size(code_buffer, sizeof(nmethod))
       + adjust_pcs_size(debug_info->pcs_size())
@@ -591,6 +595,8 @@ nmethod* nmethod::new_nmethod(methodHandle method,
       + round_to(nul_chk_table->size_in_bytes(), oopSize)
       + round_to(debug_info->data_size()       , oopSize);
 
+	// Allocate memory from CodeCache, after the allocation is complete, call
+	// the following nmethod to complete initialization
     nm = new (nmethod_size)
     nmethod(method(), nmethod_size, compile_id, entry_bci, offsets,
             orig_pc_offset, debug_info, dependencies, code_buffer, frame_size,
@@ -652,9 +658,11 @@ nmethod::nmethod(
 {
   {
     debug_only(No_Safepoint_Verifier nsv;)
+	// Ensure that the lock CodeCache_lock has been acquired
     assert_locked_or_safepoint(CodeCache_lock);
 
     init_defaults();
+	// Initialize other properties
     _method                  = method;
     _entry_bci               = InvocationEntryBci;
     // We have no exception handler or deopt handler make the
@@ -686,9 +694,12 @@ nmethod::nmethod(
     code_buffer->copy_values_to(this);
     if (ScavengeRootsInCode && detect_scavenge_root_oops()) {
       CodeCache::add_scavenge_root_nmethod(this);
+
+	  // Register the local method
       Universe::heap()->register_nmethod(this);
     }
     debug_only(verify_scavenge_root_oops());
+	// Indicates that the allocation is completed
     CodeCache::commit(this);
   }
 
@@ -1842,8 +1853,8 @@ void nmethod::metadata_do(void f(Metadata*)) {
 
 void nmethod::oops_do(OopClosure* f, bool allow_zombie) {
   // make sure the oops ready to receive visitors
-  assert(allow_zombie || !is_zombie(), "should not call follow on zombie nmethod");
-  assert(!is_unloaded(), "should not call follow on unloaded nmethod");
+  assertf(allow_zombie || !is_zombie(), "should not call follow on zombie nmethod");
+  assertf(!is_unloaded(), "should not call follow on unloaded nmethod");
 
   // If the method is not entrant or zombie then a JMP is plastered over the
   // first few bytes.  If an oop in the old code was there, that oop
@@ -1861,11 +1872,18 @@ void nmethod::oops_do(OopClosure* f, bool allow_zombie) {
   while (iter.next()) {
     if (iter.type() == relocInfo::oop_type ) {
       oop_Relocation* r = iter.oop_reloc();
+
+	  if (EnableTeraCache)
+	  {
+		  std::cerr << "oop_Relocation = " << r << std::endl;
+	  }
+
       // In this loop, we must only follow those oops directly embedded in
       // the code.  Other oops (oop_index>0) are seen as part of scopes_oops.
-      assert(1 == (r->oop_is_immediate()) +
+      assertf(1 == (r->oop_is_immediate()) +
                    (r->oop_addr() >= oops_begin() && r->oop_addr() < oops_end()),
              "oop must be found in exactly one place");
+
       if (r->oop_is_immediate() && r->oop_value() != NULL) {
         f->do_oop(r->oop_addr());
       }

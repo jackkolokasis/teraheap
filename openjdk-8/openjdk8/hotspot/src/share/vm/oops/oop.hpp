@@ -99,7 +99,7 @@ class oopDesc {
   } _metadata;
 
 #if TERA_FLAG
-  volatile uint64_t _tera_flag;     // MarkTeracache objects
+  volatile uint64_t _tera_flag;   // MarkTeracache objects
 #endif
 
   // Fast access to barrier set.  Must be initialized.

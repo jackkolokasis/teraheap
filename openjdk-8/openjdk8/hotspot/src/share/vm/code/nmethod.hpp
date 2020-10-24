@@ -439,7 +439,7 @@ class nmethod : public CodeBlob {
   }
 
   bool  is_marked_for_reclamation() const         { return _marked_for_reclamation; }
-  void  mark_for_reclamation()                    { _marked_for_reclamation = 1; }
+  void  mark_for_reclamation()                    {  _marked_for_reclamation = 1;   }
 
   bool  has_unsafe_access() const                 { return _has_unsafe_access; }
   void  set_has_unsafe_access(bool z)             { _has_unsafe_access = z; }

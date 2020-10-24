@@ -47,6 +47,7 @@
 
 template <class T>
 void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
+  // Get the object corresponding to the referent attribute
   T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
   T heap_oop = oopDesc::load_heap_oop(referent_addr);
   debug_only(
@@ -54,41 +55,35 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
       gclog_or_tty->print_cr("InstanceRefKlass::oop_follow_contents " INTPTR_FORMAT, (void *)obj);
     }
   )
+
   if (!oopDesc::is_null(heap_oop)) {
+    // Heap oop decription
     oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 #if !DISABLE_TERACACHE
 
 	if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
 	{
-		std::cerr << __func__     << " | O = " << referent 
-			      << " | TC = "  << referent->is_tera_cache() 
-				  << " | MARK = " << referent->is_gc_marked() 
-				  << " | TCR = " << Universe::teraCache()->tc_check(referent)
-				  << std::endl;
-		
-    
-		if (!referent->is_gc_marked() &&
-				MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
-			// reference was discovered, referent will be traversed later
-			// TODO check if we are here
+		std::cerr << __func__  
+			<< " | OBJ = " << obj
+			<< " | MARK = " << obj->mark() 
+			<< " | TERA = " << obj->get_obj_state()
+			<< " | TC = " << Universe::teraCache()->tc_check(obj)
+			<< std::endl;
 
-			ref->InstanceKlass::oop_follow_contents(obj);
-		}
-		
-		return;
-
+	goto TERACACHE;
+	//return;
 	}
 #endif
-
 	
     if (!referent->is_gc_marked() &&
         MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
       // reference was discovered, referent will be traversed later
-	  // TODO check if we are here
 	  
+	  // If the referent object is not marked and it is successfully added to the
+	  // DiscoverList of the corresponding type, call the oop_follow_contents method of
+	 // the parent class to process the Reference instance
       ref->InstanceKlass::oop_follow_contents(obj);
-	  
 
       debug_only(
         if(TraceReferenceGC && PrintGCDetails) {
@@ -97,6 +92,8 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
       )
       return;
     } else {
+
+TERACACHE:
       // treat referent as normal oop
       debug_only(
         if(TraceReferenceGC && PrintGCDetails) {
@@ -118,11 +115,16 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
   }
 
   T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+
+  // If the discovered attributes are used to form a pending list
   if (ReferenceProcessor::pending_list_uses_discovered_field()) {
     // Treat discovered as normal oop, if ref is not "active",
     // i.e. if next is non-NULL.
     T  next_oop = oopDesc::load_heap_oop(next_addr);
     if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+
+      // If the next attribute is not empty, the Reference instance is not in the
+	  // Active state, and the discovered attribute is processed
       T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
       debug_only(
         if(TraceReferenceGC && PrintGCDetails) {
@@ -153,6 +155,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
     }
   )
 
+  // Process the next attribute  
   MarkSweep::mark_and_push(next_addr);
   ref->InstanceKlass::oop_follow_contents(obj);
 }
@@ -266,10 +269,13 @@ template <class T> void trace_reference_gc(const char *s, oop obj,
 template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, oop obj) {
   T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
   MarkSweep::adjust_pointer(referent_addr);
+
   T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
   MarkSweep::adjust_pointer(next_addr);
+
   T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
   MarkSweep::adjust_pointer(discovered_addr);
+
   debug_only(trace_reference_gc("InstanceRefKlass::oop_adjust_pointers", obj,
                                 referent_addr, next_addr, discovered_addr);)
 }

@@ -608,6 +608,19 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // unload -> 
   // otan skaei ti prospathei na kanei accesss
   // apo pou ton diavase
+	  
+  // Unload classes and purge the SystemDictionary.
+	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
+
+  // Unload nmethods.
+     CodeCache::do_unloading(is_alive_closure(), purged_class);
+	  
+	 // Delete entries for dead interned strings.
+	  StringTable::unlink(is_alive_closure());
+
+	  // Clean up unreferenced symbols in symbol table.
+	  SymbolTable::unlink();
+
 #if !DISABLE_TERACACHE
   if (!EnableTeraCache)
   {

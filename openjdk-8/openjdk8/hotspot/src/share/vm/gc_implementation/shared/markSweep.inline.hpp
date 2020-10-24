@@ -82,33 +82,6 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 #if CLOSURE
-		if (EnableTeraCache)
-		{
-			assertf(obj->get_obj_state() != DEAD && obj->get_obj_state() != INVALID, 
-					"Object is invalide state");
-		}
-
-#if DEBUG_TERACACHE
-		if (EnableTeraCache)
-		{
-			std::cerr <<"[MARK_AND_PUSH]" 
-				  << " | OBJECT = " 
-				  << (HeapWord*)obj
-				  << " | MARKED = "
-				  << obj->mark()->is_marked()
-				  << " | TERA = "
-				  << obj->is_tera_cache()
-				  << " | META_PTR = "
-				  << (HeapWord*)obj->klass()
-				  << " | STATE = "
-				  << obj->get_obj_state()
-				  << " | NAME OF THE CLASS"
-				  << std::endl;
-		}
-#endif
-
-
-
 		if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
 		{
 			return;
@@ -117,6 +90,19 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 
 		if (!obj->mark()->is_marked()) {
 			mark_object(obj);
+
+		if (EnableTeraCache)
+		{
+			std::cerr <<"[MARK_AND_PUSH]" 
+				  << " | P = " << p
+				  << " | OBJECT = " 
+				  << (HeapWord*)obj
+				  << " | MARKED = "
+				  << obj->mark()
+				  << " | STATE = "
+				  << obj->get_obj_state()
+				  << std::endl;
+		}
 			_marking_stack.push(obj);
 		}
 	}
@@ -147,23 +133,18 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 		if (EnableTeraCache)
 		{
 			std::cerr << "[TERA_MARK_AND_PUSH]" 
+				  << " | P = " << p
 				  << " | OBJECT = " 
 				  << (HeapWord*)obj
 				  << " | MARKED = "
 				  << obj->mark()->is_marked()
-				  << " | TERA = "
-				  << obj->is_tera_cache()
-				  << " | META_PTR = "
-				  << (HeapWord*)obj->klass()
+				  << " | STATE = "
+				  << obj->get_obj_state()
 				  << std::endl;
 		}
 		
+		
 #if CLOSURE
-		if (EnableTeraCache)
-		{
-		assertf(obj->get_obj_state() != DEAD && obj->get_obj_state() != INVALID, 
-				"Object is invalide state");
-		}
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
@@ -177,6 +158,18 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 			}
 
 			obj->set_tera_cache();
+		
+			if (EnableTeraCache)
+			{
+				std::cerr << "[TERA_MARK_AND_PUSH]" 
+					<< " | OBJECT = " 
+					<< (HeapWord*)obj
+					<< " | MARKED = "
+					<< obj->mark()->is_marked()
+					<< " | STATE = "
+					<< obj->get_obj_state()
+					<< std::endl;
+			}
 			_marking_stack.push(obj);
 		}
 #endif
@@ -184,7 +177,6 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 }
 
 void MarkSweep::push_objarray(oop obj, size_t index) {
-  assertf(!obj->is_tera_cache(), "Object should not be marked to move in TeraCache");
   ObjArrayTask task(obj, index);
   assert(task.is_valid(), "bad ObjArrayTask");
   _objarray_stack.push(task);
@@ -195,6 +187,24 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
 	T heap_oop = oopDesc::load_heap_oop(p);
 	if (!oopDesc::is_null(heap_oop) ) {
 		oop obj     = oopDesc::decode_heap_oop_not_null(heap_oop);
+        assertf(Universe::heap()->is_in(obj) || 
+				Universe::teraCache()->tc_check(obj), "should be in heap");
+
+
+		// Check if we have a pointer that points to a dead object
+		if (EnableTeraCache)
+		{
+			std::cerr << "[ADJUST_CHECK] | P = " << p 
+					  << " | O = "  << obj 
+					  << " | MARK = "  << obj->mark()
+					  << " | STATE = "  << obj->get_obj_state()
+				      << std::endl;
+
+			assertf(Universe::teraCache()->tc_check(obj) 
+					|| (char *) obj->mark() == (char *) 0x1  
+					|| (char *) obj->mark() == (char *) 0x5  
+					|| obj->is_gc_marked(), "Error: Object is dead");
+		}
 		oop new_obj = NULL;
 
 #if !DISABLE_TERACACHE
@@ -209,13 +219,16 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
 
 #endif
 			
-#if DEBUG_TERACACHE
+//#if DEBUG_TERACACHE
 		if (EnableTeraCache)
 		{
-			std::cerr << "[ADJUST_CHECK] | P = " << p << " | O = "  << obj 
+			std::cerr << "[ADJUST_CHECK] | P = " << p 
+					  << " | O = "  << obj 
+					  << " | MARK = "  << obj->mark()
+					  << " | STATE = "  << obj->get_obj_state()
 				      << " | NEW_OBJ = " << new_obj << std::endl;
 		}
-#endif
+//#endif
 
 		assertf(new_obj != NULL ||                                     // is forwarding ptr?
 				obj->mark() == markOopDesc::prototype() ||             // not gc marked?

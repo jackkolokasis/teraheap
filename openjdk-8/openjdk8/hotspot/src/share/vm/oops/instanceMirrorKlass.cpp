@@ -150,6 +150,7 @@ template <class T> void assert_nothing(T *p) {}
 
 
 void InstanceMirrorKlass::oop_follow_contents(oop obj) {
+
   InstanceKlass::oop_follow_contents(obj);
 
   // Follow the klass field in the mirror.
@@ -171,7 +172,7 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
     // If klass is NULL then this a mirror for a primitive type.
     // We don't have to follow them, since they are handled as strong
     // roots in Universe::oops_do.
-    assert(java_lang_Class::is_primitive(obj), "Sanity check");
+    assertf(java_lang_Class::is_primitive(obj), "Sanity check");
   }
 
   InstanceMirrorKlass_OOP_ITERATE(                                                    \
