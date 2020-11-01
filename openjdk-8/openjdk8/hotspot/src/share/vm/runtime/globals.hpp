@@ -2418,6 +2418,9 @@ class CommandLineFlags {
                                                                             \
   product(bool, EnableTeraCache, false,                                     \
           "Enable TeraCache")                                               \
+																			\
+  product(bool, TeraCacheStatistics, false,                                 \
+          "Print TeraCache statistics")                                     \
                                                                             \
   product(bool, CacheGenerationEnabled, false,                              \
           "Enable Cache generation in ParalellGC")                          \

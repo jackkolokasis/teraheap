@@ -126,6 +126,7 @@ class outputStream : public ResourceObj {
 // ANSI C++ name collision
 extern outputStream* tty;           // tty output
 extern outputStream* gclog_or_tty;  // stream for gc log if -Xloggc:<f>, or tty
+extern outputStream* tclog_or_tty;  // stream for gc log if -Xloggc:<f>, or tty
 
 class streamIndentor : public StackObj {
  private:
@@ -242,6 +243,19 @@ class gcLogFileStream : public fileStream {
   virtual void write(const char* c, size_t len);
   virtual void rotate_log();
   void dump_loggc_header();
+};
+
+class tcLogFileStream : public fileStream {
+	protected:
+		const char* _file_name;
+		jlong _bytes_written;
+		uintx _cur_file_num;	// current logfile rotation number
+	public:
+		tcLogFileStream(const char* filename);
+		~tcLogFileStream();
+		virtual void write(const char *c, size_t len);
+		virtual void rotate_log();
+		void dump_logtc_header();
 };
 
 #ifndef PRODUCT

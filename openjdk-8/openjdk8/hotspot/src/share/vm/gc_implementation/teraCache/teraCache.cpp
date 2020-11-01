@@ -23,6 +23,7 @@ TeraCache::TeraCache()
 	total_objects = 0;
 	total_objects_size = 0;
 	total_merged_regions = 0;
+	total_forward_ptrs = 0;
 }
 
 bool TeraCache::tc_check(oop ptr)
@@ -61,9 +62,10 @@ void TeraCache::tc_new_region(void)
 	// Initializw pointer
 	_next_pos_region = _start_pos_region;
 
-#if STATISTICS
-	std::cerr << "[STATISTICS] | NUM_ACTIVE_REGIONS = " << total_active_regions << std::endl;
-#endif
+	if (TeraCacheStatistics)
+	{
+		tclog_or_tty->print_cr("[STATISTICS] | NUM_ACTIVE_REGIONS = %d", total_active_regions);
+	}
 }
 
 char* TeraCache::tc_get_addr_region(void)
@@ -79,9 +81,10 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 			obj, _next_pos_region, size);
 //#endif
 
-#if STATISTICS
-	std::cerr << "[STATISTICS] | OBJECT_SIZE  = " << size << std::endl;
-#endif
+	if (TeraCacheStatistics)
+	{
+		tclog_or_tty->print_cr("[STATISTICS] | OBJECT_SIZE  =  %d", size);
+	}
 
 	// Update Statistics
 	MutexLocker x(tera_cache_lock);
@@ -101,10 +104,11 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 
 	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is out-of-space");
 
-#if STATISTICS
-	std::cerr << "[STATISTICS] | NUM_OF_OBJECTS  = " << total_objects << std::endl;
-	std::cerr << "[STATISTICS] | TOTAL_OBJECTS_SIZE = " << total_objects_size << std::endl;
-#endif
+	if (TeraCacheStatistics)
+	{
+		tclog_or_tty->print_cr("[STATISTICS] | NUM_OF_OBJECTS  = %d", total_objects);
+		tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %d", total_objects_size);
+	}
 
 	return tmp;
 }
@@ -166,5 +170,15 @@ void TeraCache::tc_check_back_pointers()
 
 		// Move to the next object
 		q+=size;
+	}
+}
+
+// Increase forward ptrs from JVM heap to TeraCache
+void TeraCache::tc_increase_forward_ptrs()
+{
+	total_forward_ptrs++;
+	if (TeraCacheStatistics)
+	{
+		tclog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %d", total_forward_ptrs);
 	}
 }

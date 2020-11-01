@@ -17,6 +17,7 @@ class TeraCache {
 		int total_objects;                        // Number of objects located in teraCache
 		int total_objects_size;                   // Total number of objects size
 		int total_merged_regions;                 // Number of merged regions
+		int total_forward_ptrs;					  // Total number of ptrs from JMV heap to TeraCache
 
 	public:
 		// Constructor
@@ -42,6 +43,8 @@ class TeraCache {
 		// Debuging
 		// Check for backward pointers
 		void tc_check_back_pointers();
+
+		void tc_increase_forward_ptrs();
 };
 
 #endif
