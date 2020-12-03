@@ -121,7 +121,7 @@ void ClassLoaderData::Dependencies::oops_do(OopClosure* f) {
 void ClassLoaderData::classes_do(KlassClosure* klass_closure) {
   for (Klass* k = _klasses; k != NULL; k = k->next_link()) {
     klass_closure->do_klass(k);
-    assert(k != k->next_link(), "no loops!");
+    assertf(k != k->next_link(), "no loops!");
   }
 }
 

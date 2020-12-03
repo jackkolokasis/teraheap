@@ -41,7 +41,8 @@ jobject JNIHandles::make_local(oop obj) {
     return NULL;                // ignore null handles
   } else {
     Thread* thread = Thread::current();
-    assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+    assertf(Universe::heap()->is_in_reserved(obj)
+			|| Universe::teraCache()->tc_check(obj), "sanity check");
     return thread->active_handles()->allocate_handle(obj);
   }
 }
@@ -53,7 +54,8 @@ jobject JNIHandles::make_local(Thread* thread, oop obj) {
   if (obj == NULL) {
     return NULL;                // ignore null handles
   } else {
-    assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+    assertf(Universe::heap()->is_in_reserved(obj)
+			|| Universe::teraCache()->tc_check(obj), "sanity check");
     return thread->active_handles()->allocate_handle(obj);
   }
 }
@@ -64,19 +66,21 @@ jobject JNIHandles::make_local(JNIEnv* env, oop obj) {
     return NULL;                // ignore null handles
   } else {
     JavaThread* thread = JavaThread::thread_from_jni_environment(env);
-    assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+    assertf(Universe::heap()->is_in_reserved(obj)
+			|| Universe::teraCache()->tc_check(obj), "sanity check");
     return thread->active_handles()->allocate_handle(obj);
   }
 }
 
 
 jobject JNIHandles::make_global(Handle obj) {
-  assert(!Universe::heap()->is_gc_active(), "can't extend the root set during GC");
+  assertf(!Universe::heap()->is_gc_active(), "can't extend the root set during GC");
   jobject res = NULL;
   if (!obj.is_null()) {
     // ignore null handles
     MutexLocker ml(JNIGlobalHandle_lock);
-    assert(Universe::heap()->is_in_reserved(obj()), "sanity check");
+    assertf(Universe::heap()->is_in_reserved(obj())
+			|| Universe::teraCache()->tc_check(obj()), "sanity check");
     res = _global_handles->allocate_handle(obj());
   } else {
     CHECK_UNHANDLED_OOPS_ONLY(Thread::current()->clear_unhandled_oops());
@@ -87,12 +91,13 @@ jobject JNIHandles::make_global(Handle obj) {
 
 
 jobject JNIHandles::make_weak_global(Handle obj) {
-  assert(!Universe::heap()->is_gc_active(), "can't extend the root set during GC");
+  assertf(!Universe::heap()->is_gc_active(), "can't extend the root set during GC");
   jobject res = NULL;
   if (!obj.is_null()) {
     // ignore null handles
     MutexLocker ml(JNIGlobalHandle_lock);
-    assert(Universe::heap()->is_in_reserved(obj()), "sanity check");
+    assertf(Universe::heap()->is_in_reserved(obj())
+			|| Universe::teraCache()->tc_check(obj()), "sanity check");
     res = _weak_global_handles->allocate_handle(obj());
   } else {
     CHECK_UNHANDLED_OOPS_ONLY(Thread::current()->clear_unhandled_oops());
@@ -103,7 +108,7 @@ jobject JNIHandles::make_weak_global(Handle obj) {
 
 void JNIHandles::destroy_global(jobject handle) {
   if (handle != NULL) {
-    assert(is_global_handle(handle), "Invalid delete of global JNI handle");
+    assertf(is_global_handle(handle), "Invalid delete of global JNI handle");
     *((oop*)handle) = deleted_handle(); // Mark the handle as deleted, allocate will reuse it
   }
 }
@@ -111,7 +116,7 @@ void JNIHandles::destroy_global(jobject handle) {
 
 void JNIHandles::destroy_weak_global(jobject handle) {
   if (handle != NULL) {
-    assert(!CheckJNICalls || is_weak_global_handle(handle), "Invalid delete of weak global JNI handle");
+    assertf(!CheckJNICalls || is_weak_global_handle(handle), "Invalid delete of weak global JNI handle");
     *((oop*)handle) = deleted_handle(); // Mark the handle as deleted, allocate will reuse it
   }
 }
@@ -204,8 +209,8 @@ public:
 
 // We assume this is called at a safepoint: no lock is needed.
 void JNIHandles::print_on(outputStream* st) {
-  assert(SafepointSynchronize::is_at_safepoint(), "must be at safepoint");
-  assert(_global_handles != NULL && _weak_global_handles != NULL,
+  assertf(SafepointSynchronize::is_at_safepoint(), "must be at safepoint");
+  assertf(_global_handles != NULL && _weak_global_handles != NULL,
          "JNIHandles not initialized");
 
   CountHandleClosure global_handle_count;
@@ -257,7 +262,7 @@ void JNIHandleBlock::zap() {
 }
 
 JNIHandleBlock* JNIHandleBlock::allocate_block(Thread* thread)  {
-  assert(thread == NULL || thread == Thread::current(), "sanity check");
+  assertf(thread == NULL || thread == Thread::current(), "sanity check");
   JNIHandleBlock* block;
   // Check the thread-local free list for a block so we don't
   // have to acquire a mutex.
@@ -304,7 +309,7 @@ JNIHandleBlock* JNIHandleBlock::allocate_block(Thread* thread)  {
 
 
 void JNIHandleBlock::release_block(JNIHandleBlock* block, Thread* thread) {
-  assert(thread == NULL || thread == Thread::current(), "sanity check");
+  assertf(thread == NULL || thread == Thread::current(), "sanity check");
   JNIHandleBlock* pop_frame_link = block->pop_frame_link();
   // Put returned block at the beginning of the thread-local free list.
   // Note that if thread == NULL, we use it as an implicit argument that
@@ -355,11 +360,12 @@ void JNIHandleBlock::oops_do(OopClosure* f) {
   while (current_chain != NULL) {
     for (JNIHandleBlock* current = current_chain; current != NULL;
          current = current->_next) {
-      assert(current == current_chain || current->pop_frame_link() == NULL,
+      assertf(current == current_chain || current->pop_frame_link() == NULL,
         "only blocks first in chain should have pop frame link set");
       for (int index = 0; index < current->_top; index++) {
         oop* root = &(current->_handles)[index];
         oop value = *root;
+
         // traverse heap pointers only, not deleted handles or free list
         // pointers
         if (value != NULL && Universe::heap()->is_in_reserved(value)) {
@@ -379,14 +385,16 @@ void JNIHandleBlock::oops_do(OopClosure* f) {
 void JNIHandleBlock::weak_oops_do(BoolObjectClosure* is_alive,
                                   OopClosure* f) {
   for (JNIHandleBlock* current = this; current != NULL; current = current->_next) {
-    assert(current->pop_frame_link() == NULL,
+    assertf(current->pop_frame_link() == NULL,
       "blocks holding weak global JNI handles should not have pop frame link set");
     for (int index = 0; index < current->_top; index++) {
       oop* root = &(current->_handles)[index];
       oop value = *root;
+
       // traverse heap pointers only, not deleted handles or free list pointers
       if (value != NULL && Universe::heap()->is_in_reserved(value)) {
         if (is_alive->do_object_b(value)) {
+
           // The weakly referenced object is alive, update pointer
           f->do_oop(root);
         } else {
@@ -413,7 +421,8 @@ void JNIHandleBlock::weak_oops_do(BoolObjectClosure* is_alive,
 
 
 jobject JNIHandleBlock::allocate_handle(oop obj) {
-  assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+  assertf(Universe::heap()->is_in_reserved(obj)
+		  || Universe::teraCache()->tc_check(obj), "sanity check");
   if (_top == 0) {
     // This is the first allocation or the initial block got zapped when
     // entering a native function. If we have any following blocks they are
@@ -421,7 +430,7 @@ jobject JNIHandleBlock::allocate_handle(oop obj) {
     for (JNIHandleBlock* current = _next; current != NULL;
          current = current->_next) {
       assert(current->_last == NULL, "only first block should have _last set");
-      assert(current->_free_list == NULL,
+      assertf(current->_free_list == NULL,
              "only first block should have _free_list set");
       current->_top = 0;
       if (ZapJNIHandleArea) current->zap();
@@ -472,7 +481,7 @@ jobject JNIHandleBlock::allocate_handle(oop obj) {
 
 
 void JNIHandleBlock::rebuild_free_list() {
-  assert(_allocate_before_rebuild == 0 && _free_list == NULL, "just checking");
+  assertf(_allocate_before_rebuild == 0 && _free_list == NULL, "just checking");
   int free = 0;
   int blocks = 0;
   for (JNIHandleBlock* current = this; current != NULL; current = current->_next) {
@@ -486,7 +495,7 @@ void JNIHandleBlock::rebuild_free_list() {
       }
     }
     // we should not rebuild free list if there are unused handles at the end
-    assert(current->_top == block_size_in_oops, "just checking");
+    assertf(current->_top == block_size_in_oops, "just checking");
     blocks++;
   }
   // Heuristic: if more than half of the handles are free we rebuild next time

@@ -595,7 +595,7 @@ Klass* SystemDictionary::resolve_instance_class_or_null(Symbol* name,
                                                         Handle class_loader,
                                                         Handle protection_domain,
                                                         TRAPS) {
-  assert(name != NULL && !FieldType::is_array(name) &&
+  assertf(name != NULL && !FieldType::is_array(name) &&
          !FieldType::is_obj(name), "invalid class name");
 
   Ticks class_load_start_time = Ticks::now();
@@ -1670,6 +1670,7 @@ void SystemDictionary::always_strong_oops_do(OopClosure* blk) {
   blk->do_oop(&_java_system_loader);
   blk->do_oop(&_system_loader_lock_obj);
 
+  // XX TODO Check here
   dictionary()->always_strong_oops_do(blk);
 
   // Visit extra methods

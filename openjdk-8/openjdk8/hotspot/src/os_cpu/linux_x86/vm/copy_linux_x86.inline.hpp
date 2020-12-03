@@ -36,10 +36,6 @@ static void pd_conjoint_words(HeapWord* from, HeapWord* to, size_t count) {
 
 		assertf((uint64_t) (end - start) == (uint64_t) (count * HeapWordSize), 
 				"Memmove Error");
-
-		std::cerr << "[MEMMOVE] | FROM = " << from 
-			<< " | TO = " << to 
-			<< " | COUNT = " << count << std::endl;
 	}
 #endif
   (void)memmove(to, from, count * HeapWordSize);

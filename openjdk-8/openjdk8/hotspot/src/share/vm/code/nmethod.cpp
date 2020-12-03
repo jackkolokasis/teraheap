@@ -1873,11 +1873,6 @@ void nmethod::oops_do(OopClosure* f, bool allow_zombie) {
     if (iter.type() == relocInfo::oop_type ) {
       oop_Relocation* r = iter.oop_reloc();
 
-	  if (EnableTeraCache)
-	  {
-		  std::cerr << "oop_Relocation = " << r << std::endl;
-	  }
-
       // In this loop, we must only follow those oops directly embedded in
       // the code.  Other oops (oop_index>0) are seen as part of scopes_oops.
       assertf(1 == (r->oop_is_immediate()) +

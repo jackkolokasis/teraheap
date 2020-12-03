@@ -103,7 +103,7 @@ public:
   // Classes loaded by the bootstrap loader are always strongly reachable.
   // If we're not doing class unloading, all classes are strongly reachable.
   static bool is_strongly_reachable(ClassLoaderData* loader_data, Klass* klass) {
-    assert (klass != NULL, "should have non-null klass");
+    assertf (klass != NULL, "should have non-null klass");
     return (loader_data->is_the_null_class_loader_data() || !ClassUnloading);
   }
 

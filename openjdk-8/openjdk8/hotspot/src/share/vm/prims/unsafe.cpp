@@ -1174,11 +1174,24 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSwapObject(JNIEnv *env, jobject unsafe, 
   oop x = JNIHandles::resolve(x_h);
   oop e = JNIHandles::resolve(e_h);
   oop p = JNIHandles::resolve(obj);
+
+  // Check if the objects belongs to TeraCache
+  assertf(!Universe::teraCache()->tc_check(x), "Update object in TeraCache");
+  assertf(!Universe::teraCache()->tc_check(e), "Update object in TeraCache");
+
   HeapWord* addr = (HeapWord *)index_oop_from_field_offset_long(p, offset);
+
+  assertf(!Universe::teraCache()->tc_check((oop)addr), "Update object in TeraCache");
   oop res = oopDesc::atomic_compare_exchange_oop(x, addr, e, true);
+  //oop res = oopDesc::atomic_compare_exchange_oop(x, addr, e, !Universe::teraCache()->tc_check(oop(addr)));
+
   jboolean success  = (res == e);
+
+  // If the object belongs to TeraCache do not update cardTable
+  //if (success && !Universe::teraCache()->tc_check(oop(addr)))
   if (success)
     update_barrier_set((void*)addr, x);
+
   return success;
 UNSAFE_END
 
