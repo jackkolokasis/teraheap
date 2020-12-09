@@ -315,6 +315,9 @@ class MacroAssembler: public Assembler {
   // split store_check(Register obj) to enhance instruction interleaving
   void store_check_part_1(Register obj);
   void store_check_part_2(Register obj);
+  
+  void tc_store_check_part_1(Register obj);
+  void tc_store_check_part_2(Register obj);
 
   // C 'boolean' to Java boolean: x == 0 ? 0 : 1
   void c2bool(Register x);

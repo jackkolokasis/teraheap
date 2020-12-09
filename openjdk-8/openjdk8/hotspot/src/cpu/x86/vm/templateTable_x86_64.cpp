@@ -175,34 +175,33 @@ static void do_oop_store(InterpreterMacroAssembler* _masm,
       }
       break;
 #endif // INCLUDE_ALL_GCS
-    case BarrierSet::CardTableModRef:
-    case BarrierSet::CardTableExtension:
-      {
-        if (val == noreg) {
-          __ store_heap_oop_null(obj);
-        } else {
-          __ store_heap_oop(obj, val);
-          // flatten object address if needed
-          if (!precise || (obj.index() == noreg && obj.disp() == 0)) {
-            __ store_check(obj.base());
-          } else {
-            __ leaq(rdx, obj);
-            __ store_check(rdx);
-          }
-        }
-      }
-      break;
-    case BarrierSet::ModRef:
-    case BarrierSet::Other:
-      if (val == noreg) {
-        __ store_heap_oop_null(obj);
-      } else {
-        __ store_heap_oop(obj, val);
-      }
-      break;
-    default      :
-      ShouldNotReachHere();
-
+	case BarrierSet::CardTableModRef:
+	case BarrierSet::CardTableExtension:
+	  {
+		  if (val == noreg)
+			  __ store_heap_oop_null(obj);
+		  else {
+			  __ store_heap_oop(obj, val);
+			  // flatten object address if needed
+			  if (!precise || (obj.index() == noreg && obj.disp() == 0)) {
+				  __ store_check(obj.base());
+			  } else {
+				  __ leaq(rdx, obj);
+				  __ store_check(rdx);
+			  }
+		  }
+	  }
+		  break;
+		  case BarrierSet::ModRef:
+		  case BarrierSet::Other:
+		  if (val == noreg) {
+			  __ store_heap_oop_null(obj);
+		  } else {
+			  __ store_heap_oop(obj, val);
+		  }
+		  break;
+	default:
+	  ShouldNotReachHere();
   }
 }
 
