@@ -3443,6 +3443,7 @@ void MacroAssembler::store_check(Register obj) {
 	movl(tmp, Address(noreg, obj, Address::times_1, oopDesc::teraflag_offset_in_bytes()));
 	// Check if the terafla is equall to 339. This value shows that this object
 	// belongs to TeraCache
+	// TODO magic number define
 	cmpl(tmp, 0x153);
 	jcc(Assembler::equal, in_tera_cache);
 

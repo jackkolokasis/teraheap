@@ -53,12 +53,155 @@ size_t CardTableModRefBS::cards_required(size_t covered_words)
 
 size_t CardTableModRefBS::compute_byte_map_size()
 {
-  assert(_guard_index == cards_required(_whole_heap.word_size()) - 1,
+  assert(_gard_index == cards_required(_whole_heap.word_size()) - 1,
                                         "unitialized, check declaration order");
   assert(_page_size != 0, "unitialized, check declaration order");
   const size_t granularity = os::vm_allocation_granularity();
   return align_size_up(_guard_index + 1, MAX2(_page_size, granularity));
 }
+
+size_t CardTableModRefBS::tc_compute_byte_map_size()
+{
+  assertf(_tc_guard_index == cards_required(_tc_whole_heap.word_size()) - 1,
+                                        "unitialized, check declaration order");
+  assertf(_tc_page_size != 0, "unitialized, check declaration order");
+  const size_t granularity = os::vm_allocation_granularity();
+  return align_size_up(_tc_guard_index + 1, MAX2(_tc_page_size, granularity));
+}
+  
+#if TERA_CARDS
+CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regions, 
+									 MemRegion tc_whole_heap):
+	ModRefBarrierSet(max_covered_regions),
+	_whole_heap(whole_heap),
+	_guard_index(cards_required(whole_heap.word_size()) - 1),
+	_last_valid_index(_guard_index - 1),
+	_page_size(os::vm_page_size()),
+	_byte_map_size(compute_byte_map_size()),
+
+	_tc_whole_heap(tc_whole_heap),
+	_tc_guard_index(cards_required(tc_whole_heap.word_size()) - 1),
+	_tc_last_valid_index(_tc_guard_index - 1),
+	_tc_page_size(os::vm_page_size()),
+	_tc_byte_map_size(tc_compute_byte_map_size())
+{
+  _kind = BarrierSet::CardTableModRef;
+	
+  HeapWord* low_bound  = _whole_heap.start();
+  HeapWord* high_bound = _whole_heap.end();
+  
+  HeapWord* tc_low_bound  = _tc_whole_heap.start();
+  HeapWord* tc_high_bound = _tc_whole_heap.end();
+
+  assertf((uintptr_t(low_bound)  & (card_size - 1))  == 0, "heap must start at card boundary" );
+  assertf((uintptr_t(high_bound) & (card_size - 1))  == 0, "heap must end at card boundary");
+  
+  // 0x7f6100600000 & 0xff (Heap)
+  // 0x7f62258180200 & 0xff (TeraCache) assertions do not work for TeraCache
+  assertf((uintptr_t(tc_low_bound)  & (card_size - 1))  == 0, "heap must start at card boundary %p | %p", low_bound, tc_low_bound);
+  assertf((uintptr_t(tc_high_bound) & (card_size - 1))  == 0, "heap must end at card boundary");
+  assertf(card_size <= 512, "card_size  must be less than 512");
+
+  _covered = new MemRegion[max_covered_regions];
+  _committed = new MemRegion[max_covered_regions];
+  if (_covered == NULL || _committed == NULL) {
+    vm_exit_during_initialization("couldn't alloc card table covered region set.");
+  }
+
+  _cur_covered_regions = 0;
+  const size_t rs_align = _page_size == (size_t) os::vm_page_size() ? 0 :
+    MAX2(_page_size, (size_t) os::vm_allocation_granularity());
+
+  // ReservedSpace is a data structure for reserving a contiguous address range
+  ReservedSpace heap_rs(_byte_map_size, rs_align, false);
+  MemTracker::record_virtual_memory_type((address)heap_rs.base(), mtGC);
+  os::trace_page_sizes("card table", _guard_index + 1, _guard_index + 1,
+		  _page_size, heap_rs.base(), heap_rs.size());
+  
+  const size_t tc_rs_align = _tc_page_size == (size_t) os::vm_page_size() ? 0 :
+    MAX2(_tc_page_size, (size_t) os::vm_allocation_granularity());
+  
+  //ReservedSpace tc_heap_rs(_tc_byte_map_size, tc_rs_align, false);
+  //MemTracker::record_virtual_memory_type((address)tc_heap_rs.base(), mtGC);
+  //os::trace_page_sizes("tc card table", _tc_guard_index + 1, _tc_guard_index + 1,
+ //					   _tc_page_size, tc_heap_rs.base(), tc_heap_rs.size());
+
+  // The assembler store_check code will do an unsignment shift of the oop then
+  // add it to byte_map_base, i.e.
+  //
+  // _byte_map = _byte_map_base + (uintptr_t(low_bound) >> card_shift)
+  // _tc_byte_map = _tc_byte_map_base + (uintptr_t(tc_low_bound) >> card_shift)
+
+  _byte_map = (jbyte*) heap_rs.base();
+  byte_map_base = _byte_map - (uintptr_t(low_bound) >> card_shift);
+
+  assertf(byte_for(low_bound) == &_byte_map[0], "Checking start of map"); 
+  assertf(byte_for(high_bound - 1) <= &_byte_map[_last_valid_index], 
+		  "Checking end of map"); 
+  
+  _tc_byte_map = (jbyte*) Universe::teraCache()->tc_get_addr_region();
+  tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> card_shift);
+
+  assertf(byte_for(tc_low_bound) == &_tc_byte_map[0], "Checking start of map"); 
+  assertf(byte_for(tc_high_bound - 1) <= &_tc_byte_map[_tc_last_valid_index], 
+		  "Checking end of map"); 
+
+  jbyte* guard_card = &_byte_map[_guard_index];
+  uintptr_t guard_page = align_size_down((uintptr_t)guard_card, _page_size);
+  _guard_region = MemRegion((HeapWord*)guard_page, _page_size);
+
+  os::commit_memory_or_exit((char*)guard_page, _page_size, _page_size, 
+		                    !ExecMem, "card table last card");
+  *guard_card = last_card;
+
+  jbyte* tc_guard_card = &_tc_byte_map[_tc_guard_index];
+  uintptr_t tc_guard_page = align_size_down((uintptr_t)tc_guard_card, _tc_page_size);
+  _tc_guard_region = MemRegion((HeapWord*)tc_guard_page, _tc_page_size);
+
+  os::commit_memory_or_exit((char*)tc_guard_page, _tc_page_size, _tc_page_size, 
+		                    !ExecMem, "teracache card table last card");
+  *tc_guard_card = last_card;
+   
+  _lowest_non_clean =
+    NEW_C_HEAP_ARRAY(CardArr, max_covered_regions, mtGC);
+  _lowest_non_clean_chunk_size =
+    NEW_C_HEAP_ARRAY(size_t, max_covered_regions, mtGC);
+  _lowest_non_clean_base_chunk_index =
+    NEW_C_HEAP_ARRAY(uintptr_t, max_covered_regions, mtGC);
+  _last_LNC_resizing_collection =
+    NEW_C_HEAP_ARRAY(int, max_covered_regions, mtGC);
+  if (_lowest_non_clean == NULL
+      || _lowest_non_clean_chunk_size == NULL
+      || _lowest_non_clean_base_chunk_index == NULL
+      || _last_LNC_resizing_collection == NULL)
+    vm_exit_during_initialization("couldn't allocate an LNC array.");
+  for (int i = 0; i < max_covered_regions; i++) {
+    _lowest_non_clean[i] = NULL;
+    _lowest_non_clean_chunk_size[i] = 0;
+    _last_LNC_resizing_collection[i] = -1;
+  }
+  
+  _tc_lowest_non_clean =
+    NEW_C_HEAP_ARRAY(CardArr, max_covered_regions, mtGC);
+  _tc_lowest_non_clean_chunk_size =
+    NEW_C_HEAP_ARRAY(size_t, max_covered_regions, mtGC);
+  _tc_lowest_non_clean_base_chunk_index =
+    NEW_C_HEAP_ARRAY(uintptr_t, max_covered_regions, mtGC);
+  _tc_last_LNC_resizing_collection =
+    NEW_C_HEAP_ARRAY(int, max_covered_regions, mtGC);
+  if (_tc_lowest_non_clean == NULL
+      || _tc_lowest_non_clean_chunk_size == NULL
+      || _tc_lowest_non_clean_base_chunk_index == NULL
+      || _tc_last_LNC_resizing_collection == NULL)
+    vm_exit_during_initialization("couldn't allocate an LNC array.");
+
+  for (int i = 0; i < max_covered_regions; i++) {
+    _tc_lowest_non_clean[i] = NULL;
+    _tc_lowest_non_clean_chunk_size[i] = 0;
+    _tc_last_LNC_resizing_collection[i] = -1;
+  }
+}
+#endif
 
 CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap,
                                      int max_covered_regions):
@@ -67,7 +210,13 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap,
   _guard_index(cards_required(whole_heap.word_size()) - 1),
   _last_valid_index(_guard_index - 1),
   _page_size(os::vm_page_size()),
-  _byte_map_size(compute_byte_map_size())
+  _byte_map_size(compute_byte_map_size()),
+
+	_tc_whole_heap(MemRegion()),
+	_tc_guard_index(cards_required(0) - 1),
+	_tc_last_valid_index(_tc_guard_index - 1),
+	_tc_page_size(os::vm_page_size()),
+	_tc_byte_map_size(0)
 {
   _kind = BarrierSet::CardTableModRef;
 
@@ -420,6 +569,8 @@ void CardTableModRefBS::resize_covered_region(MemRegion new_region) {
 // fact that the write barrier may be either precise or imprecise.
 
 void CardTableModRefBS::write_ref_field_work(void* field, oop newVal) {
+  assertf(!Universe::teraCache()->tc_check((oop)field), "Error");
+  assertf(!Universe::teraCache()->tc_check(newVal), "Error");
   inline_write_ref_field(field, newVal);
 }
 
@@ -552,7 +703,7 @@ void CardTableModRefBS::clear_MemRegion(MemRegion mr) {
   if (mr.start() == _whole_heap.start()) {
     cur = byte_for(mr.start());
   } else {
-    assert(mr.start() > _whole_heap.start(), "mr is not covered.");
+    assertf(mr.start() > _whole_heap.start(), "mr is not covered.");
     cur = byte_after(mr.start() - 1);
   }
   jbyte* last = byte_after(mr.last());

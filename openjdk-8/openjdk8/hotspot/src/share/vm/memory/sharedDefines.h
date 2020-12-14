@@ -30,17 +30,22 @@
 
 #define DEBUG_ANNO_INTR     	 1	//< Debug @Cache annotation, TODO Disable in experiments
 
-#define DEBUG_TERACACHE     	 0	//< Debug prints for teraCache, TODO Disable in experiments
+#define DEBUG_TERACACHE     	 1	//< Debug prints for teraCache, TODO Disable in experiments
 
-#define DEBUG_CLOSURE     	     0	//< Debug prints for teraCache, TODO Disable in experiments
+#define DEBUG_CLOSURE     	     1	//< Debug prints for teraCache, TODO Disable in experiments
 
 #define DISABLE_TERACACHE		 0  //< Disable teraCache
+
+#define DISABLE_PRECOMPACT		 0  //< Disable precompact of tera objects
+
+#define TERA_CARDS				 1  //< Disable teraCache
 
 #define TERA_FLAG				 1  //< Define teraFlag word, TODO Set to 1
 
 #define CLOSURE					 1  //< Closure Calculation
 
 #define DISABLE_TERACACHE_2		 1  //< Disable teraCache
+
 
 /***********************************
  * States of the objects  
@@ -58,6 +63,8 @@
 #define INVALID					755	//< The place contains an old object
 
 #define FLUSHED					575	//< The place contains a dummy object
+
+#define IN_TERA_CACHE			339	//< This object is located in TeraCache
 
 /***********************************
  * Statistics

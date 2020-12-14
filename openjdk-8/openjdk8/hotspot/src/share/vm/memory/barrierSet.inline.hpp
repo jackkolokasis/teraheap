@@ -27,12 +27,15 @@
 
 #include "memory/barrierSet.hpp"
 #include "memory/cardTableModRefBS.hpp"
+#include "memory/universe.hpp"
 
 // Inline functions of BarrierSet, which de-virtualize certain
 // performance-critical calls when the barrier is the most common
 // card-table kind.
 
 template <class T> void BarrierSet::write_ref_field_pre(T* field, oop new_val) {
+  assertf(!Universe::teraCache()->tc_check((oop)field), "Error");
+  assertf(!Universe::teraCache()->tc_check(new_val), "Error");
   if (kind() == CardTableModRef) {
     ((CardTableModRefBS*)this)->inline_write_ref_field_pre(field, new_val);
   } else {
@@ -41,6 +44,8 @@ template <class T> void BarrierSet::write_ref_field_pre(T* field, oop new_val) {
 }
 
 void BarrierSet::write_ref_field(void* field, oop new_val) {
+  assertf(!Universe::teraCache()->tc_check((oop)field), "Error");
+  assertf(!Universe::teraCache()->tc_check(new_val), "Error");
   if (kind() == CardTableModRef) {
     ((CardTableModRefBS*)this)->inline_write_ref_field(field, new_val);
   } else {
@@ -50,7 +55,7 @@ void BarrierSet::write_ref_field(void* field, oop new_val) {
 
 // count is number of array elements being written
 void BarrierSet::write_ref_array(HeapWord* start, size_t count) {
-  assert(count <= (size_t)max_intx, "count too large");
+  assertf(count <= (size_t)max_intx, "count too large");
   HeapWord* end = (HeapWord*)((char*)start + (count*heapOopSize));
   // In the case of compressed oops, start and end may potentially be misaligned;
   // so we need to conservatively align the first downward (this is not
@@ -66,7 +71,7 @@ void BarrierSet::write_ref_array(HeapWord* start, size_t count) {
   HeapWord* aligned_start = (HeapWord*)align_size_down((uintptr_t)start, HeapWordSize);
   HeapWord* aligned_end   = (HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize);
   // If compressed oops were not being used, these should already be aligned
-  assert(UseCompressedOops || (aligned_start == start && aligned_end == end),
+  assertf(UseCompressedOops || (aligned_start == start && aligned_end == end),
          "Expected heap word alignment of start and end");
 #if 0
   warning("Post:\t" INTPTR_FORMAT "[" SIZE_FORMAT "] : [" INTPTR_FORMAT","INTPTR_FORMAT")\t",

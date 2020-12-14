@@ -25,7 +25,10 @@
 #ifndef SHARE_VM_MEMORY_CARDTABLEMODREFBS_HPP
 #define SHARE_VM_MEMORY_CARDTABLEMODREFBS_HPP
 
+#include "memory/memRegion.hpp"
 #include "memory/modRefBarrierSet.hpp"
+#include "memory/sharedDefines.h"
+#include "memory/sharedDefines.h"
 #include "oops/oop.hpp"
 #include "oops/oop.inline2.hpp"
 
@@ -77,6 +80,7 @@ class CardTableModRefBS: public ModRefBarrierSet {
 
   // dirty and precleaned are equivalent wrt younger_refs_iter.
   static bool card_is_dirty_wrt_gen_iter(jbyte cv) {
+	  assertf(false, "Here");
     return cv == dirty_card || cv == precleaned_card;
   }
 
@@ -84,12 +88,14 @@ class CardTableModRefBS: public ModRefBarrierSet {
   // to be scanned in the current traversal.  May be overridden by
   // subtypes.
   virtual bool card_will_be_scanned(jbyte cv) {
+	  assertf(false, "Here");
     return CardTableModRefBS::card_is_dirty_wrt_gen_iter(cv);
   }
 
   // Returns "true" iff the value "cv" may have represented a dirty card at
   // some point.
   virtual bool card_may_have_been_dirty(jbyte cv) {
+	  assertf(false, "Here");
     return card_is_dirty_wrt_gen_iter(cv);
   }
 
@@ -104,7 +110,19 @@ class CardTableModRefBS: public ModRefBarrierSet {
   const size_t    _byte_map_size;    // in bytes
   jbyte*          _byte_map;         // the card marking array
 
+#if TERA_CARDS
+  const MemRegion _tc_whole_heap;		// the TeraCache region covered by card table
+  const size_t    _tc_guard_index;      // index of very last element in the card
+										// table; it is set to a guard value
+                                     	// (last_card) and should never be modified
+  const size_t    _tc_last_valid_index; // index of the last valid element
+  const size_t    _tc_page_size;        // page size used when mapping _byte_map
+  const size_t    _tc_byte_map_size;    // in bytes
+  jbyte*          _tc_byte_map;         // the card marking array
+#endif
+
   int _cur_covered_regions;
+			
   // The covered regions should be in address order.
   MemRegion* _covered;
   // The committed regions correspond one-to-one to the covered regions.
@@ -119,12 +137,20 @@ class CardTableModRefBS: public ModRefBarrierSet {
   // we can use the card for verification purposes. We make sure we never
   // uncommit the MemRegion for that page.
   MemRegion _guard_region;
+  
+#if TERA_CARDS
+  // The last card is a guard card, and we commit the page for it so
+  // we can use the card for verification purposes. We make sure we never
+  // uncommit the MemRegion for that page.
+  MemRegion _tc_guard_region;
+#endif
 
  protected:
   // Initialization utilities; covered_words is the size of the covered region
   // in, um, words.
   inline size_t cards_required(size_t covered_words);
   inline size_t compute_byte_map_size();
+  inline size_t tc_compute_byte_map_size();
 
   // Finds and return the index of the region, if any, to which the given
   // region would be contiguous.  If none exists, assign a new region and
@@ -150,17 +176,47 @@ class CardTableModRefBS: public ModRefBarrierSet {
   // against uncommitting the guard region.
   MemRegion committed_unique_to_self(int self, MemRegion mr) const;
 
+#if TERA_CARDS
   // Mapping from address to card marking array entry
   jbyte* byte_for(const void* p) const {
-    assert(_whole_heap.contains(p),
-           err_msg("Attempt to access p = "PTR_FORMAT" out of bounds of "
-                   " card marking array's _whole_heap = ["PTR_FORMAT","PTR_FORMAT")",
-                   p, _whole_heap.start(), _whole_heap.end()));
+	  assertf(_whole_heap.contains(p) || _tc_whole_heap.contains(p), 
+			  "Attempt to access p = %p out of bounds of card marking \
+			  arrays _whole_heap = [%p, %p] and _tc_whole_heap = [%p, %p]", 
+			  p, _whole_heap.start(), _whole_heap.end(), _tc_whole_heap.start(),
+			  _tc_whole_heap.end());
+
+	  if (_whole_heap.contains(p))
+	  {
+		  jbyte* result = &byte_map_base[uintptr_t(p) >> card_shift];
+
+		  assertf(result >= _byte_map && result < _byte_map + _byte_map_size,
+				  "out of bounds accessor for card marking array");
+
+		  return result;
+
+	  }
+	  else
+	  {
+		  jbyte* result = &tc_byte_map_base[uintptr_t(p) >> card_shift];
+
+		  assertf(result >= _tc_byte_map && result < _tc_byte_map + _tc_byte_map_size,
+				  "out of bounds accessor for tc_card marking array");
+
+		  return result;
+	  }
+  }
+#else
+  // Mapping from address to card marking array entry
+  jbyte* byte_for(const void* p) const {
+    assertf(_whole_heap.contains(p), 
+			"Attempt to access p = %p out of bounds of card marking arrays _whole_heap = [%p, %p]",
+                   p, _whole_heap.start(), _whole_heap.end());
     jbyte* result = &byte_map_base[uintptr_t(p) >> card_shift];
-    assert(result >= _byte_map && result < _byte_map + _byte_map_size,
+    assertf(result >= _byte_map && result < _byte_map + _byte_map_size,
            "out of bounds accessor for card marking array");
     return result;
   }
+#endif
 
   // The card table byte one after the card marking array
   // entry for argument address. Typically used for higher bounds
@@ -213,6 +269,13 @@ class CardTableModRefBS: public ModRefBarrierSet {
   size_t*  _lowest_non_clean_chunk_size;
   uintptr_t* _lowest_non_clean_base_chunk_index;
   int* _last_LNC_resizing_collection;
+  
+#if TERA_CARDS
+  CardArr* _tc_lowest_non_clean;
+  size_t*  _tc_lowest_non_clean_chunk_size;
+  uintptr_t* _tc_lowest_non_clean_base_chunk_index;
+  int* _tc_last_LNC_resizing_collection;
+#endif
 
   // Initializes "lowest_non_clean" to point to the array for the region
   // covering "sp", and "lowest_non_clean_base_chunk_index" to the chunk
@@ -280,6 +343,8 @@ public:
   }
 
   CardTableModRefBS(MemRegion whole_heap, int max_covered_regions);
+  CardTableModRefBS(MemRegion whole_heap, int max_covered_regions, 
+		  MemRegion whole_tera_cache);
   ~CardTableModRefBS();
 
   // *** Barrier set functions.
@@ -348,6 +413,14 @@ public:
   // But since the heap starts at some higher address, this points to somewhere
   // before the beginning of the actual _byte_map.
   jbyte* byte_map_base;
+
+#if TERA_CARDS
+  // Card marking array base (adjusted for heap low boundary)
+  // This would be the 0th element of _byte_map, if the heap started at 0x0.
+  // But since the heap starts at some higher address, this points to somewhere
+  // before the beginning of the actual _byte_map.
+  jbyte* tc_byte_map_base;
+#endif
 
   // Return true if "p" is at the start of a card.
   bool is_card_aligned(HeapWord* p) {
@@ -419,23 +492,35 @@ public:
 
   // Mapping from card marking array entry to address of first word
   HeapWord* addr_for(const jbyte* p) const {
-    assert(p >= _byte_map && p < _byte_map + _byte_map_size,
+    assertf((p >= _byte_map && p < _byte_map + _byte_map_size)
+			||(p >= _tc_byte_map && p < _tc_byte_map + _tc_byte_map_size),
            "out of bounds access to card marking array");
-    size_t delta = pointer_delta(p, byte_map_base, sizeof(jbyte));
-    HeapWord* result = (HeapWord*) (delta << card_shift);
-    assert(_whole_heap.contains(result),
-           err_msg("Returning result = "PTR_FORMAT" out of bounds of "
-                   " card marking array's _whole_heap = ["PTR_FORMAT","PTR_FORMAT")",
-                   result, _whole_heap.start(), _whole_heap.end()));
-    return result;
+
+	if (p >= _byte_map && p < _byte_map + _byte_map_size) {
+		size_t delta = pointer_delta(p, byte_map_base, sizeof(jbyte));
+
+		HeapWord* result = (HeapWord*) (delta << card_shift);
+		assertf(_whole_heap.contains(result),
+				"Returning result = %p out of bounds of card marking arrays _whole_heap = [%p, %p]",
+				result, _whole_heap.start(), _whole_heap.end());
+		return result;
+	}
+	else {
+		size_t delta = pointer_delta(p, tc_byte_map_base, sizeof(jbyte));
+
+		HeapWord* result = (HeapWord*) (delta << card_shift);
+		assertf(_tc_whole_heap.contains(result),
+				"Returning result = %p out of bounds of card marking arrays _whole_heap = [%p, %p]",
+				result, _tc_whole_heap.start(), _tc_whole_heap.end());
+
+		return result;
+	}
   }
 
   // Mapping from address to card marking array index.
   size_t index_for(void* p) {
-    assert(_whole_heap.contains(p),
-           err_msg("Attempt to access p = "PTR_FORMAT" out of bounds of "
-                   " card marking array's _whole_heap = ["PTR_FORMAT","PTR_FORMAT")",
-                   p, _whole_heap.start(), _whole_heap.end()));
+    assertf(_whole_heap.contains(p), "Attempt to access p = %p out of bounds of card marking array's _whole_heap = [ %p, %p]", 
+			p, _whole_heap.start(), _whole_heap.end());
     return byte_for(p) - _byte_map;
   }
 

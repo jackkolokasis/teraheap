@@ -1,0 +1,5 @@
+1. Optimize interpreter
+	- Remove the jumb 
+	- Check only the address (tc_base() - obj.base() > 0)
+
+2. 
