@@ -10,8 +10,7 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
+ * accompanied this code). 
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
@@ -3112,16 +3111,17 @@ static char* anon_mmap(char* requested_addr, size_t bytes, bool fixed) {
   char * addr;
   int flags;
 
-  flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS;
+  //flags = MAP_SHARED | MAP_NORESERVE | MAP_ANONYMOUS;
+  flags = MAP_SHARED | MAP_ANONYMOUS;
   if (fixed) {
-    assert((uintptr_t)requested_addr % os::Linux::page_size() == 0, "unaligned address");
+    assertf((uintptr_t)requested_addr % os::Linux::page_size() == 0, "unaligned address");
     flags |= MAP_FIXED;
   }
 
   // Map reserved/uncommitted pages PROT_NONE so we fail early if we
   // touch an uncommitted page. Otherwise, the read/write might
   // succeed if we have enough swap space to back the physical page.
-  addr = (char*)::mmap(requested_addr, bytes, PROT_NONE,
+  addr = (char*)::mmap(requested_addr, bytes, PROT_READ | PROT_WRITE,
                        flags, -1, 0);
 
   if (addr != MAP_FAILED) {
@@ -3147,7 +3147,9 @@ static int anon_munmap(char * addr, size_t size) {
 
 char* os::pd_reserve_memory(size_t bytes, char* requested_addr,
                          size_t alignment_hint) {
-  return anon_mmap(requested_addr, bytes, (requested_addr != NULL));
+  char* addr = anon_mmap(requested_addr, bytes, (requested_addr != NULL));
+  assertf(addr != NULL, "Address is null");
+  return addr;
 }
 
 bool os::pd_release_memory(char* addr, size_t size) {
