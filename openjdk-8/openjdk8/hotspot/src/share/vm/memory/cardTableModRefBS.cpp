@@ -109,6 +109,7 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   }
 
   _cur_covered_regions = 0;
+
   const size_t rs_align = _page_size == (size_t) os::vm_page_size() ? 0 :
     MAX2(_page_size, (size_t) os::vm_allocation_granularity());
 
@@ -118,33 +119,41 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   os::trace_page_sizes("card table", _guard_index + 1, _guard_index + 1,
 		  _page_size, heap_rs.base(), heap_rs.size());
   
+  if (!heap_rs.is_reserved()) {
+    vm_exit_during_initialization("Could not reserve enough space for the "
+                                  "card marking array");
+  }
+  
   const size_t tc_rs_align = _tc_page_size == (size_t) os::vm_page_size() ? 0 :
     MAX2(_tc_page_size, (size_t) os::vm_allocation_granularity());
-  
-  //ReservedSpace tc_heap_rs(_tc_byte_map_size, tc_rs_align, false);
-  //MemTracker::record_virtual_memory_type((address)tc_heap_rs.base(), mtGC);
-  //os::trace_page_sizes("tc card table", _tc_guard_index + 1, _tc_guard_index + 1,
- //					   _tc_page_size, tc_heap_rs.base(), tc_heap_rs.size());
 
+  ReservedSpace tc_heap_rs(_tc_byte_map_size, tc_rs_align, false);
+  MemTracker::record_virtual_memory_type((address)tc_heap_rs.base(), mtGC);
+  os::trace_page_sizes("tc card table", _tc_guard_index + 1, _tc_guard_index + 1,
+ 					   _tc_page_size, tc_heap_rs.base(), tc_heap_rs.size());
+
+  if (!tc_heap_rs.is_reserved()) {
+    vm_exit_during_initialization("Could not reserve enough space for the "
+                                  "card marking array");
+  }
+  
   // The assembler store_check code will do an unsignment shift of the oop then
   // add it to byte_map_base, i.e.
   //
   // _byte_map = _byte_map_base + (uintptr_t(low_bound) >> card_shift)
   // _tc_byte_map = _tc_byte_map_base + (uintptr_t(tc_low_bound) >> card_shift)
-
+  
   _byte_map = (jbyte*) heap_rs.base();
   byte_map_base = _byte_map - (uintptr_t(low_bound) >> card_shift);
 
   assertf(byte_for(low_bound) == &_byte_map[0], "Checking start of map"); 
-  assertf(byte_for(high_bound - 1) <= &_byte_map[_last_valid_index], 
-		  "Checking end of map"); 
+  assertf(byte_for(high_bound - 1) <= &_byte_map[_last_valid_index], "Checking end of map"); 
   
-  _tc_byte_map = (jbyte*) Universe::teraCache()->tc_get_addr_region();
+  _tc_byte_map = (jbyte*) tc_heap_rs.base();
   tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> card_shift);
 
-  assertf(byte_for(tc_low_bound) == &_tc_byte_map[0], "Checking start of map"); 
-  assertf(byte_for(tc_high_bound - 1) <= &_tc_byte_map[_tc_last_valid_index], 
-		  "Checking end of map"); 
+  assertf(byte_for(tc_low_bound) == &_tc_byte_map[0], "Checking start of map");
+  assertf(byte_for(tc_high_bound - 1) <= &_tc_byte_map[_tc_last_valid_index], "Checking end of map"); 
 
   jbyte* guard_card = &_byte_map[_guard_index];
   uintptr_t guard_page = align_size_down((uintptr_t)guard_card, _page_size);
@@ -200,6 +209,7 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
     _tc_lowest_non_clean_chunk_size[i] = 0;
     _tc_last_LNC_resizing_collection[i] = -1;
   }
+  
 }
 #endif
 

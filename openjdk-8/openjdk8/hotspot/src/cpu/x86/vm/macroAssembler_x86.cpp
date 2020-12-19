@@ -3432,19 +3432,20 @@ void MacroAssembler::g1_write_barrier_post(Register store_addr,
 //////////////////////////////////////////////////////////////////////////////////
 //
 void MacroAssembler::store_check(Register obj) {
-  // Does a store check for the oop in register obj. The content of
-  // register obj is destroyed afterwards.
-  Label in_tera_cache;
-  Label Done;
+	// Does a store check for the oop in register obj. The content of
+	// register obj is destroyed afterwards.
+	Label in_tera_cache;
+	Label Done;
 
-    // Temporary register for the comparison
-	Register tmp;
-	// Save the teraflag word in tmp register
-	movl(tmp, Address(noreg, obj, Address::times_1, oopDesc::teraflag_offset_in_bytes()));
-	// Check if the terafla is equall to 339. This value shows that this object
-	// belongs to TeraCache
-	// TODO magic number define
-	cmpl(tmp, 0x153);
+	// We have to check if the object belongs to the TeraCache or in the Heap.
+	// Objects that are located in the TeraCache their teraflag is 333. 
+	// Save the address of teraflag in rdx and then load the value of teraflag
+	// in r11. Finally we compare the value with 333
+
+	leaq(rdx, Address(noreg, obj, Address::times_1, oopDesc::teraflag_offset_in_bytes()));
+	movq(r11, Address(rdx, 0));
+
+	cmpl(r11, 0x14dU);
 	jcc(Assembler::equal, in_tera_cache);
 
 	store_check_part_1(obj);
@@ -3506,7 +3507,7 @@ void MacroAssembler::tc_store_check_part_2(Register obj) {
   BarrierSet* bs = Universe::heap()->barrier_set();
   assertf(bs->kind() == BarrierSet::CardTableModRef, "Wrong barrier set kind");
   CardTableModRefBS* ct = (CardTableModRefBS*)bs;
-  assert(sizeof(*ct->tc_byte_map_base) == sizeof(jbyte), "adjust this code");
+  assertf(sizeof(*ct->tc_byte_map_base) == sizeof(jbyte), "adjust this code");
 
   // The calculation for byte_map_base is as follows:
   // byte_map_base = _byte_map - (uintptr_t(low_bound) >> card_shift);
@@ -3514,6 +3515,7 @@ void MacroAssembler::tc_store_check_part_2(Register obj) {
   // never need to be relocated. On 64bit however the value may be too
   // large for a 32bit displacement.
   intptr_t disp = (intptr_t) ct->tc_byte_map_base;
+
   if (is_simm32(disp)) {
     Address cardtable(noreg, obj, Address::times_1, disp);
     movb(cardtable, 0);
