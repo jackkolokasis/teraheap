@@ -22,6 +22,7 @@
  *
  */
 
+#include "memory/universe.hpp"
 #include "precompiled.hpp"
 #include "gc_implementation/parallelScavenge/adjoiningGenerations.hpp"
 #include "gc_implementation/parallelScavenge/adjoiningGenerationsForHeteroHeap.hpp"
@@ -87,9 +88,31 @@ jint ParallelScavengeHeap::initialize() {
   _reserved = MemRegion((HeapWord*)heap_rs.base(),
                         (HeapWord*)(heap_rs.base() + heap_rs.size()));
 
+#if TERA_CARDS
+  CardTableExtension* barrier_set;
+  if (EnableTeraCache)
+  {
+	  _tera_cache_reserved = MemRegion(
+			  (HeapWord*)Universe::teraCache()->tc_get_addr_region(), 
+			  (HeapWord*)(Universe::teraCache()->tc_get_addr_region() + 
+				  Universe::teraCache()->tc_get_size_region()*sizeof(HeapWord*)));
+	  
+	  barrier_set = new CardTableExtension(_reserved, 3, _tera_cache_reserved);
+	
+	  Universe::teraCache()->start_array()->tc_initialize(_tera_cache_reserved);
+	  Universe::teraCache()->start_array()->tc_set_covered_region(_tera_cache_reserved);
+  }
+  else {
+	  barrier_set = new CardTableExtension(_reserved, 3);
+  }
+#else
   CardTableExtension* const barrier_set = new CardTableExtension(_reserved, 3);
+#endif
+
   _barrier_set = barrier_set;
+
   oopDesc::set_bs(_barrier_set);
+
   if (_barrier_set == NULL) {
     vm_shutdown_during_initialization(
       "Could not reserve enough space for barrier set");

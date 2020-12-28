@@ -103,6 +103,8 @@ class PSScavenge: AllStatic {
   // Performance Counters
   static CollectorCounters* counters()           { return _counters; }
 
+  static CardTableExtension* const pub_card_table() { return card_table();}
+
   // Used by scavenge_contents && psMarkSweep
   static ReferenceProcessor* const reference_processor() {
     assert(_ref_processor != NULL, "Sanity");
@@ -136,12 +138,21 @@ class PSScavenge: AllStatic {
 
   template <class T> static inline bool should_scavenge(T* p);
 
+#if TERA_CARDS
+  template <class T> static inline bool tc_should_scavenge(T* p);
+#endif
+
   // These call should_scavenge() above and, if it returns true, also check that
   // the object was not newly copied into to_space.  The version with the bool
   // argument is a convenience wrapper that fetches the to_space pointer from
   // the heap and calls the other version (if the arg is true).
   template <class T> static inline bool should_scavenge(T* p, MutableSpace* to_space);
   template <class T> static inline bool should_scavenge(T* p, bool check_to_space);
+
+#if TERA_CARDS
+  template <class T> static inline bool tc_should_scavenge(T* p, MutableSpace* to_space);
+  template <class T> static inline bool tc_should_scavenge(T* p, bool check_to_space);
+#endif
 
   template <class T, bool promote_immediately>
     inline static void copy_and_push_safe_barrier(PSPromotionManager* pm, T* p);

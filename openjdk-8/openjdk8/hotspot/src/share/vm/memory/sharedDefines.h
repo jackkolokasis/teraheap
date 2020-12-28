@@ -47,11 +47,13 @@
 #define DISABLE_TERACACHE_2		 1  //< Disable teraCache
 
 
-/***********************************
+/**********************************f
  * States of the objects  
  **********************************/
 #define MOVE_TO_TERA			255	//< Move this object to tera cache
-		
+
+#define IN_TERA_CACHE		    333	//< This object is located in TeraCache
+
 #define INIT					325	//< Initial object state
 
 #define DEAD      		        425 //< Object found as dead during precompaction
@@ -64,7 +66,7 @@
 
 #define FLUSHED					575	//< The place contains a dummy object
 
-#define IN_TERA_CACHE			339	//< This object is located in TeraCache
+
 
 /***********************************
  * Statistics

@@ -26,6 +26,7 @@
 #define SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_CARDTABLEEXTENSION_HPP
 
 #include "memory/cardTableModRefBS.hpp"
+#include "memory/memRegion.hpp"
 
 class MutableSpace;
 class ObjectStartArray;
@@ -56,6 +57,12 @@ class CardTableExtension : public CardTableModRefBS {
   CardTableExtension(MemRegion whole_heap, int max_covered_regions) :
     CardTableModRefBS(whole_heap, max_covered_regions) { }
 
+#if TERA_CARDS
+  CardTableExtension(MemRegion whole_heap, int max_covered_regions,  
+				     MemRegion whole_tera_cache) :
+    CardTableModRefBS(whole_heap, max_covered_regions, whole_tera_cache) { }
+#endif
+
   // Too risky for the 4/10/02 putback
   // BarrierSet::Name kind() { return BarrierSet::CardTableExtension; }
 
@@ -66,7 +73,14 @@ class CardTableExtension : public CardTableModRefBS {
                                   PSPromotionManager* pm,
                                   uint stripe_number,
                                   uint stripe_total);
-
+  
+  // Scavenge support for TeraCache
+  void tc_scavenge_contents_parallel(ObjectStartArray* start_array,
+                                  HeapWord* space_top,
+                                  PSPromotionManager* pm,
+                                  uint stripe_number,
+                                  uint stripe_total);
+  
   // Verification
   static void verify_all_young_refs_imprecise();
   static void verify_all_young_refs_precise();
@@ -74,13 +88,13 @@ class CardTableExtension : public CardTableModRefBS {
   bool addr_is_marked_imprecise(void *addr);
   bool addr_is_marked_precise(void *addr);
 
-  void set_card_newgen(void* addr)   { jbyte* p = byte_for(addr); *p = verify_card; }
+  void set_card_newgen(void* addr)   {jbyte* p = byte_for(addr); *p = verify_card; }
 
   // Testers for entries
-  static bool card_is_dirty(int value)      { return value == dirty_card; }
-  static bool card_is_newgen(int value)     { return value == youngergen_card; }
-  static bool card_is_clean(int value)      { return value == clean_card; }
-  static bool card_is_verify(int value)     { return value == verify_card; }
+  static bool card_is_dirty(int value)      {return value == dirty_card; }
+  static bool card_is_newgen(int value)     {return value == youngergen_card; }
+  static bool card_is_clean(int value)      {return value == clean_card; }
+  static bool card_is_verify(int value)     {return value == verify_card; }
 
   // Card marking
   void inline_write_ref_field_gc(void* field, oop new_val) {
@@ -107,6 +121,16 @@ class CardTableExtension : public CardTableModRefBS {
     return (addr >= _byte_map) && (addr < _byte_map + _byte_map_size);
   }
 
+#else 
+  
+  bool is_valid_card_address(jbyte* addr) {
+	  // Check if the address belongs to the address range of the Old Generation
+	  // or in the TeraCache
+	  return ((addr >= _byte_map) && (addr < _byte_map + _byte_map_size)
+		     ||
+			 ((addr >= _tc_byte_map) && (addr < _tc_byte_map + _tc_byte_map_size)));
+
+  }
 #endif // ASSERT
 };
 

@@ -138,11 +138,11 @@ void ReservedSpace::initialize(size_t size,
                                // const size_t noaccess_prefix,
                                bool executable) {
     const size_t granularity = os::vm_allocation_granularity();
-    assert((size & (granularity - 1)) == 0,
+    assertf((size & (granularity - 1)) == 0,
             "size not aligned to os::vm_allocation_granularity()");
-    assert((alignment & (granularity - 1)) == 0,
+    assertf((alignment & (granularity - 1)) == 0,
             "alignment not aligned to os::vm_allocation_granularity()");
-    assert(alignment == 0 || is_power_of_2((intptr_t)alignment),
+    assertf(alignment == 0 || is_power_of_2((intptr_t)alignment),
             "not a power of 2");
 
     alignment = MAX2(alignment, (size_t)os::vm_page_size());

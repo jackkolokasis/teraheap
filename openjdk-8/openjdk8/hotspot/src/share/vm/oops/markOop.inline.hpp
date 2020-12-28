@@ -31,6 +31,11 @@
 
 // Should this header be preserved during GC (when biased locking is enabled)?
 inline bool markOopDesc::must_be_preserved_with_bias(oop obj_containing_mark) const {
+  if (EnableTeraCache)
+  {
+	  assertf(!Universe::teraCache()->tc_check(obj_containing_mark), 
+			  "Error: Object is in teraCache");
+  }
   assertf(UseBiasedLocking, "unexpected");
   if (has_bias_pattern()) {
     // Will reset bias at end of collection
@@ -50,6 +55,11 @@ inline bool markOopDesc::must_be_preserved_with_bias(oop obj_containing_mark) co
 
 // Should this header be preserved during GC?
 inline bool markOopDesc::must_be_preserved(oop obj_containing_mark) const {
+  if (EnableTeraCache)
+  {
+	  assertf(!Universe::teraCache()->tc_check(obj_containing_mark), 
+			  "Error: Object is in teraCache");
+  }
   if (!UseBiasedLocking)
     return (!is_unlocked() || !has_no_hash());
   return must_be_preserved_with_bias(obj_containing_mark);
@@ -58,6 +68,11 @@ inline bool markOopDesc::must_be_preserved(oop obj_containing_mark) const {
 // Should this header be preserved in the case of a promotion failure
 // during scavenge (when biased locking is enabled)?
 inline bool markOopDesc::must_be_preserved_with_bias_for_promotion_failure(oop obj_containing_mark) const {
+  if (EnableTeraCache)
+  {
+	  assertf(!Universe::teraCache()->tc_check(obj_containing_mark), 
+			  "Error: Object is in teraCache");
+  }
   assert(UseBiasedLocking, "unexpected");
   // We don't explicitly save off the mark words of biased and
   // currently-locked objects during scavenges, so if during a
@@ -78,6 +93,11 @@ inline bool markOopDesc::must_be_preserved_with_bias_for_promotion_failure(oop o
 // Should this header be preserved in the case of a promotion failure
 // during scavenge?
 inline bool markOopDesc::must_be_preserved_for_promotion_failure(oop obj_containing_mark) const {
+  if (EnableTeraCache)
+  {
+	  assertf(!Universe::teraCache()->tc_check(obj_containing_mark), 
+			  "Error: Object is in teraCache");
+  }
   if (!UseBiasedLocking)
     return (!is_unlocked() || !has_no_hash());
   return must_be_preserved_with_bias_for_promotion_failure(obj_containing_mark);

@@ -39,7 +39,6 @@ template <class T>
 inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
   if (p != NULL) { // XXX: error if p != NULL here
     oop o = oopDesc::load_decode_heap_oop_not_null(p);
-	//assertf(!Universe::teraCache()->tc_check(o), "Object should not be in TC");
 
 #if !DISABLE_TERACACHE
 	 // XXX TODO Check this case again
@@ -49,16 +48,23 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
 		return;
 	}
 #endif
-	
+
     if (o->is_forwarded()) {
       o = o->forwardee();
       // Card mark
       if (PSScavenge::is_obj_in_young(o)) {
+		if (Universe::teraCache()->tc_is_in((void *)p)) {
+			Universe::teraCache()->tc_push_object((void *)p, o);
+		}
         PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
       }
 
+	  if (Universe::teraCache()->tc_is_in((void *)p) && !PSScavenge::is_obj_in_young(o)) {
+		  Universe::teraCache()->tc_push_object((void *)p, o);
+		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
+	  }
+
 	  // How oopDesc::encode_store_heap_oop_not_null works
-	  
 	  //				 ______forwarded____
 	  //				|					V
 	  //  +----------------------------------------+
@@ -72,7 +78,6 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
       oopDesc::encode_store_heap_oop_not_null(p, o);
     } else {
 
-	  
 	  // If it has not been forwarded, the copy is not done immediately, but
 	  // placed on a stack. All GC threads will start from here.
 	  // Take the task from the stack. After taking it out, traverse and copy.
@@ -89,6 +94,18 @@ inline void PSPromotionManager::claim_or_forward_depth(T* p) {
 
   claim_or_forward_internal_depth(p);
 }
+
+#if TERA_CARDS
+template <class T>
+inline void PSPromotionManager::tc_claim_or_forward_depth(T* p) {
+  assertf(PSScavenge::tc_should_scavenge(p, true), "revisiting object?");
+  assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+  assertf(Universe::teraCache()->tc_is_in((void *)p), "pointer outside of TeraCache");
+
+  claim_or_forward_internal_depth(p);
+}
+#endif
+
 
 //
 // This method is pretty bulky. It would be nice to split it up

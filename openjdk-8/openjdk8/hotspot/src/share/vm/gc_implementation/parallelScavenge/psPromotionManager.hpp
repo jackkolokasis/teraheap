@@ -202,6 +202,10 @@ class PSPromotionManager VALUE_OBJ_CLASS_SPEC {
 
   template <class T> inline void claim_or_forward_depth(T* p);
 
+#if TERA_CARDS
+  template <class T> inline void tc_claim_or_forward_depth(T* p);
+#endif
+
   TASKQUEUE_STATS_ONLY(inline void record_steal(StarTask& p);)
 };
 

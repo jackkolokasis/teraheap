@@ -173,16 +173,16 @@ void StealTask::do_it(GCTaskManager* manager, uint which) {
 
 void OldToYoungRootsTask::do_it(GCTaskManager* manager, uint which) {
   // There are not old-to-young pointers if the old gen is empty.
-  assert(!_gen->object_space()->is_empty(),
+  assertf(!_gen->object_space()->is_empty(),
     "Should not be called is there is no work");
-  assert(_gen != NULL, "Sanity");
-  assert(_gen->object_space()->contains(_gen_top) || _gen_top == _gen->object_space()->top(), "Sanity");
-  assert(_stripe_number < ParallelGCThreads, "Sanity");
+  assertf(_gen != NULL, "Sanity");
+  assertf(_gen->object_space()->contains(_gen_top) || _gen_top == _gen->object_space()->top(), "Sanity");
+  assertf(_stripe_number < ParallelGCThreads, "Sanity");
 
   {
     PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
 
-    assert(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+    assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
     CardTableExtension* card_table = (CardTableExtension *)Universe::heap()->barrier_set();
     // FIX ME! Assert that card_table is the type we believe it to be.
 
@@ -192,8 +192,30 @@ void OldToYoungRootsTask::do_it(GCTaskManager* manager, uint which) {
                                            pm,
                                            _stripe_number,
                                            _stripe_total);
-
     // Do the real work
     pm->drain_stacks(false);
   }
+}
+
+//
+// TeraCacheToHeapRootsTask
+//
+void TeraToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
+	// There are not tera-to-heap pointers if the tera cache is empty.
+	assertf(!_tc->tc_empty(),
+			"Should not be called is there is no work");
+	assertf(_tc != NULL, "Sanity");
+	assertf(_stripe_number < ParallelGCThreads, "Sanity");
+
+	{
+		PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
+
+		assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+		CardTableExtension* card_table = (CardTableExtension *)Universe::heap()->barrier_set();
+
+		
+		// Traverse TeraCache to Heap pointers
+		card_table->tc_scavenge_contents_parallel(_tc->start_array(), _tc_top,
+												  pm, _stripe_number, _stripe_total);
+	}
 }

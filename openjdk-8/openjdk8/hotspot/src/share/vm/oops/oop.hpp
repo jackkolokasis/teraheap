@@ -99,7 +99,7 @@ class oopDesc {
   } _metadata;
 
 #if TERA_FLAG
-  volatile uint64_t _tera_flag;   // MarkTeracache objects
+  volatile int64_t _tera_flag;   // MarkTeracache objects
 #endif
 
   // Fast access to barrier set.  Must be initialized.
@@ -127,7 +127,7 @@ class oopDesc {
   { 
 	  return _tera_flag == MOVE_TO_TERA; 
   }
- 
+
   /*
    * For Debugging purposes
    * During the GC, we need to find the state of the objects in the heap between the
@@ -139,13 +139,15 @@ class oopDesc {
    * Object states:
    *
    */
-
-  /* Set the state of the bject */
-  void set_obj_state(int state) 
+ 
+  /*
+   * Mark this object that is located in TeraCache
+   */
+  void set_obj_in_tc() 
   { 
-	  _tera_flag  = state; 
+	  _tera_flag  = IN_TERA_CACHE; 
   }
-  
+
   /* Get the state of the bject */
   uint64_t get_obj_state() 
   { 
@@ -375,11 +377,14 @@ class oopDesc {
   // reference field in "this".
   void follow_contents(void);
 
-  void follow_contents_tera_cache(void);
+  void follow_contents_tera_cache(bool assert_on = false);
 
 #if INCLUDE_ALL_GCS
   // Parallel Scavenge
   void push_contents(PSPromotionManager* pm);
+  
+  // Parallel Scavenge TeraCache
+  void tc_push_contents(PSPromotionManager* pm);
 
   // Parallel Old
   void update_contents(ParCompactionManager* cm);
@@ -455,8 +460,17 @@ class oopDesc {
   void     set_displaced_mark(markOop m);
 
   // for code generation
+  // 0 +-----------+
+  //   | _mark     |
+  // 8 +-----------+
+  //   | _klass    |
+  // 16+-----------+
+  //   | _tera_flag|
+  //   +-----------+
   static int mark_offset_in_bytes()    { return offset_of(oopDesc, _mark); }
   static int klass_offset_in_bytes()   { return offset_of(oopDesc, _metadata._klass); }
+  static long teraflag_offset_in_bytes() { return offset_of(oopDesc, _tera_flag); }
+
   static int klass_gap_offset_in_bytes();
 };
 

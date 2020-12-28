@@ -218,13 +218,6 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     // Move all active objects to a new position
     mark_sweep_phase4();
   
-#if DEBUG_CLOSURE
-	if (EnableTeraCache)
-	{
-		Universe::teraCache()->tc_check_back_pointers();
-	}
-#endif
-
     restore_marks();
 
     deallocate_stacks();
@@ -549,6 +542,10 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
     
+	// Traverse TeraCache
+	if (!Universe::teraCache()->tc_empty())
+		Universe::teraCache()->scavenge();
+
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
 
@@ -585,7 +582,8 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 
   // Next, mark all objects that can be recursively traced from the marked object.
   // Flush marking stack.
-  follow_stack();
+	follow_stack();
+
 
   // Process reference objects found during marking
   // Process the reference object (java.lang.ref object) found in the above process
@@ -597,7 +595,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
         is_alive_closure(), mark_and_push_closure(), follow_stack_closure(), NULL, _gc_timer);
     gc_tracer()->report_gc_reference_stats(stats);
   }
-
+  
   // This is the point where the entire marking should have completed.
   assertf(_marking_stack.is_empty(), "Marking should have completed");
 
@@ -610,16 +608,16 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // apo pou ton diavase
 	  
   // Unload classes and purge the SystemDictionary.
-	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
+  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
 
   // Unload nmethods.
-     CodeCache::do_unloading(is_alive_closure(), purged_class);
-	  
-	 // Delete entries for dead interned strings.
-	  StringTable::unlink(is_alive_closure());
+  CodeCache::do_unloading(is_alive_closure(), purged_class);
 
-	  // Clean up unreferenced symbols in symbol table.
-	  SymbolTable::unlink();
+  // Delete entries for dead interned strings.
+  StringTable::unlink(is_alive_closure());
+
+  // Clean up unreferenced symbols in symbol table.
+  SymbolTable::unlink();
 
 #if !DISABLE_TERACACHE
   if (!EnableTeraCache)
@@ -627,10 +625,10 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 	  // Unload classes and purge the SystemDictionary.
 	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
 
-	  // Unload nmethods.
+	  // Unload nmethds.
 	  CodeCache::do_unloading(is_alive_closure(), purged_class);
 
-	  // Prune dead klasses from subklass/sibling/implementor lists.
+	  // Prune dead klasses from subklass/sibling/impleme
 	  Klass::clean_weak_klass_links(is_alive_closure());
 
 	  // Delete entries for dead interned strings.
@@ -705,6 +703,10 @@ void PSMarkSweep::mark_sweep_phase3() {
   // Need to clear claim bits before the tracing starts.
   ClassLoaderDataGraph::clear_claimed_marks();
 
+  // Traverse TeraCache
+  if (!Universe::teraCache()->tc_empty())
+	  Universe::teraCache()->tc_adjust();
+
   // General strong roots.
   Universe::oops_do(adjust_pointer_closure());
   JNIHandles::oops_do(adjust_pointer_closure());   // Global (strong) JNI handles
@@ -726,10 +728,9 @@ void PSMarkSweep::mark_sweep_phase3() {
   CodeCache::oops_do(adjust_pointer_closure());
 
   StringTable::oops_do(adjust_pointer_closure());
+
   ref_processor()->weak_oops_do(adjust_pointer_closure());
   PSScavenge::reference_processor()->weak_oops_do(adjust_pointer_closure());
-
-  //Universe::teraCache()->tc_adjust_pointers();
 
   // Overflow stack and preserved marks
   adjust_marks();

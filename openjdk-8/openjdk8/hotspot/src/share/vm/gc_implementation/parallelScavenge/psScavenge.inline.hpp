@@ -31,6 +31,7 @@
 #include "gc_implementation/parallelScavenge/psPromotionManager.inline.hpp"
 #include "gc_implementation/parallelScavenge/psScavenge.hpp"
 #include "memory/iterator.hpp"
+#include "memory/universe.hpp"
 
 inline void PSScavenge::save_to_space_top_before_gc() {
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
@@ -41,6 +42,29 @@ template <class T> inline bool PSScavenge::should_scavenge(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   return PSScavenge::is_obj_in_young(heap_oop);
 }
+
+#if TERA_CARDS
+template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
+	T heap_oop = oopDesc::load_heap_oop(p);
+	
+	if (oopDesc::is_null(heap_oop))
+		return false;
+
+	oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+	if (Universe::teraCache()->tc_check(obj)) {
+		return false;
+	}
+	else if (PSScavenge::is_obj_in_young(heap_oop)) {
+		return true;
+	}
+	else {
+		obj->set_tera_cache();
+		Universe::teraCache()->tc_push_object((void *)p, obj);
+		return false;
+	}
+}
+#endif
 
 template <class T>
 inline bool PSScavenge::should_scavenge(T* p, MutableSpace* to_space) {
@@ -54,6 +78,20 @@ inline bool PSScavenge::should_scavenge(T* p, MutableSpace* to_space) {
   return false;
 }
 
+#if TERA_CARDS
+template <class T>
+inline bool PSScavenge::tc_should_scavenge(T* p, MutableSpace* to_space) {
+	if (tc_should_scavenge(p)) {
+		oop obj = oopDesc::load_decode_heap_oop_not_null(p);
+
+		// Skip objects copied to to_space since the scavenge started.
+		HeapWord* const addr = (HeapWord*)obj;
+		return addr < to_space_top_before_gc() || addr >= to_space->end();
+	}
+	return false;
+}
+#endif
+
 template <class T>
 inline bool PSScavenge::should_scavenge(T* p, bool check_to_space) {
   if (check_to_space) {
@@ -62,6 +100,19 @@ inline bool PSScavenge::should_scavenge(T* p, bool check_to_space) {
   }
   return should_scavenge(p);
 }
+
+#if TERA_CARDS
+
+template <class T>
+inline bool PSScavenge::tc_should_scavenge(T* p, bool check_to_space) {
+	if (check_to_space) {
+		ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
+		return should_scavenge(p, heap->young_gen()->to_space());
+	}
+	return tc_should_scavenge(p);
+}
+
+#endif
 
 // Attempt to "claim" oop at p via CAS, push the new obj if successful
 // This version tests the oop* to make sure it is within the heap before
@@ -75,22 +126,23 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	assertf(Universe::heap()->is_in_reserved(o) ||  Universe::teraCache()->tc_check(o), 
 			"Object should be in object space or in TeraCache");
 
-	// Check if object belongs to TeraCache
-#if !DISABLE_TERACACHE
-	if (EnableTeraCache && Universe::teraCache()->tc_check(o))
-	{
-		oop new_object = o;
-		oopDesc::encode_store_heap_oop_not_null(p, new_object);
-		return;
-	} 
-#endif
-
-	// If o has been copied to the new address, then forwardee of o is not
+	// If `o` has been copied to the new address, then forwardee of o is not
 	// empty, and is_forwarded is true, At this point, just take out the new
 	// address directly. If there is no forward, then do a forward. 
+#if TERA_CARDS
+	if (EnableTeraCache && Universe::teraCache()->tc_check(o)) {
+		oopDesc::encode_store_heap_oop_not_null(p, o);
+		return;
+	}
+
 	oop new_obj = o->is_forwarded()
 		? o->forwardee()
 		: pm->copy_to_survivor_space<promote_immediately>(o);
+#else
+	oop new_obj = o->is_forwarded()
+		? o->forwardee()
+		: pm->copy_to_survivor_space<promote_immediately>(o);
+#endif 
 
 #ifndef PRODUCT
 	// This code must come after the CAS test, or it will print incorrect
@@ -109,10 +161,14 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	// We cannot mark without test, as some code passes us pointers
 	// that are outside the heap. These pointers are either from roots
 	// or from metadata.
-	if ((!PSScavenge::is_obj_in_young((HeapWord*)p)) && Universe::heap()->is_in_reserved(p)) {
-		if (PSScavenge::is_obj_in_young(new_obj)) {
+	if ((!PSScavenge::is_obj_in_young((HeapWord*)p)) && (Universe::heap()->is_in_reserved(p))) {
+		if (PSScavenge::is_obj_in_young(new_obj))
 			card_table()->inline_write_ref_field_gc(p, new_obj);
-		}
+	}
+
+	if (Universe::teraCache()->tc_is_in((void *)p)) {
+		Universe::teraCache()->tc_push_object((void *)p, new_obj);
+		card_table()->inline_write_ref_field_gc(p, new_obj);
 	}
 }
 
@@ -147,12 +203,13 @@ class PSScavengeFromKlassClosure: public OopClosure {
  public:
   PSScavengeFromKlassClosure(PSPromotionManager* pm) : _pm(pm), _scanned_klass(NULL) { }
   void do_oop(narrowOop* p) { ShouldNotReachHere(); }
+
   void do_oop(oop* p)       {
     ParallelScavengeHeap* psh = ParallelScavengeHeap::heap();
     assert(!psh->is_in_reserved(p), "GC barrier needed");
     if (PSScavenge::should_scavenge(p)) {
-      assert(!Universe::heap()->is_in_reserved(p), "Not from meta-data?");
-      assert(PSScavenge::should_scavenge(p, true), "revisiting object?");
+      assertf(!Universe::heap()->is_in_reserved(p), "Not from meta-data?");
+      assertf(PSScavenge::should_scavenge(p, true), "revisiting object?");
 
       oop o = *p;
       oop new_obj;
@@ -161,6 +218,7 @@ class PSScavengeFromKlassClosure: public OopClosure {
 #if !DISABLE_TERACACHE
 	  if (EnableTeraCache && Universe::teraCache()->tc_check(o))
 	  {
+		  assertf(false, "HERE");
 		  oopDesc::encode_store_heap_oop_not_null(p, o);
 		  return;
 	  }

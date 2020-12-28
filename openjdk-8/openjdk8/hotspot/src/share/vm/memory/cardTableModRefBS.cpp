@@ -152,6 +152,18 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   _tc_byte_map = (jbyte*) tc_heap_rs.base();
   tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> card_shift);
 
+  printf("======================================================\n");
+  printf("TC\n");
+  printf("CT_Base = %p \n", tc_heap_rs.base());
+  printf("CT_End = %p \n", tc_heap_rs.end());
+  printf("======================================================\n");
+  printf("\n");
+  printf("======================================================\n");
+  printf("Heap\n");
+  printf("CT_Base = %p \n", heap_rs.base());
+  printf("CT_End = %p \n", heap_rs.end());
+  printf("======================================================\n");
+
   assertf(byte_for(tc_low_bound) == &_tc_byte_map[0], "Checking start of map");
   assertf(byte_for(tc_high_bound - 1) <= &_tc_byte_map[_tc_last_valid_index], "Checking end of map"); 
 

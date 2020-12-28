@@ -544,6 +544,14 @@ public:
     return ParGCCardsPerStrideChunk * card_size_in_words;
   }
 
+#if TERA_CARDS
+public:
+  // Use this function to access byte for from TeraCache
+  jbyte* tc_byte_for(const void* p) const {
+	  return byte_for(p);
+  }
+#endif
+
 };
 
 class CardTableRS;

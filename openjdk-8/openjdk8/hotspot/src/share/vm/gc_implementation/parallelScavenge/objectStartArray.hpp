@@ -28,6 +28,8 @@
 #include "gc_implementation/parallelScavenge/psVirtualspace.hpp"
 #include "memory/allocation.hpp"
 #include "memory/memRegion.hpp"
+#include "memory/sharedDefines.h"
+#include "runtime/os.hpp"
 #include "oops/oop.hpp"
 
 //
@@ -37,7 +39,6 @@
 
 class ObjectStartArray : public CHeapObj<mtGC> {
  friend class VerifyObjectStartArrayClosure;
-
  private:
   PSVirtualSpace  _virtual_space;
   MemRegion       _reserved_region;
@@ -62,10 +63,10 @@ class ObjectStartArray : public CHeapObj<mtGC> {
 
   // Mapping from address to object start array entry
   jbyte* block_for_addr(void* p) const {
-    assert(_covered_region.contains(p),
+    assertf(_covered_region.contains(p),
            "out of bounds access to object start array");
     jbyte* result = &_offset_base[uintptr_t(p) >> block_shift];
-    assert(_blocks_region.contains(result),
+    assertf(_blocks_region.contains(result),
            "out of bounds result in byte_for");
     return result;
   }
@@ -111,9 +112,16 @@ class ObjectStartArray : public CHeapObj<mtGC> {
 
   // This method is in lieu of a constructor, so that this class can be
   // embedded inline in other classes.
+  // This function is used for teraCache
+  void tc_initialize(MemRegion reserved_region);
+
+  // This method is in lieu of a constructor, so that this class can be
+  // embedded inline in other classes.
   void initialize(MemRegion reserved_region);
 
   void set_covered_region(MemRegion mr);
+  
+  void tc_set_covered_region(MemRegion mr);
 
   void reset();
 
@@ -137,7 +145,7 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   // object in that block. Scroll backwards by one, and the first
   // object hit should be at the beginning of the block
   HeapWord* object_start(HeapWord* addr) const {
-    assert(_covered_region.contains(addr), "Must be in covered region");
+    assertf(_covered_region.contains(addr), "Must be in covered region");
     jbyte* block = block_for_addr(addr);
     HeapWord* scroll_forward = offset_addr_for_block(block--);
     while (scroll_forward > addr) {
@@ -149,8 +157,8 @@ class ObjectStartArray : public CHeapObj<mtGC> {
       scroll_forward = next;
       next += oop(next)->size();
     }
-    assert(scroll_forward <= addr, "wrong order for current and arg");
-    assert(addr <= next, "wrong order for arg and next");
+    assertf(scroll_forward <= addr, "wrong order for current and arg");
+    assertf(addr <= next, "wrong order for arg and next");
     return scroll_forward;
   }
 

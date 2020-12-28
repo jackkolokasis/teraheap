@@ -3112,7 +3112,7 @@ static char* anon_mmap(char* requested_addr, size_t bytes, bool fixed) {
   int flags;
 
   //flags = MAP_SHARED | MAP_NORESERVE | MAP_ANONYMOUS;
-  flags = MAP_SHARED | MAP_ANONYMOUS;
+  flags = MAP_PRIVATE | MAP_ANONYMOUS;
   if (fixed) {
     assertf((uintptr_t)requested_addr % os::Linux::page_size() == 0, "unaligned address");
     flags |= MAP_FIXED;

@@ -22,6 +22,7 @@
  *
  */
 
+#include "gc_implementation/parallelScavenge/psScavenge.hpp"
 #include "precompiled.hpp"
 #include "classfile/symbolTable.hpp"
 #include "code/codeCache.hpp"
@@ -82,7 +83,6 @@ public:
 	{
 		return true;
 	}
-	assertf(!Universe::teraCache()->tc_check(p), "Object is in teraCache");
 #endif
     return (!PSScavenge::is_obj_in_young(p)) || p->is_forwarded();
   }
@@ -105,8 +105,9 @@ public:
   }
 
   template <class T> void do_oop_work(T* p) {
-    assert (!oopDesc::is_null(*p), "expected non-null ref");
-    assert ((oopDesc::load_decode_heap_oop_not_null(p))->is_oop(), "expected an oop while scanning weak refs");
+    assertf (!oopDesc::is_null(*p), "expected non-null ref");
+    assertf ((oopDesc::load_decode_heap_oop_not_null(p))->is_oop(), 
+			"expected an oop while scanning weak refs");
 
     // Weak refs may be visited more than once.
     if (PSScavenge::should_scavenge(p, _to_space)) {
@@ -395,6 +396,7 @@ bool PSScavenge::invoke_no_policy() {
     // Set the number of GC threads to be used in this collection
     gc_task_manager()->set_active_gang();
     gc_task_manager()->task_idle_workers();
+
     // Get the active number of workers here and use that value
     // throughout the methods.
     uint active_workers = gc_task_manager()->active_workers();
@@ -419,6 +421,19 @@ bool PSScavenge::invoke_no_policy() {
           q->enqueue(new OldToYoungRootsTask(old_gen, old_top, i, stripe_total));
         }
       }
+	  
+	  if (!Universe::teraCache()->tc_empty())
+	  {
+		  // There are objects from TeraCache to heap if there are objects in
+		  // the old gen
+		  uint stripe_total = active_workers;
+		  for (uint i = 0; i < stripe_total; i++) {
+			  q->enqueue(new TeraToHeapRootsTask(Universe::teraCache(), 
+						 (HeapWord*)Universe::teraCache()->tc_region_cur_ptr(), 
+						 i, stripe_total));
+		  }
+	  }
+
 
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::universe));
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::jni_handles));
