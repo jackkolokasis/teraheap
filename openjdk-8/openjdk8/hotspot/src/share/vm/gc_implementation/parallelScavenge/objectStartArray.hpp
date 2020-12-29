@@ -91,7 +91,7 @@ class ObjectStartArray : public CHeapObj<mtGC> {
       return _covered_region.start();
     }
 
-    assert(_blocks_region.contains(p),
+    assertf(_blocks_region.contains(p),
            "out of bounds access to object start array");
 
     if (*p == clean_block) {
@@ -99,10 +99,15 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     }
 
     size_t delta = pointer_delta(p, _offset_base, sizeof(jbyte));
+	printf("==================================================================\n");
+	printf("P = %p | OFFSET_BASE = %p | DELTA = %lu \n", p, _offset_base, delta);
     HeapWord* result = (HeapWord*) (delta << block_shift);
+	printf("Result = %p \n", result);
     result += *p;
+	printf("Result = %p \n", result);
+	printf("==================================================================\n");
 
-    assert(_covered_region.contains(result),
+    assertf(_covered_region.contains(result),
            "out of bounds accessor from card marking array");
 
     return result;
@@ -148,10 +153,16 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     assertf(_covered_region.contains(addr), "Must be in covered region");
     jbyte* block = block_for_addr(addr);
     HeapWord* scroll_forward = offset_addr_for_block(block--);
+	printf("==========================================================\n");
+	printf("ADDR = %p | Scroll = %p | Block = %p\n", addr, scroll_forward, block);
+	printf("==========================================================\n");
     while (scroll_forward > addr) {
       scroll_forward = offset_addr_for_block(block--);
     }
 
+	printf("==========================================================\n");
+	printf("ADDR = %p | Scroll = %p\n", addr, scroll_forward);
+	printf("==========================================================\n");
     HeapWord* next = scroll_forward;
     while (next <= addr) {
       scroll_forward = next;

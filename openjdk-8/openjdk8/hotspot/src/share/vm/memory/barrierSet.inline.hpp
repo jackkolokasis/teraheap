@@ -34,8 +34,6 @@
 // card-table kind.
 
 template <class T> void BarrierSet::write_ref_field_pre(T* field, oop new_val) {
-  assertf(!Universe::teraCache()->tc_check((oop)field), "Error");
-  assertf(!Universe::teraCache()->tc_check(new_val), "Error");
   if (kind() == CardTableModRef) {
     ((CardTableModRefBS*)this)->inline_write_ref_field_pre(field, new_val);
   } else {
@@ -44,8 +42,6 @@ template <class T> void BarrierSet::write_ref_field_pre(T* field, oop new_val) {
 }
 
 void BarrierSet::write_ref_field(void* field, oop new_val) {
-  assertf(!Universe::teraCache()->tc_check((oop)field), "Error");
-  assertf(!Universe::teraCache()->tc_check(new_val), "Error");
   if (kind() == CardTableModRef) {
     ((CardTableModRefBS*)this)->inline_write_ref_field(field, new_val);
   } else {

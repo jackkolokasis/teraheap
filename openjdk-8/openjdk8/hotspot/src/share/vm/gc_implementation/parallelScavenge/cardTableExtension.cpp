@@ -267,6 +267,10 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			jbyte* following_clean_card = current_card;
 
 			if (first_unclean_card < worker_end_card) {
+				printf("==================================================\n");
+				printf("First Unclean Card %p | Worker End Card %p | Addr %p\n",
+						first_unclean_card, worker_end_card, addr_for(first_unclean_card));
+				printf("==================================================\n");
 				oop* p = (oop*) start_array->object_start(addr_for(first_unclean_card));
 				assertf((HeapWord*)p <= addr_for(first_unclean_card), "checking");
 
@@ -332,7 +336,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 					printf("====================================\n");
 					while (p < to) {
 						oop m = oop(p);
-						bool check = m->is_oop_or_null();
 						assertf(m->is_oop_or_null(), "check for header");
 						printf("================================================\n");
 						printf("p = %p | to = %p\n", p, to);

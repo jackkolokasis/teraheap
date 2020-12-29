@@ -118,6 +118,8 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 		_next_pos_region = (char *)((((uint64_t)_next_pos_region) + (8 - 1)) & -8);
 	}
 
+	_start_array.allocate_block((HeapWord *)tmp);
+
 	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is out-of-space");
 
 	if (TeraCacheStatistics)

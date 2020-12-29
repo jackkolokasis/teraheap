@@ -48,31 +48,31 @@ void ObjectStartArray::tc_initialize(MemRegion reserved_region) {
 
   // Do not use large-pages for the backing store. The one large page region
   // will be used for the heap proper.
-  //ReservedSpace backing_store(bytes_to_reserve);
-  //if (!backing_store.is_reserved()) {
-  //  vm_exit_during_initialization("Could not reserve space for ObjectStartArray");
-  //}
-  //MemTracker::record_virtual_memory_type((address)backing_store.base(), mtGC);
+  ReservedSpace backing_store(bytes_to_reserve);
+  if (!backing_store.is_reserved()) {
+    vm_exit_during_initialization("Could not reserve space for ObjectStartArray");
+  }
+  MemTracker::record_virtual_memory_type((address)backing_store.base(), mtGC);
 
-  //// We do not commit any memory initially
-  //if (!_virtual_space.initialize(backing_store, 0)) {
-  //  vm_exit_during_initialization("Could not commit space for ObjectStartArray");
-  //}
+  // We do not commit any memory initially
+  if (!_virtual_space.initialize(backing_store, bytes_to_reserve)) {
+    vm_exit_during_initialization("Could not commit space for ObjectStartArray");
+  }
 
-  _raw_base = (jbyte*)_reserved_region.start();
+  _raw_base = (jbyte*)_virtual_space.low_boundary();
   if (_raw_base == NULL) {
     vm_exit_during_initialization("Could not get raw_base address");
   }
 
-  //MemTracker::record_virtual_memory_type((address)_raw_base, mtGC);
+  MemTracker::record_virtual_memory_type((address)_raw_base, mtGC);
 
   _offset_base = _raw_base - (size_t(reserved_region.start()) >> block_shift);
 
   _covered_region.set_start(reserved_region.start());
-  _covered_region.set_word_size(0);
+  _covered_region.set_word_size(reserved_region.word_size());
 
   _blocks_region.set_start((HeapWord*)_raw_base);
-  _blocks_region.set_word_size(0);
+  _blocks_region.set_word_size(bytes_to_reserve);
 }
 #endif
 
@@ -85,11 +85,18 @@ void ObjectStartArray::initialize(MemRegion reserved_region) {
   // Calculate how much space must be reserved
   _reserved_region = reserved_region;
 
+  printf("==============DEBUGGING====================\n");
+  printf("Reserved Region: Start %p | End %p \n", reserved_region.start(), reserved_region.end());
+
   size_t bytes_to_reserve = reserved_region.word_size() / block_size_in_words;
   assert(bytes_to_reserve > 0, "Sanity");
 
+  printf("Bytes to Reserved: Bytes B %lu ", bytes_to_reserve);
+
   bytes_to_reserve =
     align_size_up(bytes_to_reserve, os::vm_allocation_granularity());
+  
+  printf("| Bytes A %lu \n", bytes_to_reserve);
 
   // Do not use large-pages for the backing store. The one large page region
   // will be used for the heap proper.
@@ -105,6 +112,9 @@ void ObjectStartArray::initialize(MemRegion reserved_region) {
   }
 
   _raw_base = (jbyte*)_virtual_space.low_boundary();
+  
+  printf("Raw_base %p\n", _raw_base);
+  printf("Virtual Space: Low %p | High %p\n", _virtual_space.low_boundary(), _virtual_space.high_boundary());
 
   if (_raw_base == NULL) {
     vm_exit_during_initialization("Could not get raw_base address");
@@ -114,12 +124,15 @@ void ObjectStartArray::initialize(MemRegion reserved_region) {
 
 
   _offset_base = _raw_base - (size_t(reserved_region.start()) >> block_shift);
+  printf("size_t(reserved_region.start()) %lu\n", size_t(reserved_region.start()));
+  printf("Offset_Base %p\n", _offset_base);
 
   _covered_region.set_start(reserved_region.start());
   _covered_region.set_word_size(0);
 
   _blocks_region.set_start((HeapWord*)_raw_base);
   _blocks_region.set_word_size(0);
+  printf("===========================================\n");
 }
 
 void ObjectStartArray::tc_set_covered_region(MemRegion mr) {

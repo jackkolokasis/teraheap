@@ -100,7 +100,7 @@ jint ParallelScavengeHeap::initialize() {
 	  barrier_set = new CardTableExtension(_reserved, 3, _tera_cache_reserved);
 	
 	  Universe::teraCache()->start_array()->tc_initialize(_tera_cache_reserved);
-	  Universe::teraCache()->start_array()->tc_set_covered_region(_tera_cache_reserved);
+	  //Universe::teraCache()->start_array()->tc_set_covered_region(_tera_cache_reserved);
   }
   else {
 	  barrier_set = new CardTableExtension(_reserved, 3);
