@@ -55,7 +55,8 @@ void ObjectStartArray::tc_initialize(MemRegion reserved_region) {
   MemTracker::record_virtual_memory_type((address)backing_store.base(), mtGC);
 
   // We do not commit any memory initially
-  if (!_virtual_space.initialize(backing_store, bytes_to_reserve)) {
+  //if (!_virtual_space.initialize(backing_store, bytes_to_reserve)) {
+  if (!_virtual_space.initialize(backing_store, 0)) {
     vm_exit_during_initialization("Could not commit space for ObjectStartArray");
   }
 
@@ -69,10 +70,10 @@ void ObjectStartArray::tc_initialize(MemRegion reserved_region) {
   _offset_base = _raw_base - (size_t(reserved_region.start()) >> block_shift);
 
   _covered_region.set_start(reserved_region.start());
-  _covered_region.set_word_size(reserved_region.word_size());
+  _covered_region.set_word_size(0);
 
   _blocks_region.set_start((HeapWord*)_raw_base);
-  _blocks_region.set_word_size(bytes_to_reserve);
+  _blocks_region.set_word_size(0);
 }
 #endif
 
@@ -85,18 +86,18 @@ void ObjectStartArray::initialize(MemRegion reserved_region) {
   // Calculate how much space must be reserved
   _reserved_region = reserved_region;
 
-  printf("==============DEBUGGING====================\n");
-  printf("Reserved Region: Start %p | End %p \n", reserved_region.start(), reserved_region.end());
+  //printf("==============DEBUGGING====================\n");
+  //printf("Reserved Region: Start %p | End %p \n", reserved_region.start(), reserved_region.end());
 
   size_t bytes_to_reserve = reserved_region.word_size() / block_size_in_words;
   assert(bytes_to_reserve > 0, "Sanity");
 
-  printf("Bytes to Reserved: Bytes B %lu ", bytes_to_reserve);
+  //printf("Bytes to Reserved: Bytes B %lu ", bytes_to_reserve);
 
   bytes_to_reserve =
     align_size_up(bytes_to_reserve, os::vm_allocation_granularity());
   
-  printf("| Bytes A %lu \n", bytes_to_reserve);
+  //printf("| Bytes A %lu \n", bytes_to_reserve);
 
   // Do not use large-pages for the backing store. The one large page region
   // will be used for the heap proper.
@@ -113,8 +114,8 @@ void ObjectStartArray::initialize(MemRegion reserved_region) {
 
   _raw_base = (jbyte*)_virtual_space.low_boundary();
   
-  printf("Raw_base %p\n", _raw_base);
-  printf("Virtual Space: Low %p | High %p\n", _virtual_space.low_boundary(), _virtual_space.high_boundary());
+  //printf("Raw_base %p\n", _raw_base);
+  //printf("Virtual Space: Low %p | High %p\n", _virtual_space.low_boundary(), _virtual_space.high_boundary());
 
   if (_raw_base == NULL) {
     vm_exit_during_initialization("Could not get raw_base address");
@@ -124,15 +125,15 @@ void ObjectStartArray::initialize(MemRegion reserved_region) {
 
 
   _offset_base = _raw_base - (size_t(reserved_region.start()) >> block_shift);
-  printf("size_t(reserved_region.start()) %lu\n", size_t(reserved_region.start()));
-  printf("Offset_Base %p\n", _offset_base);
+  //printf("size_t(reserved_region.start()) %lu\n", size_t(reserved_region.start()));
+  //printf("Offset_Base %p\n", _offset_base);
 
   _covered_region.set_start(reserved_region.start());
   _covered_region.set_word_size(0);
 
   _blocks_region.set_start((HeapWord*)_raw_base);
   _blocks_region.set_word_size(0);
-  printf("===========================================\n");
+  //printf("===========================================\n");
 }
 
 void ObjectStartArray::tc_set_covered_region(MemRegion mr) {
@@ -153,6 +154,16 @@ void ObjectStartArray::tc_set_covered_region(MemRegion mr) {
   _covered_region = mr;
 
   size_t current_blocks_size_in_bytes = _blocks_region.byte_size();
+  
+  if (requested_blocks_size_in_bytes > current_blocks_size_in_bytes) {
+    // Expand
+    size_t expand_by = requested_blocks_size_in_bytes - current_blocks_size_in_bytes;
+    if (!_virtual_space.expand_by(expand_by)) {
+      vm_exit_out_of_memory(expand_by, OOM_MMAP_ERROR, "object start array expansion");
+    }
+    // Clear *only* the newly allocated region
+    memset(_blocks_region.end(), clean_block, expand_by);
+  }
 
   _blocks_region.set_word_size(requested_blocks_size_in_bytes / sizeof(HeapWord));
 

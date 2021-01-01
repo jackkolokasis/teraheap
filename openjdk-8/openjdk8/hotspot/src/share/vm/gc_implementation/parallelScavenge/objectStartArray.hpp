@@ -99,13 +99,13 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     }
 
     size_t delta = pointer_delta(p, _offset_base, sizeof(jbyte));
-	printf("==================================================================\n");
-	printf("P = %p | OFFSET_BASE = %p | DELTA = %lu \n", p, _offset_base, delta);
+	//printf("==================================================================\n");
+	//printf("P = %p | OFFSET_BASE = %p | DELTA = %lu \n", p, _offset_base, delta);
     HeapWord* result = (HeapWord*) (delta << block_shift);
-	printf("Result = %p \n", result);
+	//printf("Result = %p | *p = %c \n", result, *p);
     result += *p;
-	printf("Result = %p \n", result);
-	printf("==================================================================\n");
+	//printf("Result = %p \n", result);
+	//printf("==================================================================\n");
 
     assertf(_covered_region.contains(result),
            "out of bounds accessor from card marking array");
@@ -133,11 +133,11 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   MemRegion covered_region() { return _covered_region; }
 
   void allocate_block(HeapWord* p) {
-    assert(_covered_region.contains(p), "Must be in covered region");
+    assertf(_covered_region.contains(p), "Must be in covered region");
     jbyte* block = block_for_addr(p);
     HeapWord* block_base = addr_for_block(block);
     size_t offset = pointer_delta(p, block_base, sizeof(HeapWord*));
-    assert(offset < 128, "Sanity");
+    assertf(offset < 128, "Sanity");
     // When doing MT offsets, we can't assert this.
     //assert(offset > *block, "Found backwards allocation");
     *block = (jbyte)offset;
@@ -152,17 +152,20 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   HeapWord* object_start(HeapWord* addr) const {
     assertf(_covered_region.contains(addr), "Must be in covered region");
     jbyte* block = block_for_addr(addr);
+	//printf("==========================================================\n");
+	//printf("Block = %p\n", block);
+	//printf("==========================================================\n");
     HeapWord* scroll_forward = offset_addr_for_block(block--);
-	printf("==========================================================\n");
-	printf("ADDR = %p | Scroll = %p | Block = %p\n", addr, scroll_forward, block);
-	printf("==========================================================\n");
+	//printf("==========================================================\n");
+	//printf("ADDR = %p | Scroll = %p | Block = %p\n", addr, scroll_forward, block);
+	//printf("==========================================================\n");
     while (scroll_forward > addr) {
       scroll_forward = offset_addr_for_block(block--);
     }
 
-	printf("==========================================================\n");
-	printf("ADDR = %p | Scroll = %p\n", addr, scroll_forward);
-	printf("==========================================================\n");
+	//printf("==========================================================\n");
+	//printf("ADDR = %p | Scroll = %p\n", addr, scroll_forward);
+	//printf("==========================================================\n");
     HeapWord* next = scroll_forward;
     while (next <= addr) {
       scroll_forward = next;

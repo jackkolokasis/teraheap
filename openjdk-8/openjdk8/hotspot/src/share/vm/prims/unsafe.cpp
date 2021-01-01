@@ -1175,10 +1175,6 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSwapObject(JNIEnv *env, jobject unsafe, 
   oop e = JNIHandles::resolve(e_h);
   oop p = JNIHandles::resolve(obj);
 
-  // Check if the objects belongs to TeraCache
-  assertf(!Universe::teraCache()->tc_check(x), "Update object in TeraCache");
-  assertf(!Universe::teraCache()->tc_check(e), "Update object in TeraCache");
-
   HeapWord* addr = (HeapWord *)index_oop_from_field_offset_long(p, offset);
 
   oop res = oopDesc::atomic_compare_exchange_oop(x, addr, e, true);

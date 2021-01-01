@@ -60,7 +60,10 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 	}
 	else {
 		obj->set_tera_cache();
+		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
+		printf ("IN_OLD_GEN\n");
 		Universe::teraCache()->tc_push_object((void *)p, obj);
+        PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
 		return false;
 	}
 }
@@ -209,6 +212,7 @@ class PSScavengeFromKlassClosure: public OopClosure {
     assert(!psh->is_in_reserved(p), "GC barrier needed");
     if (PSScavenge::should_scavenge(p)) {
       assertf(!Universe::heap()->is_in_reserved(p), "Not from meta-data?");
+      assertf(!Universe::teraCache()->tc_is_in(p), "Not from meta-data?");
       assertf(PSScavenge::should_scavenge(p, true), "revisiting object?");
 
       oop o = *p;
@@ -218,7 +222,6 @@ class PSScavengeFromKlassClosure: public OopClosure {
 #if !DISABLE_TERACACHE
 	  if (EnableTeraCache && Universe::teraCache()->tc_check(o))
 	  {
-		  assertf(false, "HERE");
 		  oopDesc::encode_store_heap_oop_not_null(p, o);
 		  return;
 	  }

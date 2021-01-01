@@ -119,6 +119,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 	}
 
 	_start_array.allocate_block((HeapWord *)tmp);
+	//_start_array.allocate_block((HeapWord *)_next_pos_region);
 
 	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is out-of-space");
 
@@ -155,12 +156,13 @@ void TeraCache::scavenge()
 void TeraCache::tc_push_object(void *p, oop o) {
 	_tc_stack.push(o);
 	_tc_adjust_stack.push((oop *)p);
+	assertf(!_tc_stack.is_empty(), "Sanity Check");
+	assertf(!_tc_adjust_stack.is_empty(), "Sanity Check");
 }
 
 void TeraCache::tc_adjust() {
 	while (!_tc_adjust_stack.is_empty()) {
 		oop * obj = _tc_adjust_stack.pop();
-
 		MarkSweep::adjust_pointer(obj);
 	}
 

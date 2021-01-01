@@ -422,7 +422,7 @@ bool PSScavenge::invoke_no_policy() {
         }
       }
 	  
-	  if (!Universe::teraCache()->tc_empty())
+	  if (EnableTeraCache && !Universe::teraCache()->tc_empty())
 	  {
 		  // There are objects from TeraCache to heap if there are objects in
 		  // the old gen

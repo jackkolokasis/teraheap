@@ -157,18 +157,25 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 	// The width of the stripe ssize*stripe_total must be consistent with the
 	// number of so that the complete slice is covered.
 	size_t slice_width = ssize * stripe_total;
+	
+	std::cout << "=========================================================" << std::endl;
+	printf("slice_width = %lu\n", slice_width);
+	std::cout << "=========================================================" << std::endl;
 
 	for (jbyte* slice = start_card; slice < end_card; slice += slice_width) {
 		jbyte* worker_start_card = slice + stripe_number * ssize;
 		if (worker_start_card >= end_card)
-		{
 			return; // We're done.
-		}
 
 		jbyte* worker_end_card = worker_start_card + ssize;
 		if (worker_end_card > end_card) {
 			worker_end_card = end_card;
 		}
+	
+		std::cout << "=========================================================" << std::endl;
+		printf("worker_start card = %p\n", worker_start_card);
+		printf("worker_end_card = %p\n", worker_end_card);
+		std::cout << "=========================================================" << std::endl;
 
 		// We do not want to scan objects more than once. In order to accomplish
 		// this, we assert that any object with an object head inside our
@@ -177,7 +184,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		//
 		// Note! ending cards are exclusive!
 		HeapWord* slice_start = addr_for(worker_start_card);
-		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_start_card));
+		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
 
 		std::cout << "=========================================================" << std::endl;
 		std::cout << "sp_top = " << sp_top << std::endl;
@@ -207,7 +214,8 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		}
 
 		// Update the ending card
-		if (slice_end < (HeapWord*)sp_top && slice_end != slice_start) {
+		//if (slice_end < (HeapWord*)sp_top && slice_end != slice_start) {
+		if (slice_end < (HeapWord*)sp_top) {
 			// The substaction is important! An object may start precisely at
 			// slice end
 			HeapWord* last_object = start_array->object_start(slice_end - 1);
@@ -298,10 +306,9 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				printf("================================================\n");
 
 				// Test slice_end first!
-				//if ((HeapWord*)to > slice_end) {
-				//	to = (oop*)slice_end;
-				//} else 
-				if (to > sp_top) {
+				if ((HeapWord*)to > slice_end) {
+					to = (oop*)slice_end;
+				} else if (to > sp_top) {
 					to = sp_top;
 				}
 
