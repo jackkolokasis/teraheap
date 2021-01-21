@@ -7,6 +7,7 @@
 #include "memory/cardTableModRefBS.hpp"
 #include "memory/memRegion.hpp"
 #include "memory/sharedDefines.h"
+#include "runtime/globals.hpp"
 #include "runtime/mutexLocker.hpp"          // std::mutex
 #include "oops/oop.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -36,7 +37,6 @@ TeraCache::TeraCache()
 	total_objects = 0;
 	total_objects_size = 0;
 	total_merged_regions = 0;
-	total_forward_ptrs = 0;
 }
 
 // Check if an object `ptr` belongs to the TeraCache. If the object belongs
@@ -57,8 +57,7 @@ bool TeraCache::tc_is_in(void *p) {
 // Create a new region in the TeraCache. The size of regions is dynamically. 
 // TODO(JK:) Support multiple regions
 // TODO(JK:) Fix the size. For now I use a hard number for the size
-void TeraCache::tc_new_region()
-{
+void TeraCache::tc_new_region() {
 	// Update Statistics
 	total_active_regions++;
 
@@ -66,50 +65,44 @@ void TeraCache::tc_new_region()
 	_region = new_region(NULL);
 
 	// Initialize the size of the region
-	_start_pos_region = (char *)rc_rstralloc0(_region, 41943040*sizeof(char));
-	_start_pos_region = (char *)align_ptr_up(_start_pos_region, CardTableModRefBS::ct_max_alignment_constraint());
+	_start_pos_region = (char *)rc_rstralloc0(_region, 2147483648 * sizeof(char));
+	_start_pos_region = (char *)align_ptr_up(_region, CardTableModRefBS::ct_max_alignment_constraint());
 
 	// Check if the allocation happens succesfully
 	assertf((char *)(_start_pos_region) !=  (char *) NULL, "Allocation Failed");
 
 	// Initialize pointer
 	_next_pos_region = _start_pos_region;
-
-	if (TeraCacheStatistics)
-	{
-		tclog_or_tty->print_cr("[STATISTICS] | NUM_ACTIVE_REGIONS = %d", total_active_regions);
-	}
 }
 
 // Return the start address of the region
-char* TeraCache::tc_get_addr_region(void)
-{
+char* TeraCache::tc_get_addr_region(void) {
 	assertf((char *)(_start_pos_region) != NULL, "Region is not allocated");
 	return _start_pos_region;
 }
 
-// Get the size of the region
-size_t TeraCache::tc_get_size_region(void)
-{
-	return 41943040;
+// Get the size of TeraCache
+size_t TeraCache::tc_get_size_region(void) {
+	return mem_pool_size();
 }
 
 // Get the allocation top pointer of the region
 char* TeraCache::tc_region_top(oop obj, size_t size)
 {
-	if (TeraCacheStatistics)
-	{
-		tclog_or_tty->print_cr("[STATISTICS] | OBJECT_SIZE  =  %d", size);
-	}
+	MutexLocker x(tera_cache_lock);
 
 	// Update Statistics
-	MutexLocker x(tera_cache_lock);
 	total_objects_size += size;
-	total_objects ++;
+	total_objects++;
+	trans_per_fgc++;
+
 	char *tmp = _next_pos_region;
 
+#if DEBUG_TERACACHE
 	printf("[BEFORE TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %lu | NAME %s\n",
 			(HeapWord *)obj, tmp, size, obj->klass()->internal_name());
+#endif
+
 	// make heapwordsize
 	_next_pos_region = (char *) (((uint64_t) _next_pos_region) + size*sizeof(char*));
 
@@ -123,34 +116,43 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 
 	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is out-of-space");
 
-	if (TeraCacheStatistics)
-	{
-		tclog_or_tty->print_cr("[STATISTICS] | NUM_OF_OBJECTS  = %d", total_objects);
-		tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %d", total_objects_size);
-	}
-
 	return tmp;
 }
 
-// Get the last access pointer of the region
+// Get the allocation top pointer of the TeraCache
 char* TeraCache::tc_region_cur_ptr(void)
 {
-	std::cerr << "Get the region of the last pointer" << std::endl;
-
 	assertf((char *)(_next_pos_region) != (char *) NULL, "Invalid pointer");
 	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is full");
+
 	return (char *) _next_pos_region;
 }
 
+// Pop the objects that are in `_tc_stack` and mark them as live object. These
+// objects are located in the Java Heap and we need to ensure that they will be
+// kept alive.
 void TeraCache::scavenge()
 {
+	struct timeval start_time;
+	struct timeval end_time;
+
+	gettimeofday(&start_time, NULL);
+
 	while (!_tc_stack.is_empty()) {
 		oop obj = _tc_stack.pop();
 
-		printf("TC_STACK: obj = %p\n", obj); 
+		if (TeraCacheStatistics)
+			back_ptrs_per_fgc++;
 
 		MarkSweep::mark_and_push(&obj);
 	}
+	
+	gettimeofday(&end_time, NULL);
+
+	if (TeraCacheStatistics)
+		tclog_or_tty->print_cr("[STATISTICS] | TC_MARK = %llu\n", 
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
 }
 		
 void TeraCache::tc_push_object(void *p, oop o) {
@@ -160,39 +162,25 @@ void TeraCache::tc_push_object(void *p, oop o) {
 	assertf(!_tc_adjust_stack.is_empty(), "Sanity Check");
 }
 
+// Adjust backwards pointers during Full GC.  
 void TeraCache::tc_adjust() {
+	struct timeval start_time;
+	struct timeval end_time;
+
+	gettimeofday(&start_time, NULL);
+
 	while (!_tc_adjust_stack.is_empty()) {
-		oop * obj = _tc_adjust_stack.pop();
+		oop* obj = _tc_adjust_stack.pop();
 		MarkSweep::adjust_pointer(obj);
 	}
+	
+	gettimeofday(&end_time, NULL);
 
+	if (TeraCacheStatistics)
+		tclog_or_tty->print_cr("[STATISTICS] | TC_ADJUST %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
 }
-
-// TODO Remove all these
-void TeraCache::tc_adjust_pointers()
-{
-
-	if (_start_pos_region == _next_pos_region)
-	{
-		return;
-	}
-
-	HeapWord* q  = (HeapWord *) _start_pos_region;
-	HeapWord* t  = (HeapWord *) _next_pos_region;
-
-	// Point all the oops to the new location
-	while (q < t) {
-		if (oop(q)->klass() == NULL)
-		{
-			return;
-		}
-
-		std::cerr << "Ajust pointers in the teraCache" << std::endl;
-		size_t size = oop(q)->adjust_pointers();
-		q += size;
-	}
-}
-
 
 // Check for backward pointers
 void TeraCache::tc_check_back_pointers(bool assert_on)
@@ -230,14 +218,9 @@ void TeraCache::tc_check_back_pointers(bool assert_on)
 }
 
 
-// Increase forward ptrs from JVM heap to TeraCache
-void TeraCache::tc_increase_forward_ptrs()
-{
-	total_forward_ptrs++;
-	if (TeraCacheStatistics)
-	{
-		tclog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %d", total_forward_ptrs);
-	}
+// Increase the number of forward ptrs from JVM heap to TeraCache
+void TeraCache::tc_increase_forward_ptrs() {
+	fwd_ptrs_per_fgc++;
 }
 
 
@@ -297,43 +280,6 @@ HeapWord* TeraCache::tc_heap_ptr(HeapWord* dest)
 
 }
 
-
-void TeraCache::tc_adjust_back_ptr(bool full_gc)
-{
-	if (full_gc)
-	{
-		// Traverse the map containing backward pointers
-		for (std::map<HeapWord*, back_ptr>::const_iterator it = tc_to_heap_ptrs.begin();
-				it != tc_to_heap_ptrs.end(); it++)
-		{
-			assertf(it->second._new_dst != NULL, "Invalid new address");
-
-			std::vector <HeapWord*> tmp = it->second._v_src;
-
-			for (size_t i = 0; i < tmp.size(); i++)
-			{
-				oop(tmp[i])->klass()->oop_adjust_pointers_tera_cache(oop(tmp[i]), true);
-			}
-		}
-	}
-	else
-	{
-		for (std::map<HeapWord*, back_ptr>::const_iterator it = tc_to_heap_ptrs.begin();
-				it != tc_to_heap_ptrs.end(); it++)
-		{
-
-			assertf(it->second._new_dst != NULL, "Invalid new address");
-
-			std::vector <HeapWord*> tmp = it->second._v_src;
-
-			for (size_t i = 0; i < tmp.size(); i++)
-			{
-				oop(tmp[i])->klass()->oop_adjust_pointers_tera_cache(oop(tmp[i]), false);
-			}
-		}
-	}
-}
-
 // Clear back pointers at the end of each FGC
 void TeraCache::tc_clear_map(void)
 {
@@ -359,10 +305,35 @@ void TeraCache::tc_print_map(void)
 }
 
 bool TeraCache::tc_empty() {
-	if (_start_pos_region == _next_pos_region) {
-		return true;
-	}
-	else {
-		return false;
-	}
+	return (_start_pos_region == _next_pos_region);
+}
+		
+void TeraCache::tc_clear_stacks() {
+	printf("[TC] CLEAR STACKS\n");
+	_tc_adjust_stack.clear(true);
+	_tc_stack.clear(true);
+}
+
+// Init the statistics counters of TeraCache to zero when a Full GC
+// starts
+void TeraCache::tc_init_counters() {
+	fwd_ptrs_per_fgc  = 0;	
+	back_ptrs_per_fgc = 0;
+	trans_per_fgc     = 0;
+}
+
+// Print the statistics of TeraCache at the end of each FGC
+// Will print:
+//	- the total forward pointers from the JVM heap to the TeraCache
+//	- the total back pointers from TeraCache to the JVM heap
+//	- the total objects that has been transfered to the TeraCache
+//	- the current total size of objects in TeraCache until
+//	- the current total objects that are located in TeraCache
+void TeraCache::tc_print_statistics() {
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %d\n", fwd_ptrs_per_fgc);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_BACK_PTRS = %d\n", back_ptrs_per_fgc);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_TRANS_OBJ = %d\n", trans_per_fgc);
+
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %d\n", total_objects);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %d\n", total_objects_size);
 }

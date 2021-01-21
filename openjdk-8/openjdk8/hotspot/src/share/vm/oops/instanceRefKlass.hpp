@@ -66,9 +66,16 @@ class InstanceRefKlass: public InstanceKlass {
   // Garbage collection
   int  oop_adjust_pointers(oop obj);
   void oop_follow_contents(oop obj);
+  void oop_follow_contents_tera_cache(oop obj, bool assert_on);
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS
+
+#if INCLUDE_ALL_GCS
+#if TERA_CARDS
+  virtual void tc_oop_push_contents(PSPromotionManager* pm, oop obj);
+#endif
+#endif
 
   int oop_oop_iterate(oop obj, ExtendedOopClosure* blk) {
     return oop_oop_iterate_v(obj, blk);

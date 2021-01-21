@@ -105,15 +105,22 @@ class ObjArrayKlass : public ArrayKlass {
 
   // Garbage collection
   void oop_follow_contents(oop obj);
-  void oop_follow_contents_tera_cache(oop obj);
+  void oop_follow_contents_tera_cache(oop obj, bool assert_on);
   inline void oop_follow_contents(oop obj, int index);
   template <class T> inline void objarray_follow_contents(oop obj, int index);
-  template <class T> inline void objarray_follow_contents_tera_cache(oop obj, int index);
+  template <class T> inline void objarray_follow_contents_tera_cache(oop obj, int index, bool assert_on);
 
   int  oop_adjust_pointers(oop obj);
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS
+
+#if INCLUDE_ALL_GCS
+#if TERA_CARDS
+  virtual void tc_oop_push_contents(PSPromotionManager* pm, oop obj);
+#endif
+#endif
+
 #if INCLUDE_ALL_GCS
   inline void oop_follow_contents(ParCompactionManager* cm, oop obj, int index);
   template <class T> inline void

@@ -31,6 +31,7 @@
 #include "oops/methodData.hpp"
 #include "oops/objArrayKlass.inline.hpp"
 #include "oops/oop.inline.hpp"
+#include "runtime/globals.hpp"
 
 uint                    MarkSweep::_total_invocations = 0;
 
@@ -57,6 +58,7 @@ MarkSweep::FollowKlassClosure MarkSweep::follow_klass_closure;
 MarkSweep::AdjustKlassClosure MarkSweep::adjust_klass_closure;
 
 void MarkSweep::MarkAndPushClosure::do_oop(oop* p)       { mark_and_push(p); }
+
 void MarkSweep::MarkAndPushClosure::do_oop(narrowOop* p) { mark_and_push(p); }
 
 void MarkSweep::FollowKlassClosure::do_klass(Klass* klass) {
@@ -114,11 +116,18 @@ void MarkSweep::AdjustPointerClosure::do_oop(oop* p)       { adjust_pointer(p); 
 void MarkSweep::AdjustPointerClosure::do_oop(narrowOop* p) { adjust_pointer(p); }
 
 void MarkSweep::adjust_marks() {
-  assert( _preserved_oop_stack.size() == _preserved_mark_stack.size(),
+  assertf( _preserved_oop_stack.size() == _preserved_mark_stack.size(),
          "inconsistent preserved oop stacks");
 
   // adjust the oops we saved earlier
   for (size_t i = 0; i < _preserved_count; i++) {
+
+#if DEBUG_TERACACHE
+	  if (EnableTeraCache)
+	  {
+	      _preserved_marks[i].print_object();
+	  }
+#endif
     _preserved_marks[i].adjust_pointer();
   }
 
@@ -153,7 +162,14 @@ void MarkSweep::restore_marks() {
 
 MarkSweep::IsAliveClosure   MarkSweep::is_alive;
 
-bool MarkSweep::IsAliveClosure::do_object_b(oop p) { return p->is_gc_marked(); }
+bool MarkSweep::IsAliveClosure::do_object_b(oop p) { 
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && Universe::teraCache()->tc_check(p))
+		return true;
+#endif
+
+	return p->is_gc_marked(); 
+}
 
 MarkSweep::KeepAliveClosure MarkSweep::keep_alive;
 

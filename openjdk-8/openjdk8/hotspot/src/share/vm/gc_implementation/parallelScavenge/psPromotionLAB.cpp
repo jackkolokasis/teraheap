@@ -89,6 +89,10 @@ void PSPromotionLAB::flush() {
 
   filler_oop->set_klass(Universe::intArrayKlassObj());
 
+#if TERA_FLAG
+  filler_oop->set_obj_state();
+#endif 
+
   const size_t array_length =
     pointer_delta(tlab_end, top()) - typeArrayOopDesc::header_size(T_INT);
 

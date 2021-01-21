@@ -685,7 +685,7 @@ class JavaValue {
  jdouble get_jdouble() const { return _value.d; }
  jint get_jint() const { return _value.i; }
  jlong get_jlong() const { return _value.l; }
- jobject get_jobject() const { return _value.h; }
+ jobject get_jobject() const {  return _value.h;  }
  JavaCallValue* get_value_addr() { return &_value; }
  BasicType get_type() const { return _type; }
 

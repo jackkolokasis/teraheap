@@ -22,6 +22,8 @@
  *
  */
 
+#include "gc_implementation/shared/markSweep.hpp"
+#include "oops/oop.hpp"
 #include "precompiled.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/systemDictionary.hpp"
@@ -32,6 +34,7 @@
 #include "memory/genOopClosures.inline.hpp"
 #include "oops/instanceRefKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "runtime/globals.hpp"
 #include "utilities/preserveException.hpp"
 #include "utilities/macros.hpp"
 #if INCLUDE_ALL_GCS
@@ -47,117 +50,186 @@
 
 template <class T>
 void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
-  // Get the object corresponding to the referent attribute
-  T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
-  T heap_oop = oopDesc::load_heap_oop(referent_addr);
-  debug_only(
-    if(TraceReferenceGC && PrintGCDetails) {
-      gclog_or_tty->print_cr("InstanceRefKlass::oop_follow_contents " INTPTR_FORMAT, (void *)obj);
-    }
-  )
+#if CLOSURE
+	if (EnableTeraCache)
+		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+#endif
 
-  if (!oopDesc::is_null(heap_oop)) {
-    // Heap oop decription
-    oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
+	// Get the object corresponding to the referent attribute
+	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+	T heap_oop = oopDesc::load_heap_oop(referent_addr);
 
-#if !DISABLE_TERACACHE
+	debug_only(
+			(TraceReferenceGC && PrintGCDetails) ?  gclog_or_tty->print_cr(
+				"InstanceRefKlass::oop_follow_contents " INTPTR_FORMAT, 
+				(void *)obj);)
 
+	if (!oopDesc::is_null(heap_oop)) {
+		// Heap oop decription
+		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+#if CLOSURE
 	if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
 	{
-		std::cerr << __func__  
-			<< " | OBJ = " << obj
-			<< " | MARK = " << obj->mark() 
-			<< " | TERA = " << obj->get_obj_state()
-			<< " | TC = " << Universe::teraCache()->tc_check(obj)
-			<< std::endl;
+		// We have to keep it here (CHECK)
+		MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type());
+		//assertf(false, "Object in TeraCache");
 
-	goto TERACACHE;
-	//return;
+		goto TERACACHE;
 	}
 #endif
 	
-    if (!referent->is_gc_marked() &&
-        MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
-      // reference was discovered, referent will be traversed later
-	  
-	  // If the referent object is not marked and it is successfully added to the
-	  // DiscoverList of the corresponding type, call the oop_follow_contents method of
-	 // the parent class to process the Reference instance
-      ref->InstanceKlass::oop_follow_contents(obj);
+    if (!referent->is_gc_marked() && 
+			MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
+		// Reference was discovered and the referent will be traversed later 
+		// If the referent object is not marked and it is successfully added
+		// to the DiscoverList of the corresponding type, call the
+		// oop_follow_contents method of the parent class to process the
+		// reference instance
+		
+#if CLOSURE
+		// Check if the objects is marked to be moved in TeraCache
+		// Set the referent object to be moved in TeraCache
+		if (EnableTeraCache && obj->is_tera_cache())
+		{
+			printf("SetTeraCache\n");
+			referent->set_tera_cache();
+		}
+#endif
+		ref->InstanceKlass::oop_follow_contents(obj);
 
-      debug_only(
-        if(TraceReferenceGC && PrintGCDetails) {
-          gclog_or_tty->print_cr("       Non NULL enqueued " INTPTR_FORMAT, (void *)obj);
-        }
-      )
-      return;
-    } else {
+		debug_only(
+				if(TraceReferenceGC && PrintGCDetails) {
+				gclog_or_tty->print_cr("Non NULL enqueued " INTPTR_FORMAT, (void *)obj);
+				}
+			)
 
+		return;
+    } 
+	else 
+	{
+#if CLOSURE
 TERACACHE:
-      // treat referent as normal oop
-      debug_only(
-        if(TraceReferenceGC && PrintGCDetails) {
-          gclog_or_tty->print_cr("       Non NULL normal " INTPTR_FORMAT, (void *)obj);
-        }
-      )
-#if !DISABLE_TERACACHE
-	  if (EnableTeraCache && referent->is_tera_cache()) {
-		  MarkSweep::tera_mark_and_push(referent_addr);
-	  }
-	  else {
-		  MarkSweep::mark_and_push(referent_addr);
-	  }
+#endif
+		// treat referent as normal oop
+		debug_only(
+				if(TraceReferenceGC && PrintGCDetails) {
+				gclog_or_tty->print_cr("Non NULL normal " INTPTR_FORMAT, 
+						(void *)obj);})
+#if CLOSURE
+		  if (EnableTeraCache && obj->is_tera_cache())
+		  {
+			  printf("SetTeraCache\n");
+			  MarkSweep::tera_mark_and_push(referent_addr);
+		  }
+		  else 
+		  {
+			  MarkSweep::mark_and_push(referent_addr);
+		  }
 #else
 	  MarkSweep::mark_and_push(referent_addr);
-
 #endif
     }
   }
 
-  T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
 
-  // If the discovered attributes are used to form a pending list
-  if (ReferenceProcessor::pending_list_uses_discovered_field()) {
-    // Treat discovered as normal oop, if ref is not "active",
-    // i.e. if next is non-NULL.
-    T  next_oop = oopDesc::load_heap_oop(next_addr);
-    if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+	// If the discovered attributes are used to form a pending list
+	if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+		// Treat discovered as normal oop, if ref is not "active",
+		// i.e. if next is non-NULL.
+		T  next_oop = oopDesc::load_heap_oop(next_addr);
+		if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
 
-      // If the next attribute is not empty, the Reference instance is not in the
-	  // Active state, and the discovered attribute is processed
-      T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
-      debug_only(
-        if(TraceReferenceGC && PrintGCDetails) {
-          gclog_or_tty->print_cr("   Process discovered as normal "
-                                 INTPTR_FORMAT, discovered_addr);
-        }
-      )
+			// If the next attribute is not empty, the Reference instance is not in the
+			// Active state, and the discovered attribute is processed
+			T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
 
-	  // TODO: JK: We might add tera_mark_and_push call
-      MarkSweep::mark_and_push(discovered_addr);
-    }
-  } else {
+			debug_only(
+					if(TraceReferenceGC && PrintGCDetails) {
+					gclog_or_tty->print_cr("   Process discovered as normal "
+							INTPTR_FORMAT, discovered_addr);
+					}
+					)
+
+#if CLOSURE
+				if (EnableTeraCache && obj->is_tera_cache())
+				{
+					printf("SetTeraCache\n");
+					MarkSweep::tera_mark_and_push(discovered_addr);
+				}
+				else {
+					MarkSweep::mark_and_push(discovered_addr);
+				}
+#else
+			MarkSweep::mark_and_push(discovered_addr);
+#endif
+		}
+	} 
+	else 
+	{
 #ifdef ASSERT
-    // In the case of older JDKs which do not use the discovered
-    // field for the pending list, an inactive ref (next != NULL)
-    // must always have a NULL discovered field.
-    oop next = oopDesc::load_decode_heap_oop(next_addr);
-    oop discovered = java_lang_ref_Reference::discovered(obj);
-    assert(oopDesc::is_null(next) || oopDesc::is_null(discovered),
-           err_msg("Found an inactive reference " PTR_FORMAT " with a non-NULL discovered field",
-                   (oopDesc*)obj));
+		// In the case of older JDKs which do not use the discovered
+		// field for the pending list, an inactive ref (next != NULL)
+		// must always have a NULL discovered field.
+		oop next = oopDesc::load_decode_heap_oop(next_addr);
+		oop discovered = java_lang_ref_Reference::discovered(obj);
+		assertf(oopDesc::is_null(next) || oopDesc::is_null(discovered),
+				"Found an inactive reference with a non-NULL discovered field");
 #endif
-  }
-  // treat next as normal oop.  next is a link in the reference queue.
-  debug_only(
-    if(TraceReferenceGC && PrintGCDetails) {
-      gclog_or_tty->print_cr("   Process next as normal " INTPTR_FORMAT, next_addr);
-    }
-  )
+	}
+	// Treat next as normal oop.  next is a link in the reference queue.
+	debug_only(
+			if(TraceReferenceGC && PrintGCDetails) {
+			gclog_or_tty->print_cr("   Process next as normal " INTPTR_FORMAT, next_addr);
+			}
+			)
+#if CLOSURE
+		// Process the next attribute  
+		if (EnableTeraCache && obj->is_tera_cache())
+		{
+			printf("SetTeraCache\n");
+			MarkSweep::tera_mark_and_push(next_addr);
+		}
+		else 
+		{
+			MarkSweep::mark_and_push(next_addr);
+		}
+#else
+	MarkSweep::mark_and_push(next_addr);
+#endif
 
-  // Process the next attribute  
-  MarkSweep::mark_and_push(next_addr);
-  ref->InstanceKlass::oop_follow_contents(obj);
+	ref->InstanceKlass::oop_follow_contents(obj);
+}
+
+template <class T>
+void specialized_oop_follow_contents_tera_cache(InstanceRefKlass* ref, oop obj, bool assert_on) {
+	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+	T heap_oop = oopDesc::load_heap_oop(referent_addr);
+
+	if (!oopDesc::is_null(heap_oop)) {
+		// Heap oop decription
+		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+		MarkSweep::trace_tera_cache(referent_addr, assert_on);
+	}
+
+	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+
+	if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+		T  next_oop = oopDesc::load_heap_oop(next_addr);
+
+		if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+
+			// If the next attribute is not empty, the Reference instance is not in the
+			// Active state, and the discovered attribute is processed
+			T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+			MarkSweep::trace_tera_cache(discovered_addr, assert_on);
+		}
+	}
+
+	MarkSweep::trace_tera_cache(next_addr, assert_on);
+	ref->InstanceKlass::oop_follow_contents_tera_cache(obj, assert_on);
 }
 
 void InstanceRefKlass::oop_follow_contents(oop obj) {
@@ -166,6 +238,11 @@ void InstanceRefKlass::oop_follow_contents(oop obj) {
   } else {
     specialized_oop_follow_contents<oop>(this, obj);
   }
+}
+
+void InstanceRefKlass::oop_follow_contents_tera_cache(oop obj, bool assert_on)
+{
+    specialized_oop_follow_contents_tera_cache<oop>(this, obj, assert_on);
 }
 
 #if INCLUDE_ALL_GCS
@@ -465,6 +542,60 @@ void specialized_oop_push_contents(InstanceRefKlass *ref,
   ref->InstanceKlass::oop_push_contents(pm, obj);
 }
 
+#if TERA_CARDS
+template <class T>
+void tc_specialized_oop_push_contents(InstanceRefKlass *ref,
+                                   PSPromotionManager* pm, oop obj) {
+  T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+  if (PSScavenge::tc_should_scavenge(referent_addr)) {
+    ReferenceProcessor* rp = PSScavenge::reference_processor();
+    if (rp->discover_reference(obj, ref->reference_type())) {
+      // reference already enqueued, referent and next will be traversed later
+      ref->InstanceKlass::tc_oop_push_contents(pm, obj);
+      return;
+    } else {
+      // treat referent as normal oop
+      pm->tc_claim_or_forward_depth(referent_addr);
+    }
+  }
+  // Treat discovered as normal oop, if ref is not "active",
+  // i.e. if next is non-NULL.
+  T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+  if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+    T  next_oop = oopDesc::load_heap_oop(next_addr);
+    if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+      T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+      debug_only(
+        if(TraceReferenceGC && PrintGCDetails) {
+          gclog_or_tty->print_cr("   Process discovered as normal "
+                                 INTPTR_FORMAT, discovered_addr);
+        }
+      )
+      if (PSScavenge::tc_should_scavenge(discovered_addr)) {
+        pm->tc_claim_or_forward_depth(discovered_addr);
+      }
+    }
+  } else {
+#ifdef ASSERT
+    // In the case of older JDKs which do not use the discovered
+    // field for the pending list, an inactive ref (next != NULL)
+    // must always have a NULL discovered field.
+    oop next = oopDesc::load_decode_heap_oop(next_addr);
+    oop discovered = java_lang_ref_Reference::discovered(obj);
+    assert(oopDesc::is_null(next) || oopDesc::is_null(discovered),
+           err_msg("Found an inactive reference " PTR_FORMAT " with a non-NULL discovered field",
+                   (oopDesc*)obj));
+#endif
+  }
+
+  // Treat next as normal oop;  next is a link in the reference queue.
+  if (PSScavenge::tc_should_scavenge(next_addr)) {
+    pm->tc_claim_or_forward_depth(next_addr);
+  }
+  ref->InstanceKlass::tc_oop_push_contents(pm, obj);
+}
+#endif
+
 void InstanceRefKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
   if (UseCompressedOops) {
     specialized_oop_push_contents<narrowOop>(this, pm, obj);
@@ -472,6 +603,18 @@ void InstanceRefKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
     specialized_oop_push_contents<oop>(this, pm, obj);
   }
 }
+
+#if TERA_CARDS
+void InstanceRefKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  if (UseCompressedOops) {
+    //specialized_oop_push_contents<narrowOop>(this, pm, obj);
+	assertf(false, "To be implement");
+  } else {
+    tc_specialized_oop_push_contents<oop>(this, pm, obj);
+  }
+}
+#endif
+
 
 template <class T>
 void specialized_oop_update_pointers(InstanceRefKlass *ref,

@@ -492,10 +492,17 @@ class Klass : public Metadata {
   // garbage collection support
   virtual void oop_follow_contents(oop obj) = 0;
   virtual int  oop_adjust_pointers(oop obj) = 0;
-  virtual void oop_follow_contents_tera_cache(oop obj) = 0;
+  virtual void oop_follow_contents_tera_cache(oop obj, bool assert_on) = 0;
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS_PV
+
+  // TeraCache Parallel Scavenge 
+#if INCLUDE_ALL_GCS
+#if TERA_CARDS
+  virtual void tc_oop_push_contents(PSPromotionManager* pm, oop obj) = 0;
+#endif
+#endif
 
   // type testing operations
  protected:

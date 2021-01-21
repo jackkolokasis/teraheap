@@ -60,6 +60,7 @@ size_t CardTableModRefBS::compute_byte_map_size()
   return align_size_up(_guard_index + 1, MAX2(_page_size, granularity));
 }
 
+#if TERA_CARDS
 size_t CardTableModRefBS::tc_compute_byte_map_size()
 {
   assertf(_tc_guard_index == cards_required(_tc_whole_heap.word_size()) - 1,
@@ -68,6 +69,7 @@ size_t CardTableModRefBS::tc_compute_byte_map_size()
   const size_t granularity = os::vm_allocation_granularity();
   return align_size_up(_tc_guard_index + 1, MAX2(_tc_page_size, granularity));
 }
+#endif
   
 #if TERA_CARDS
 CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regions, 
@@ -138,8 +140,7 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   }
   
   // The assembler store_check code will do an unsignment shift of the oop then
-  // add it to byte_map_base, i.e.
-  //
+  // add it to byte_map_base, i.e. 
   // _byte_map = _byte_map_base + (uintptr_t(low_bound) >> card_shift)
   // _tc_byte_map = _tc_byte_map_base + (uintptr_t(tc_low_bound) >> card_shift)
   
@@ -152,17 +153,21 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   _tc_byte_map = (jbyte*) tc_heap_rs.base();
   tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> card_shift);
 
+#if DEBUG_TERACACHE
   printf("======================================================\n");
   printf("TC\n");
   printf("CT_Base = %p \n", tc_heap_rs.base());
   printf("CT_End = %p \n", tc_heap_rs.end());
+  printf("CT_ByteMapBase = %p \n", tc_byte_map_base);
   printf("======================================================\n");
   printf("\n");
   printf("======================================================\n");
   printf("Heap\n");
   printf("CT_Base = %p \n", heap_rs.base());
   printf("CT_End = %p \n", heap_rs.end());
+  printf("CT_ByteMapBase = %p \n", byte_map_base);
   printf("======================================================\n");
+#endif
 
   assertf(byte_for(tc_low_bound) == &_tc_byte_map[0], "Checking start of map");
   assertf(byte_for(tc_high_bound - 1) <= &_tc_byte_map[_tc_last_valid_index], "Checking end of map"); 
@@ -232,13 +237,15 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap,
   _guard_index(cards_required(whole_heap.word_size()) - 1),
   _last_valid_index(_guard_index - 1),
   _page_size(os::vm_page_size()),
-  _byte_map_size(compute_byte_map_size()),
+  _byte_map_size(compute_byte_map_size())
 
-	_tc_whole_heap(MemRegion()),
+#if TERA_CARDS
+	,_tc_whole_heap(MemRegion()),
 	_tc_guard_index(cards_required(0) - 1),
 	_tc_last_valid_index(_tc_guard_index - 1),
 	_tc_page_size(os::vm_page_size()),
 	_tc_byte_map_size(0)
+#endif
 {
   _kind = BarrierSet::CardTableModRef;
 
@@ -699,8 +706,8 @@ void CardTableModRefBS::non_clean_card_iterate_serial(MemRegion mr,
 }
 
 void CardTableModRefBS::dirty_MemRegion(MemRegion mr) {
-  assert((HeapWord*)align_size_down((uintptr_t)mr.start(), HeapWordSize) == mr.start(), "Unaligned start");
-  assert((HeapWord*)align_size_up  ((uintptr_t)mr.end(),   HeapWordSize) == mr.end(),   "Unaligned end"  );
+  assertf((HeapWord*)align_size_down((uintptr_t)mr.start(), HeapWordSize) == mr.start(), "Unaligned start");
+  assertf((HeapWord*)align_size_up  ((uintptr_t)mr.end(),   HeapWordSize) == mr.end(),   "Unaligned end"  );
   jbyte* cur  = byte_for(mr.start());
   jbyte* last = byte_after(mr.last());
   while (cur < last) {
@@ -717,6 +724,14 @@ void CardTableModRefBS::invalidate(MemRegion mr, bool whole_heap) {
     if (!mri.is_empty()) dirty_MemRegion(mri);
   }
 }
+
+#if TERA_CARDS
+void CardTableModRefBS::tc_invalidate() {
+  assert((HeapWord*)align_size_down((uintptr_t)mr.start(), HeapWordSize) == mr.start(), "Unaligned start");
+  assert((HeapWord*)align_size_up  ((uintptr_t)mr.end(),   HeapWordSize) == mr.end(),   "Unaligned end"  );
+  dirty_MemRegion(_tc_whole_heap);
+}
+#endif
 
 void CardTableModRefBS::clear_MemRegion(MemRegion mr) {
   // Be conservative: only clean cards entirely contained within the

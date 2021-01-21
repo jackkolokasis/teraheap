@@ -47,6 +47,7 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/biasedLocking.hpp"
 #include "runtime/fprofiler.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/safepoint.hpp"
 #include "runtime/vmThread.hpp"
 #include "services/management.hpp"
@@ -201,6 +202,12 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     ref_processor()->enable_discovery(true /*verify_disabled*/, true /*verify_no_refs*/);
     ref_processor()->setup_policy(clear_all_softrefs);
 
+	// Initialize TeraCache statistics counters to 0
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && TeraCacheStatistics)
+		Universe::teraCache()->tc_init_counters();
+#endif
+
     // Recursive mark all the live objects
     mark_sweep_phase1(clear_all_softrefs);
 
@@ -221,6 +228,17 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     restore_marks();
 
     deallocate_stacks();
+
+#if TERA_CARDS
+	// Deallocate stacks for TeraCache
+	if (EnableTeraCache)
+		Universe::teraCache()->tc_clear_stacks();
+#endif
+
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && TeraCacheStatistics)
+		Universe::teraCache()->tc_print_statistics();
+#endif
 
     if (ZapUnusedHeapArea) {
       // Do a complete mangle (top to end) because the usage for
@@ -250,6 +268,12 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
       } else {
         modBS->invalidate(MemRegion(old_mr.start(), old_mr.end()));
       }
+
+#if TERA_CARDS
+	  if (EnableTeraCache && !Universe::teraCache()->tc_empty()) {
+		  modBS->tc_invalidate();
+	  }
+#endif
     }
 
     // Delete metaspaces for unloaded class loaders and clean up loader_data graph
@@ -521,6 +545,7 @@ void PSMarkSweep::deallocate_stacks() {
   _preserved_oop_stack.clear(true);
   _marking_stack.clear();
   _objarray_stack.clear(true);
+
 }
 
 void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
@@ -542,9 +567,11 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
     
+#if !DISABLE_TERACACHE
 	// Traverse TeraCache
-	if (!Universe::teraCache()->tc_empty())
+	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
 		Universe::teraCache()->scavenge();
+#endif
 
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
@@ -571,10 +598,8 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 	// the objects referenced by the static fields of the class.
     SystemDictionary::always_strong_oops_do(mark_and_push_closure());
 
-#if DISABLE_TERACACHE
     // Keep this comment!!
     ClassLoaderDataGraph::always_strong_oops_do(mark_and_push_closure(), follow_klass_closure(), true);
-#endif
     
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
@@ -599,27 +624,21 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // This is the point where the entire marking should have completed.
   assertf(_marking_stack.is_empty(), "Marking should have completed");
 
-  // ektipwse unload klaseis -> poies kanei unload
-  // poia ekana unload kai ekei pou skas ekanes unload
-  // poia klasei exei ginei access kai einai unload
-  // comment out olo to unloading
-  // unload -> 
-  // otan skaei ti prospathei na kanei accesss
-  // apo pou ton diavase
-	  
-  // Unload classes and purge the SystemDictionary.
-  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
-
-  // Unload nmethods.
-  CodeCache::do_unloading(is_alive_closure(), purged_class);
-
-  // Delete entries for dead interned strings.
-  StringTable::unlink(is_alive_closure());
-
-  // Clean up unreferenced symbols in symbol table.
-  SymbolTable::unlink();
-
 #if !DISABLE_TERACACHE
+  if (EnableTeraCache) {
+	  // Unload classes and purge the SystemDictionary.
+	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
+
+	  // Unload nmethods.
+	  CodeCache::do_unloading(is_alive_closure(), purged_class);
+
+	  // Delete entries for dead interned strings.
+	  StringTable::unlink(is_alive_closure());
+
+	  // Clean up unreferenced symbols in symbol table.
+	  SymbolTable::unlink();
+  }
+
   if (!EnableTeraCache)
   {
 	  // Unload classes and purge the SystemDictionary.
@@ -703,9 +722,11 @@ void PSMarkSweep::mark_sweep_phase3() {
   // Need to clear claim bits before the tracing starts.
   ClassLoaderDataGraph::clear_claimed_marks();
 
+#if !DISABLE_TERACACHE
   // Traverse TeraCache
-  if (!Universe::teraCache()->tc_empty())
+  if (EnableTeraCache && !Universe::teraCache()->tc_empty())
 	  Universe::teraCache()->tc_adjust();
+#endif
 
   // General strong roots.
   Universe::oops_do(adjust_pointer_closure());

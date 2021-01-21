@@ -72,9 +72,16 @@ public:
 
     // Garbage collection
   void oop_follow_contents(oop obj);
+  void oop_follow_contents_tera_cache(oop obj, bool assert_on);
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS
+
+#if INCLUDE_ALL_GCS
+#if TERA_CARDS
+  virtual void tc_oop_push_contents(PSPromotionManager* pm, oop obj);
+#endif
+#endif
 };
 
 #endif // SHARE_VM_OOPS_INSTANCECLASSLOADERKLASS_HPP

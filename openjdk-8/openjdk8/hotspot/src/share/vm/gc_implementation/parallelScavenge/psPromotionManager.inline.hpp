@@ -53,16 +53,20 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
       o = o->forwardee();
       // Card mark
       if (PSScavenge::is_obj_in_young(o)) {
+#if TERA_CARDS
 		if (Universe::teraCache()->tc_is_in((void *)p)) {
 			Universe::teraCache()->tc_push_object((void *)p, o);
 		}
+#endif 
         PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
       }
 
+#if TERA_CARDS
 	  if (Universe::teraCache()->tc_is_in((void *)p) && !PSScavenge::is_obj_in_young(o)) {
 		  Universe::teraCache()->tc_push_object((void *)p, o);
 		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
 	  }
+#endif
 
 	  // How oopDesc::encode_store_heap_oop_not_null works
 	  //				 ______forwarded____

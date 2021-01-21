@@ -167,13 +167,13 @@ class MarkSweep : AllStatic {
   // Check mark and maybe push on marking stack
   template <class T> static void mark_and_push(T* p);
   template <class T> static void tera_mark_and_push(T* p);
-  template <class T> static void trace_tera_cache(T* p);
+  template <class T> static void trace_tera_cache(T* p, bool assert_on);
 
   static inline void push_objarray(oop obj, size_t index);
 
   static void follow_stack();   // Empty marking stack.
 
-  static void follow_klass(Klass* klass);
+  static void follow_klass(Klass* klass, bool is_tera = false);
   
   static void follow_klass_tera_cache(Klass* klass);
 
@@ -208,9 +208,10 @@ public:
 
   void print_object()
   {
-#if TERA_FLAG
-	  std::cerr << "[PRESERVED_MARKS] | O = " << _obj <<  " | MARK = " << _obj->mark() << "| STATE = "  << _obj->get_obj_state() << std::endl;
-#endif
+	  std::cerr << "[PRESERVED_MARKS] | O = " << _obj 
+		        << " | MARK = " << _obj->mark() 
+		        << " | KLASS = " << _obj->klass() 
+				<< std::endl;
   }
 };
 

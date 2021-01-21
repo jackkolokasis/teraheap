@@ -32,6 +32,7 @@
 #include "gc_implementation/parallelScavenge/psScavenge.hpp"
 #include "memory/iterator.hpp"
 #include "memory/universe.hpp"
+#include "runtime/globals.hpp"
 
 inline void PSScavenge::save_to_space_top_before_gc() {
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
@@ -61,7 +62,7 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 	else {
 		obj->set_tera_cache();
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
-		printf ("IN_OLD_GEN\n");
+
 		Universe::teraCache()->tc_push_object((void *)p, obj);
         PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
 		return false;
@@ -169,10 +170,12 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 			card_table()->inline_write_ref_field_gc(p, new_obj);
 	}
 
+#if TERA_CARDS
 	if (Universe::teraCache()->tc_is_in((void *)p)) {
 		Universe::teraCache()->tc_push_object((void *)p, new_obj);
 		card_table()->inline_write_ref_field_gc(p, new_obj);
 	}
+#endif
 }
 
 template<bool promote_immediately>
@@ -209,7 +212,8 @@ class PSScavengeFromKlassClosure: public OopClosure {
 
   void do_oop(oop* p)       {
     ParallelScavengeHeap* psh = ParallelScavengeHeap::heap();
-    assert(!psh->is_in_reserved(p), "GC barrier needed");
+    assertf(!psh->is_in_reserved(p), "GC barrier needed");
+    assertf(!Universe::teraCache()->tc_is_in(p), "Not from meta-data?");
     if (PSScavenge::should_scavenge(p)) {
       assertf(!Universe::heap()->is_in_reserved(p), "Not from meta-data?");
       assertf(!Universe::teraCache()->tc_is_in(p), "Not from meta-data?");

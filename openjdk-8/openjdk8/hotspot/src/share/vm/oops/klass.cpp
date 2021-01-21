@@ -459,8 +459,8 @@ void Klass::klass_update_barrier_set_pre(void* p, oop v) {
 }
 
 void Klass::klass_oop_store(oop* p, oop v) {
-  assert(!Universe::heap()->is_in_reserved((void*)p), "Should store pointer into metadata");
-  assert(v == NULL || Universe::heap()->is_in_reserved((void*)v), "Should store pointer to an object");
+  assertf(!Universe::heap()->is_in_reserved((void*)p), "Should store pointer into metadata");
+  assertf(v == NULL || Universe::heap()->is_in_reserved((void*)v), "Should store pointer to an object");
 
   // do the store
   if (always_do_update_barrier) {
@@ -473,8 +473,8 @@ void Klass::klass_oop_store(oop* p, oop v) {
 }
 
 void Klass::klass_oop_store(volatile oop* p, oop v) {
-  assert(!Universe::heap()->is_in_reserved((void*)p), "Should store pointer into metadata");
-  assert(v == NULL || Universe::heap()->is_in_reserved((void*)v), "Should store pointer to an object");
+  assertf(!Universe::heap()->is_in_reserved((void*)p), "Should store pointer into metadata");
+  assertf(v == NULL || Universe::heap()->is_in_reserved((void*)v), "Should store pointer to an object");
 
   klass_update_barrier_set_pre((void*)p, v);
   OrderAccess::release_store_ptr(p, v);

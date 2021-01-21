@@ -9,8 +9,6 @@
  ***************************************************
  */
 
-// JK: Remember code that nee to be tested is marked with TODO XX: TESTED
-
 #ifndef _SHARE_DEFINES_H_
 #define _SHARE_DEFINES_H_
 
@@ -20,10 +18,8 @@
  * DEBUG
  **********************************/
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
-
-#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__,\
-						  clean_errno(), ##__VA_ARGS__) 
-
+#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
+		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 
 #define DEBUG_SLOWPATH_INTR		 0	//< Use only interpreter for object allocation
@@ -32,41 +28,30 @@
 
 #define DEBUG_TERACACHE     	 1	//< Debug prints for teraCache, TODO Disable in experiments
 
-#define DEBUG_CLOSURE     	     1	//< Debug prints for teraCache, TODO Disable in experiments
-
 #define DISABLE_TERACACHE		 0  //< Disable teraCache
 
 #define DISABLE_PRECOMPACT		 0  //< Disable precompact of tera objects
 
-#define TERA_CARDS				 1  //< Disable teraCache
+#define TERA_CARDS				 1  //< Disable teraCache, TODO Set to 1
 
 #define TERA_FLAG				 1  //< Define teraFlag word, TODO Set to 1
 
-#define CLOSURE					 1  //< Closure Calculation
+#define CLOSURE					 0  //< Closure Calculation
 
-#define DISABLE_TERACACHE_2		 1  //< Disable teraCache
+#define DEBUG_INTR               0  //< Debug Interpreter
 
+#define DEBUG_VECTORS			 0  //< Enable debug vectors in compaction phase
+									//  to check every memmove operation if
+									//  overwrites other objects
 
-/**********************************f
- * States of the objects  
+/**********************************
+ * States of TeraFlag  
  **********************************/
 #define MOVE_TO_TERA			255	//< Move this object to tera cache
 
-#define IN_TERA_CACHE		    333	//< This object is located in TeraCache
+#define IN_TERA_CACHE    2147483561	//< This object is located in TeraCache
 
-#define INIT					325	//< Initial object state
-
-#define DEAD      		        425 //< Object found as dead during precompaction
-
-#define PRECOMPACT		        525 //< Object in precompact phase and need to be move in new location
-
-#define VALID	                655	//< The place contains an already copied object that has been moved by this GC
-
-#define INVALID					755	//< The place contains an old object
-
-#define FLUSHED					575	//< The place contains a dummy object
-
-
+#define INIT_TF				   2035	//< Initial object state
 
 /***********************************
  * Statistics

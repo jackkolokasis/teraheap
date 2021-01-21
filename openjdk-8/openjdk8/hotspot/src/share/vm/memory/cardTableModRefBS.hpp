@@ -446,6 +446,9 @@ public:
 
   // ModRefBS functions.
   virtual void invalidate(MemRegion mr, bool whole_heap = false);
+#if TERA_CARDS
+  virtual void tc_invalidate();
+#endif
   void clear(MemRegion mr);
   void dirty(MemRegion mr);
 
@@ -492,6 +495,7 @@ public:
 
   // Mapping from card marking array entry to address of first word
   HeapWord* addr_for(const jbyte* p) const {
+#if TERA_CARDS
     assertf((p >= _byte_map && p < _byte_map + _byte_map_size)
 			||(p >= _tc_byte_map && p < _tc_byte_map + _tc_byte_map_size),
            "out of bounds access to card marking array");
@@ -515,6 +519,19 @@ public:
 
 		return result;
 	}
+#else
+    assertf((p >= _byte_map && p < _byte_map + _byte_map_size),
+           "out of bounds access to card marking array");
+
+		size_t delta = pointer_delta(p, byte_map_base, sizeof(jbyte));
+
+		HeapWord* result = (HeapWord*) (delta << card_shift);
+		assertf(_whole_heap.contains(result),
+				"Returning result = %p out of bounds of card marking arrays _whole_heap = [%p, %p]",
+				result, _whole_heap.start(), _whole_heap.end());
+
+		return result;
+#endif 
   }
 
   // Mapping from address to card marking array index.

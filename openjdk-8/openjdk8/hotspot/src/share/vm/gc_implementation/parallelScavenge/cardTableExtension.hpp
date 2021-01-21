@@ -75,11 +75,13 @@ class CardTableExtension : public CardTableModRefBS {
                                   uint stripe_total);
   
   // Scavenge support for TeraCache
+#if TERA_CARDS
   void tc_scavenge_contents_parallel(ObjectStartArray* start_array,
                                   HeapWord* space_top,
                                   PSPromotionManager* pm,
                                   uint stripe_number,
                                   uint stripe_total);
+#endif
   
   // Verification
   static void verify_all_young_refs_imprecise();
@@ -123,14 +125,15 @@ class CardTableExtension : public CardTableModRefBS {
 
 #else 
   
+#if TERA_CARDS
   bool is_valid_card_address(jbyte* addr) {
 	  // Check if the address belongs to the address range of the Old Generation
 	  // or in the TeraCache
 	  return ((addr >= _byte_map) && (addr < _byte_map + _byte_map_size)
 		     ||
 			 ((addr >= _tc_byte_map) && (addr < _tc_byte_map + _tc_byte_map_size)));
-
   }
+#endif
 #endif // ASSERT
 };
 

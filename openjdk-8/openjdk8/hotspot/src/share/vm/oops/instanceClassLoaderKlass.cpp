@@ -120,14 +120,40 @@ ALL_OOP_OOP_ITERATE_CLOSURES_1(InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m)
 ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m)
 
 void InstanceClassLoaderKlass::oop_follow_contents(oop obj) {
-  InstanceKlass::oop_follow_contents(obj);
-  ClassLoaderData * const loader_data = java_lang_ClassLoader::loader_data(obj);
+#if CLOSURE
+	// Debugging
+	if (EnableTeraCache)
+		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+	
+	InstanceKlass::oop_follow_contents(obj);
 
-  // We must NULL check here, since the class loader
-  // can be found before the loader data has been set up.
-  if(loader_data != NULL) {
-    MarkSweep::follow_class_loader(loader_data);
-  }
+	ClassLoaderData * const loader_data = java_lang_ClassLoader::loader_data(obj);
+
+	// We must NULL check here, since the class loader
+	// can be found before the loader data has been set up.
+	if(loader_data != NULL) {
+		MarkSweep::follow_class_loader(loader_data);
+	}
+#else
+	// Debugging
+	if (EnableTeraCache)
+		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+	
+	InstanceKlass::oop_follow_contents(obj);
+
+	ClassLoaderData * const loader_data = java_lang_ClassLoader::loader_data(obj);
+
+	// We must NULL check here, since the class loader
+	// can be found before the loader data has been set up.
+	if(loader_data != NULL) {
+		MarkSweep::follow_class_loader(loader_data);
+	}
+
+#endif
+}
+
+void InstanceClassLoaderKlass::oop_follow_contents_tera_cache(oop obj, bool assert_on) {
+	InstanceKlass::oop_follow_contents_tera_cache(obj, assert_on);
 }
 
 #if INCLUDE_ALL_GCS
@@ -146,6 +172,17 @@ void InstanceClassLoaderKlass::oop_push_contents(PSPromotionManager* pm, oop obj
   // all class loader data. So, we don't have to follow the class loader ->
   // class loader data link.
 }
+
+#if TERA_CARDS
+void InstanceClassLoaderKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  
+	InstanceKlass::tc_oop_push_contents(pm, obj);
+
+  // This is called by the young collector. It will already have taken care of
+  // all class loader data. So, we don't have to follow the class loader ->
+  // class loader data link.
+}
+#endif
 
 int InstanceClassLoaderKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   InstanceKlass::oop_update_pointers(cm, obj);

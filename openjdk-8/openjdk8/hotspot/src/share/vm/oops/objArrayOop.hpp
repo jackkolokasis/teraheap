@@ -38,7 +38,7 @@ class objArrayOopDesc : public arrayOopDesc {
   friend class G1ParScanPartialArrayClosure;
 
   template <class T> T* obj_at_addr(int index) const {
-    assert(is_within_bounds(index), "index out of bounds");
+    assertf(is_within_bounds(index), "index out of bounds");
     return &((T*)base())[index];
   }
 
@@ -46,7 +46,7 @@ private:
   // Give size of objArrayOop in HeapWords minus the header
   static int array_size(int length) {
     const int OopsPerHeapWord = HeapWordSize/heapOopSize;
-    assert(OopsPerHeapWord >= 1 && (HeapWordSize % heapOopSize == 0),
+    assertf(OopsPerHeapWord >= 1 && (HeapWordSize % heapOopSize == 0),
            "Else the following (new) computation would be in error");
 #ifdef ASSERT
     // The old code is left in for sanity-checking; it'll

@@ -33,15 +33,22 @@ class TeraCache {
 		std::map<HeapWord*, back_ptr> tc_to_heap_ptrs;  
 		//===============================================
 		//
-		static Stack<oop, mtGC>       _tc_stack;
+		static Stack<oop, mtGC>         _tc_stack;
 		static Stack<oop *, mtGC>       _tc_adjust_stack;
 
-		// Statistics of TeraCache
+		/*-----------------------------------------------
+		 * Statistics of TeraCache
+		 *---------------------------------------------*/
 		int total_active_regions;      // Number of active regions
-		int total_objects;             // Number of objects located in teraCache
-		int total_objects_size;        // Total number of objects size
 		int total_merged_regions;      // Number of merged regions
-		int total_forward_ptrs;	       // Total number of forward ptrs
+
+		int total_objects;             // Total number of objects located in TeraCache
+		int total_objects_size;        // Total number of objects size
+
+		int fwd_ptrs_per_fgc;	       // Total number of forward ptrs per FGC
+		int back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
+		int trans_per_fgc;	           // Total number of objects transfered to 
+									   // TeraCache per FGC
 
 	public:
 		// Constructor
@@ -72,13 +79,33 @@ class TeraCache {
 
 		// Use in full GC
 		void scavenge();
+		
+		// Increase forward ptrs from JVM heap to TeraCache
+		void tc_increase_forward_ptrs();
 
+		ObjectStartArray* start_array() { return &_start_array; }
 
+		void tc_push_object(void *p, oop o);
 
+		void tc_adjust();
 
-		// TeraCache adjust pointers during 3rd phase of fullgc
-		// TODO remove
-		void tc_adjust_pointers();
+		// Deallocate the stacks
+		void tc_clear_stacks();
+
+		// Init the statistics counters of TeraCache to zero when a Full GC
+		// starts
+		void tc_init_counters();
+		
+		// Print the statistics of TeraCache at the end of each FGC
+		// Will print:
+		//	- the total forward pointers from the JVM heap to the
+		// TeraCache
+		//	- the total back pointers from TeraCache to the JVM heap
+		//	- the total objects that has been transfered to the TeraCache
+		//	- the current total size of objects in TeraCache
+		//	- the current total objects that are located in TeraCache
+		void tc_print_statistics();
+
 
 		// TeraCache add back pointer to the map of back pointers
 		void add_tc_back_ptr(HeapWord *dest);
@@ -89,9 +116,6 @@ class TeraCache {
 		// Teracache update heap pointer
 		void tc_update_heap_ptr(HeapWord* dest, HeapWord *new_dest);
 		
-		// Teracache adjust back pointers
-		void tc_adjust_back_ptr(bool full_gc);
-
 		HeapWord* tc_heap_ptr(HeapWord* dest);
 
 		// Clear back pointers at the end of each Full GC
@@ -104,14 +128,6 @@ class TeraCache {
 		// Check for backward pointers
 		void tc_check_back_pointers(bool assert_on = false);
 
-		// Increase forward ptrs from JVM heap to TeraCache
-		void tc_increase_forward_ptrs();
-
-		ObjectStartArray* start_array() { return &_start_array; }
-
-		void tc_push_object(void *p, oop o);
-
-		void tc_adjust();
 };
 
 #endif

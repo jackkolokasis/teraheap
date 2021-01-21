@@ -258,6 +258,9 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   // Allocate memory for the instance
   if (alloc_cache == 0) {
     obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
+#if TERA_FLAG
+	obj->set_obj_state();
+#endif
   } else {
 	  // The interpreter establishes the object strength entrance
       obj = klass->allocate_instance(CHECK); 
@@ -272,6 +275,7 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
 #endif
 
   }
+
   // The secured result is stored in JavaThread with JavaThread and
   // return
   thread->set_vm_result(obj);
@@ -280,6 +284,10 @@ IRT_END
 
 IRT_ENTRY(void, InterpreterRuntime::newarray(JavaThread* thread, BasicType type, jint size))
   oop obj = oopFactory::new_typeArray(type, size, CHECK);
+
+#if TERA_FLAG
+  obj->set_obj_state();
+#endif
 
   thread->set_vm_result(obj);
 IRT_END
@@ -291,6 +299,10 @@ IRT_ENTRY(void, InterpreterRuntime::anewarray(JavaThread* thread, ConstantPool* 
   //       (This may have to change if this code changes!)
   Klass*    klass = pool->klass_at(index, CHECK);
   objArrayOop obj = oopFactory::new_objArray(klass, size, CHECK);
+
+#if TERA_FLAG
+  obj->set_obj_state();
+#endif
 
   thread->set_vm_result(obj);
 IRT_END
@@ -319,6 +331,9 @@ IRT_ENTRY(void, InterpreterRuntime::multianewarray(JavaThread* thread, jint* fir
     dims[index] = first_size_address[n];
   }
   oop obj = ArrayKlass::cast(klass)->multi_allocate(nof_dims, dims, CHECK);
+#if TERA_FLAG
+  obj->set_obj_state();
+#endif
   thread->set_vm_result(obj);
 IRT_END
 

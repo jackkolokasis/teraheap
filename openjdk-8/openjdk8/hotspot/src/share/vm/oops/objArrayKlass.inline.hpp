@@ -27,6 +27,7 @@
 
 #include "gc_implementation/shared/markSweep.inline.hpp"
 #include "oops/objArrayKlass.hpp"
+#include "runtime/globals.hpp"
 #include "utilities/macros.hpp"
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/parallelScavenge/psCompactionManager.inline.hpp"
@@ -34,6 +35,10 @@
 #endif // INCLUDE_ALL_GCS
 
 void ObjArrayKlass::oop_follow_contents(oop obj, int index) {
+	if (EnableTeraCache)
+	{
+		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+	}
   if (UseCompressedOops) {
     objarray_follow_contents<narrowOop>(obj, index);
   } else {
@@ -43,29 +48,43 @@ void ObjArrayKlass::oop_follow_contents(oop obj, int index) {
 
 template <class T>
 void ObjArrayKlass::objarray_follow_contents(oop obj, int index) {
-  objArrayOop a = objArrayOop(obj);
-  const size_t len = size_t(a->length());
-  const size_t beg_index = size_t(index);
-  assert(beg_index < len || len == 0, "index too large");
+	objArrayOop a = objArrayOop(obj);
+	const size_t len = size_t(a->length());
+	const size_t beg_index = size_t(index);
+	assertf(beg_index < len || len == 0, "index too large");
 
-  const size_t stride = MIN2(len - beg_index, ObjArrayMarkingStride);
-  const size_t end_index = beg_index + stride;
-  T* const base = (T*)a->base();
-  T* const beg = base + beg_index;
-  T* const end = base + end_index;
+	const size_t stride = MIN2(len - beg_index, ObjArrayMarkingStride);
+	const size_t end_index = beg_index + stride;
+	T* const base = (T*)a->base();
+	T* const beg = base + beg_index;
+	T* const end = base + end_index;
 
-  // Push the non-NULL elements of the next stride on the marking stack.
-  for (T* e = beg; e < end; e++) {
-    MarkSweep::mark_and_push<T>(e);
-  }
+#if CLOSURE
+	if (EnableTeraCache && obj->is_tera_cache())
+	{
+		for (T* e = beg; e < end; e++) {
+			printf("ObjSetTeraCache\n");
+			MarkSweep::tera_mark_and_push<T>(e);
+		}
+	}
+	else {
+		for (T* e = beg; e < end; e++) {
+			MarkSweep::mark_and_push<T>(e);
+		}
+	}
+#else
+	for (T* e = beg; e < end; e++) {
+		MarkSweep::mark_and_push<T>(e);
+	}
+#endif
 
-  if (end_index < len) {
-    MarkSweep::push_objarray(a, end_index); // Push the continuation.
-  }
+	if (end_index < len) {
+		MarkSweep::push_objarray(a, end_index); // Push the continuation.
+	}
 }
 
 template <class T>
-void ObjArrayKlass::objarray_follow_contents_tera_cache(oop obj, int index) {
+void ObjArrayKlass::objarray_follow_contents_tera_cache(oop obj, int index, bool assert_on) {
   objArrayOop a = objArrayOop(obj);
   const size_t len = size_t(a->length());
   const size_t beg_index = size_t(index);
@@ -79,12 +98,8 @@ void ObjArrayKlass::objarray_follow_contents_tera_cache(oop obj, int index) {
 
   // Push the non-NULL elements of the next stride on the marking stack.
   for (T* e = beg; e < end; e++) {
-    MarkSweep::trace_tera_cache<T>(e);
+    MarkSweep::trace_tera_cache<T>(e, assert_on);
   }
-
-  //if (end_index < len) {
-  //  MarkSweep::push_objarray(a, end_index); // Push the continuation.
-  //}
 }
 
 #if INCLUDE_ALL_GCS

@@ -43,4 +43,15 @@ inline void oopDesc::push_contents(PSPromotionManager* pm) {
   // Else skip it.  The TypeArrayKlass in the header never needs scavenging.
 }
 
+#if TERA_CARDS
+inline void oopDesc::tc_push_contents(PSPromotionManager* pm) {
+  Klass* k = klass();
+  if (!k->oop_is_typeArray()) {
+    // It might contain oops beyond the header, so take the virtual call.
+    k->tc_oop_push_contents(pm, this);
+  }
+  // Else skip it.  The TypeArrayKlass in the header never needs scavenging.
+}
+#endif
+
 #endif // SHARE_VM_OOPS_OOP_PSGC_INLINE_HPP

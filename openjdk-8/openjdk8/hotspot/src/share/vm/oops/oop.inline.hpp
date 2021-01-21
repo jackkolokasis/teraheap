@@ -39,6 +39,7 @@
 #include "oops/markOop.inline.hpp"
 #include "oops/oop.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/os.hpp"
 #include "utilities/macros.hpp"
 #ifdef TARGET_ARCH_x86
@@ -93,7 +94,7 @@ inline int oopDesc::klass_gap_offset_in_bytes() {
 inline Klass** oopDesc::klass_addr() {
   // Only used internally and with CMS and will not work with
   // UseCompressedOops
-  assert(!UseCompressedClassPointers, "only supported with uncompressed klass pointers");
+  assertf(!UseCompressedClassPointers, "only supported with uncompressed klass pointers");
   return (Klass**) &_metadata._klass;
 }
 
@@ -514,7 +515,6 @@ template <class T> inline void update_barrier_set_pre(T* p, oop v) {
 }
 
 template <class T> inline void oop_store(T* p, oop v) {
-
 	if (always_do_update_barrier) {
 		oop_store((volatile T*)p, v);
 	} else {
@@ -525,6 +525,12 @@ template <class T> inline void oop_store(T* p, oop v) {
 }
 
 template <class T> inline void oop_store(volatile T* p, oop v) {
+	assertf(!Universe::teraCache()->tc_check(v), 
+			"Update object in TeraCache %p | NAME %s", 
+			v, v->klass()->internal_name());
+	assertf(!Universe::teraCache()->tc_check((oop)p), 
+			"Update object in TeraCache %p | NAME %s", 
+			p, ((oop)p)->klass()->internal_name());
   update_barrier_set_pre((T*)p, v);   // cast away volatile
   // Used by release_obj_field_put, so use release_store_ptr.
   oopDesc::release_encode_store_heap_oop(p, v);
@@ -534,6 +540,8 @@ template <class T> inline void oop_store(volatile T* p, oop v) {
 // Should replace *addr = oop assignments where addr type depends on UseCompressedOops
 // (without having to remember the function name this calls).
 inline void oop_store_raw(HeapWord* addr, oop value) {
+  assertf(!Universe::teraCache()->tc_check((oop)addr), "Error");
+  assertf(!Universe::teraCache()->tc_check(value), "Error");
   if (UseCompressedOops) {
     oopDesc::encode_store_heap_oop((narrowOop*)addr, value);
   } else {
@@ -586,7 +594,8 @@ inline bool oopDesc::has_bias_pattern() const {
 inline bool oopDesc::is_oop(bool ignore_mark_word) const {
   oop obj = (oop) this;
   if (!check_obj_alignment(obj)) return false;
-  if (!Universe::heap()->is_in_reserved(obj)) return false;
+  if (!Universe::heap()->is_in_reserved(obj) 
+		  && !Universe::teraCache()->tc_check(obj)) return false;
   // obj is aligned and accessible in heap
   if (Universe::heap()->is_in_reserved(obj->klass_or_null())) return false;
 
@@ -597,9 +606,13 @@ inline bool oopDesc::is_oop(bool ignore_mark_word) const {
   if (ignore_mark_word) {
     return true;
   }
+
   if (mark() != NULL) {
     return true;
   }
+
+  bool check = !SafepointSynchronize::is_at_safepoint();
+
   return !SafepointSynchronize::is_at_safepoint();
 }
 
@@ -618,13 +631,19 @@ inline bool oopDesc::is_unlocked_oop() const {
 #endif // PRODUCT
 
 inline void oopDesc::follow_contents(void) {
-  assertf (is_gc_marked(), "should be marked");
+  assertf (is_gc_marked() || Universe::teraCache()->tc_check(this), "should be marked");
   klass()->oop_follow_contents(this);
 }
 
-inline void oopDesc::follow_contents_tera_cache(void) {
+inline void oopDesc::follow_contents_tera_cache(bool assert_on) {
   assertf (Universe::teraCache()->tc_check(this), "Object should be in TeraCache");
-  klass()->oop_follow_contents_tera_cache(this);
+  
+  if (assert_on) {
+	  klass()->oop_follow_contents_tera_cache(this, assert_on);
+  }
+  else {
+	  klass()->oop_follow_contents_tera_cache(this, assert_on);
+  }
 }
 
 // Used by scavengers
@@ -646,12 +665,12 @@ inline void oopDesc::forward_to(oop p) {
 
 // Used by parallel scavengers
 inline bool oopDesc::cas_forward_to(oop p, markOop compare) {
-  assert(check_obj_alignment(p),
+  assertf(check_obj_alignment(p),
          "forwarding to something not aligned");
-  assert(Universe::heap()->is_in_reserved(p),
+  assertf(Universe::heap()->is_in_reserved(p),
          "forwarding to something not in heap");
   markOop m = markOopDesc::encode_pointer_as_mark(p);
-  assert(m->decode_pointer() == p, "encoding must be reversable");
+  assertf(m->decode_pointer() == p, "encoding must be reversable");
   return cas_set_mark(m, compare) == compare;
 }
 

@@ -362,6 +362,8 @@ void JavaCalls::call_helper(JavaValue* result, methodHandle* m, JavaCallArgument
   BasicType result_type = runtime_type_from(result);
   bool oop_result_flag = (result->get_type() == T_OBJECT || result->get_type() == T_ARRAY);
 
+
+
   // NOTE: if we move the computation of the result_val_address inside
   // the call to call_stub, the optimizer produces wrong code.
   intptr_t* result_val_address = (intptr_t*)(result->get_value_addr());
@@ -402,10 +404,12 @@ void JavaCalls::call_helper(JavaValue* result, methodHandle* m, JavaCallArgument
         CHECK
       );
 
+
       result = link.result();  // circumvent MS C++ 5.0 compiler bug (result is clobbered across call)
+
       // Preserve oop return value across possible gc points
       if (oop_result_flag) {
-        thread->set_vm_result((oop) result->get_jobject());
+		  thread->set_vm_result((oop) result->get_jobject());
       }
     }
   } // Exit JavaCallWrapper (can block - potential return oop must be preserved)

@@ -2054,7 +2054,7 @@ template <class T> void assert_nothing(T *p) {}
   } else {                                                               \
 	if (EnableTeraCache)                                                 \
 	  {																	 \
-		std::cerr << "OOP ITER" << obj << std::endl;                     \
+		std::cerr << "OOP ITER " << obj << std::endl;                     \
 	  }																	 \
     while (map < end_map) {                                              \
       InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                         \
@@ -2115,41 +2115,58 @@ template <class T> void assert_nothing(T *p) {}
 }
 
 void InstanceKlass::oop_follow_contents(oop obj) {
-  assert(obj != NULL, "can't follow the content of NULL object");
-  
-  MarkSweep::follow_klass(obj->klass());
+	assertf(obj != NULL, "can't follow the content of NULL object");
+
+	MarkSweep::follow_klass(obj->klass());
 
 #if CLOSURE
-  if (EnableTeraCache && obj->is_tera_cache())
-  {
-    InstanceKlass_OOP_MAP_ITERATE( \
-        obj, \
-        MarkSweep::tera_mark_and_push(p), \
-        assert_is_in_closed_subset)
-  }
-  else{
-	  InstanceKlass_OOP_MAP_ITERATE( \
-			  obj, \
-			  MarkSweep::mark_and_push(p), \
-			  assert_is_in_closed_subset)
-  }
+
+	if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
+	{
+		assertf(false, "Object is in TeraCache");
+	}
+
+	if (EnableTeraCache && obj->is_tera_cache())
+	{
+		InstanceKlass_OOP_MAP_ITERATE( \
+				obj, \
+				MarkSweep::tera_mark_and_push(p), \
+				assert_is_in_closed_subset)
+	}
+	else
+	{
+		InstanceKlass_OOP_MAP_ITERATE( \
+				obj, \
+				MarkSweep::mark_and_push(p), \
+				assert_is_in_closed_subset)
+	}
+
 #else
-  InstanceKlass_OOP_MAP_ITERATE( \
-		  obj, \
-		  MarkSweep::mark_and_push(p), \
-		  assert_is_in_closed_subset)
+
+	InstanceKlass_OOP_MAP_ITERATE( \
+			obj, \
+			MarkSweep::mark_and_push(p), \
+			assert_is_in_closed_subset)
 #endif
 }
 
-void InstanceKlass::oop_follow_contents_tera_cache(oop obj) {
+void InstanceKlass::oop_follow_contents_tera_cache(oop obj, bool assert_on) {
   assertf(obj != NULL, "can't follow the content of NULL object");
-  
-  MarkSweep::follow_klass(obj->klass());
+	
+  if (assert_on) {
+	  InstanceKlass_OOP_MAP_ITERATE( \
+			  obj, \
+			  MarkSweep::trace_tera_cache(p, true), \
+			  assert_is_in_closed_subset)
+  }
+  else {
+	  Universe::teraCache()->tc_trace_obj(obj);
 
-  InstanceKlass_OOP_MAP_ITERATE( \
-		  obj, \
-		  MarkSweep::trace_tera_cache(p), \
-		  assert_is_in_closed_subset)
+	  InstanceKlass_OOP_MAP_ITERATE( \
+			  obj, \
+			  MarkSweep::trace_tera_cache(p, false), \
+			  assert_is_in_closed_subset)
+  }
 }
 
 #if INCLUDE_ALL_GCS
@@ -2250,13 +2267,25 @@ int InstanceKlass::oop_adjust_pointers(oop obj) {
 
 #if INCLUDE_ALL_GCS
 void InstanceKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
-  InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
-    obj, \
-    if (PSScavenge::should_scavenge(p)) { \
-      pm->claim_or_forward_depth(p); \
-    }, \
-    assert_nothing )
+
+	  InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
+			  obj, \
+			  if (PSScavenge::should_scavenge(p)) { \
+			  pm->claim_or_forward_depth(p); \
+			  }, \
+			  assert_nothing )
 }
+#if TERA_CARDS
+void InstanceKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
+
+	InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
+			obj, \
+			if (PSScavenge::tc_should_scavenge(p)) { \
+			pm->tc_claim_or_forward_depth(p); \
+			}, \
+			assert_nothing )
+}
+#endif
 
 int InstanceKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   int size = size_helper();

@@ -209,8 +209,8 @@ void TypeArrayKlass::oop_follow_contents(oop obj) {
   // know that Universe::TypeArrayKlass never moves.
 }
 
-void TypeArrayKlass::oop_follow_contents_tera_cache(oop obj) {
-  assert(obj->is_typeArray(),"must be a type array");
+void TypeArrayKlass::oop_follow_contents_tera_cache(oop obj, bool assert_on) {
+  assertf(obj->is_typeArray(),"must be a type array");
   // Performance tweak: We skip iterating over the klass pointer since we
   // know that Universe::TypeArrayKlass never moves.
 }
@@ -224,7 +224,7 @@ void TypeArrayKlass::oop_follow_contents(ParCompactionManager* cm, oop obj) {
 #endif // INCLUDE_ALL_GCS
 
 int TypeArrayKlass::oop_adjust_pointers(oop obj) {
-  assert(obj->is_typeArray(),"must be a type array");
+  assertf(obj->is_typeArray(),"must be a type array");
   typeArrayOop t = typeArrayOop(obj);
   // Performance tweak: We skip iterating over the klass pointer since we
   // know that Universe::TypeArrayKlass never moves.
@@ -252,6 +252,14 @@ void TypeArrayKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
   ShouldNotReachHere();
   assert(obj->is_typeArray(),"must be a type array");
 }
+
+#if TERA_CARDS
+void TypeArrayKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  ShouldNotReachHere();
+  assert(obj->is_typeArray(),"must be a type array");
+}
+#endif
+
 
 int
 TypeArrayKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {

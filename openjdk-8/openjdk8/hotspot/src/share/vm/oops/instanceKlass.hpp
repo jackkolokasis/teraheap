@@ -946,7 +946,7 @@ class InstanceKlass: public Klass {
   // Garbage collection
   void oop_follow_contents(oop obj);
   int  oop_adjust_pointers(oop obj);
-  void oop_follow_contents_tera_cache(oop obj);
+  void oop_follow_contents_tera_cache(oop obj, bool assert_on);
 
   void clean_implementors_list(BoolObjectClosure* is_alive);
   void clean_method_data(BoolObjectClosure* is_alive);
@@ -972,6 +972,13 @@ class InstanceKlass: public Klass {
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS
+
+  // TeraCache Parallel Scavenge
+#if INCLUDE_ALL_GCS
+#if TERA_CARDS
+  virtual void tc_oop_push_contents(PSPromotionManager* pm, oop obj);
+#endif
+#endif
 
   // Naming
   const char* signature_name() const;

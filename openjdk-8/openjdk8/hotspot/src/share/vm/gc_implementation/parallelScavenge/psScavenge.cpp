@@ -134,7 +134,9 @@ class PSEvacuateFollowersClosure: public VoidClosure {
 
 class PSPromotionFailedClosure : public ObjectClosure {
   virtual void do_object(oop obj) {
+#if DEBUG_TERACACHE
 	assertf(!Universe::teraCache()->tc_check(obj), "Object should not be in teracache");
+#endif
     if (obj->is_forwarded()) {
       obj->init_mark();
     }
@@ -229,7 +231,6 @@ void PSRefProcTaskExecutor::execute(EnqueueTask& task)
 bool PSScavenge::invoke() {
   assertf(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
   assertf(Thread::current() == (Thread*)VMThread::vm_thread(), "should be in vm thread");
-  assertf(!Universe::heap()->is_gc_active(), "not reentrant");
 
   ParallelScavengeHeap* const heap = (ParallelScavengeHeap*)Universe::heap();
   assertf(heap->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
@@ -260,6 +261,11 @@ bool PSScavenge::invoke() {
       full_gc_done = PSMarkSweep::invoke_no_policy(clear_all_softrefs);
     }
   }
+
+#if TERA_CARDS
+  if (EnableTeraCache)
+	  Universe::teraCache()->tc_clear_stacks();
+#endif
 
   return full_gc_done;
 }
@@ -412,16 +418,8 @@ bool PSScavenge::invoke_no_policy() {
 
 	  // Create the task queu for the scavengers
       GCTaskQueue* q = GCTaskQueue::create();
-
-      if (!old_gen->object_space()->is_empty()) {
-        // There are only old-to-young pointers if there are objects
-        // in the old gen.
-        uint stripe_total = active_workers;
-        for(uint i=0; i < stripe_total; i++) {
-          q->enqueue(new OldToYoungRootsTask(old_gen, old_top, i, stripe_total));
-        }
-      }
 	  
+#if TERA_CARDS
 	  if (EnableTeraCache && !Universe::teraCache()->tc_empty())
 	  {
 		  // There are objects from TeraCache to heap if there are objects in
@@ -433,7 +431,16 @@ bool PSScavenge::invoke_no_policy() {
 						 i, stripe_total));
 		  }
 	  }
+#endif
 
+      if (!old_gen->object_space()->is_empty()) {
+        // There are only old-to-young pointers if there are objects
+        // in the old gen.
+        uint stripe_total = active_workers;
+        for(uint i=0; i < stripe_total; i++) {
+          q->enqueue(new OldToYoungRootsTask(old_gen, old_top, i, stripe_total));
+        }
+      }
 
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::universe));
       q->enqueue(new ScavengeRootsTask(ScavengeRootsTask::jni_handles));

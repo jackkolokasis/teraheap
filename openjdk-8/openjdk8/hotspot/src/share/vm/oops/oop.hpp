@@ -29,6 +29,7 @@
 #include "memory/memRegion.hpp"
 #include "memory/specialized_oop_closures.hpp"
 #include "oops/metadata.hpp"
+#include "runtime/globals.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/top.hpp"
 #include <iostream>
@@ -110,12 +111,6 @@ class oopDesc {
   markOop* mark_addr() const    { return (markOop*) &_mark; }
 
 #if TERA_FLAG
-  /* Init TeraCache marking flag */
-  void init_tera_cache() 
-  {
-	  _tera_flag = INIT; 
-  }
-
   /* Mark an object to be moved in TeraCache */
   void set_tera_cache() 
   { 
@@ -129,18 +124,6 @@ class oopDesc {
   }
 
   /*
-   * For Debugging purposes
-   * During the GC, we need to find the state of the objects in the heap between the
-   * different phases.
-   *
-   * The following functions use the tera_flag word to store the object state
-   * during the GC.
-   *
-   * Object states:
-   *
-   */
- 
-  /*
    * Mark this object that is located in TeraCache
    */
   void set_obj_in_tc() 
@@ -152,6 +135,11 @@ class oopDesc {
   uint64_t get_obj_state() 
   { 
 	  return _tera_flag;
+  }
+  
+  void set_obj_state() 
+  { 
+	  _tera_flag = INIT_TF;
   }
 
 #endif
@@ -469,7 +457,9 @@ class oopDesc {
   //   +-----------+
   static int mark_offset_in_bytes()    { return offset_of(oopDesc, _mark); }
   static int klass_offset_in_bytes()   { return offset_of(oopDesc, _metadata._klass); }
+#if TERA_FLAG
   static long teraflag_offset_in_bytes() { return offset_of(oopDesc, _tera_flag); }
+#endif
 
   static int klass_gap_offset_in_bytes();
 };

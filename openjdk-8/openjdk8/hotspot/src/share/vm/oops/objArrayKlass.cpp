@@ -453,23 +453,38 @@ void ObjArrayKlass::initialize(TRAPS) {
   }
 
 void ObjArrayKlass::oop_follow_contents(oop obj) {
-  assert (obj->is_array(), "obj must be array");
-  MarkSweep::follow_klass(obj->klass());
-  if (UseCompressedOops) {
-    objarray_follow_contents<narrowOop>(obj, 0);
-  } else {
-    objarray_follow_contents<oop>(obj, 0);
-  }
+	// Debugging
+	if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
+	{
+		os::abort();
+	}
+
+	assertf(obj->is_array(), "obj must be array");
+
+	MarkSweep::follow_klass(obj->klass());
+
+	if (UseCompressedOops) 
+	{
+		objarray_follow_contents<narrowOop>(obj, 0);
+	} 
+	else 
+	{
+		objarray_follow_contents<oop>(obj, 0);
+	}
 }
 
-void ObjArrayKlass::oop_follow_contents_tera_cache(oop obj) {
-  assert (obj->is_array(), "obj must be array");
-  MarkSweep::follow_klass_tera_cache(obj->klass());
-  if (UseCompressedOops) {
-    objarray_follow_contents<narrowOop>(obj, 0);
-  } else {
-    objarray_follow_contents<oop>(obj, 0);
-  }
+void ObjArrayKlass::oop_follow_contents_tera_cache(oop obj, bool assert_on) {
+
+	assertf(obj->is_array(), "obj must be array");
+	
+	if (UseCompressedOops) 
+	{
+		objarray_follow_contents_tera_cache<narrowOop>(obj, 0, assert_on);
+	} 
+	else 
+	{
+		objarray_follow_contents_tera_cache<oop>(obj, 0, assert_on);
+	}
 }
 
 #if INCLUDE_ALL_GCS
@@ -582,7 +597,7 @@ int ObjArrayKlass::oop_adjust_pointers(oop obj) {
   ObjArrayKlass_OOP_ITERATE(a, p, MarkSweep::adjust_pointer(p))
   return size;
 }
-
+  
 #if INCLUDE_ALL_GCS
 void ObjArrayKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
   assert(obj->is_objArray(), "obj must be obj array");
@@ -592,6 +607,17 @@ void ObjArrayKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
       pm->claim_or_forward_depth(p); \
     })
 }
+
+#if TERA_CARDS
+  void ObjArrayKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  assertf(obj->is_objArray(), "obj must be obj array");
+  ObjArrayKlass_OOP_ITERATE( \
+    objArrayOop(obj), p, \
+    if (PSScavenge::tc_should_scavenge(p)) { \
+      pm->tc_claim_or_forward_depth(p); \
+    })
+  }
+#endif
 
 int ObjArrayKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   assert (obj->is_objArray(), "obj must be obj array");

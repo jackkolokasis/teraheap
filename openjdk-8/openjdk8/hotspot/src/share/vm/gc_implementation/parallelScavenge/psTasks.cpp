@@ -208,6 +208,11 @@ void TeraToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
 	assertf(_stripe_number < ParallelGCThreads, "Sanity");
 
 	{
+		struct timeval start_time;
+		struct timeval end_time;
+
+		gettimeofday(&start_time, NULL);
+
 		PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
 
 		assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
@@ -215,7 +220,19 @@ void TeraToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
 
 		
 		// Traverse TeraCache to Heap pointers
+#if TERA_CARDS
 		card_table->tc_scavenge_contents_parallel(_tc->start_array(), _tc_top,
 												  pm, _stripe_number, _stripe_total);
+#endif
+		
+		gettimeofday(&end_time, NULL);
+	
+		if (TeraCacheStatistics)
+			tclog_or_tty->print_cr("[STATISTICS] | MINOR_GC = %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+
+		// Do the real work
+		pm->drain_stacks(false);
 	}
 }

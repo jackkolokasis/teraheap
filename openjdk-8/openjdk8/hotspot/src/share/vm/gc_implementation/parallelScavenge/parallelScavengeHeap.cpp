@@ -93,12 +93,15 @@ jint ParallelScavengeHeap::initialize() {
   if (EnableTeraCache)
   {
 	  _tera_cache_reserved = MemRegion(
-			  (HeapWord*)Universe::teraCache()->tc_get_addr_region(), 
-			  (HeapWord*)(Universe::teraCache()->tc_get_addr_region() + 
+			  (HeapWord*)Universe::teraCache()->tc_get_addr_region(),
+			  (HeapWord*)(Universe::teraCache()->tc_get_addr_region() +
 				  Universe::teraCache()->tc_get_size_region()*sizeof(HeapWord*)));
-	  
+
+	  assertf(_tera_cache_reserved.start() > _reserved.end(), 
+			  "TeraCache should be in grater address than Heap");
+
 	  barrier_set = new CardTableExtension(_reserved, 3, _tera_cache_reserved);
-	
+
 	  Universe::teraCache()->start_array()->tc_initialize(_tera_cache_reserved);
 	  Universe::teraCache()->start_array()->tc_set_covered_region(_tera_cache_reserved);
   }
@@ -467,8 +470,8 @@ HeapWord* ParallelScavengeHeap::direct_mem_allocate_old(
 
       // If certain conditions hold, try allocating from the old gen.
       result = mem_allocate_old_gen(size);
-      
-	  if (result != NULL) { 
+
+	  if (result != NULL) {
 		  return result;
 	  }
 
