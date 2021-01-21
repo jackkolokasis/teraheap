@@ -34,6 +34,7 @@
 #include "memory/universe.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/biasedLocking.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/interfaceSupport.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/os.hpp"
@@ -702,6 +703,7 @@ void MacroAssembler::print_state() {
 
   popa();
   addl(rsp, wordSize);
+  hlt();
 }
 
 #else // _LP64
@@ -1234,7 +1236,7 @@ void MacroAssembler::debug64(char* msg, int64_t pc, int64_t regs[]) {
     if (os::message_box(msg, "Execution stopped, print registers?")) {
       print_state64(pc, regs);
       BREAKPOINT;
-      assert(false, "start up GDB");
+      assertf(false, "start up GDB");
     }
     ThreadStateTransition::transition(thread, _thread_in_vm, saved_state);
   } else {
@@ -3436,27 +3438,61 @@ void MacroAssembler::store_check(Register obj) {
 	// register obj is destroyed afterwards.
 	Label in_tera_cache;
 	Label Done;
+	Label ok;
 
 	// We have to check if the object belongs to the TeraCache or in the Heap.
-	// Objects that are located in the TeraCache their teraflag is 333. 
-	// Save the address of teraflag in rdx and then load the value of teraflag
-	// in r11. Finally we compare the value with 333
+	// So we compare the object address with start addresss of TeraCache
+#if TERA_CARDS
+	if (EnableTeraCache) {
+		AddressLiteral tc_start_addr((address)Universe::teraCache()->tc_get_addr_region(), relocInfo::none);
+		// Push the teraCache address in r11
+		lea(r11, tc_start_addr);
 
-	leaq(rdx, Address(noreg, obj, Address::times_1, oopDesc::teraflag_offset_in_bytes()));
-	movq(r11, Address(rdx, 0));
+		cmpptr(obj, r11); 
+		jcc(Assembler::greaterEqual, in_tera_cache);
 
-	cmpl(r11, 0x14dU);
-	jcc(Assembler::equal, in_tera_cache);
+		store_check_part_1(obj);
+		store_check_part_2(obj);
+		jmp(Done);
 
-	store_check_part_1(obj);
-	store_check_part_2(obj);
-	jmp(Done);
+		bind(in_tera_cache);
+#if DEBUG_INTR
+		stop("Execution stopped, print registers?");
+#endif
+		tc_store_check_part_1(obj);
+		tc_store_check_part_2(obj);
 
-	bind(in_tera_cache);
-	tc_store_check_part_1(obj);
-	tc_store_check_part_2(obj);
+		bind(Done);
+	}
+	else {
+		store_check_part_1(obj);
+		store_check_part_2(obj);
+	}
+#else
 
-	bind(Done);
+	if (EnableTeraCache) {
+		AddressLiteral tc_start_addr((address)Universe::teraCache()->tc_get_addr_region(), relocInfo::none);
+		// Push the teraCache address in r11
+		lea(r11, tc_start_addr);
+
+		cmpptr(obj, r11); 
+		jcc(Assembler::lessEqual, ok);
+
+		// Debug
+		stop("Execution stopped, print registers?");
+
+		bind(ok);
+		store_check_part_1(obj);
+		store_check_part_2(obj);
+		jmp(Done);
+
+		bind(Done);
+	}
+	else {
+		store_check_part_1(obj);
+		store_check_part_2(obj);
+	}
+#endif
 }
 
 void MacroAssembler::store_check(Register obj, Address dst) {
@@ -3503,6 +3539,7 @@ void MacroAssembler::tc_store_check_part_1(Register obj) {
   shrptr(obj, CardTableModRefBS::card_shift);
 }
 
+#if TERA_CARDS
 void MacroAssembler::tc_store_check_part_2(Register obj) {
   BarrierSet* bs = Universe::heap()->barrier_set();
   assertf(bs->kind() == BarrierSet::CardTableModRef, "Wrong barrier set kind");
@@ -3529,6 +3566,7 @@ void MacroAssembler::tc_store_check_part_2(Register obj) {
     movb(as_Address(ArrayAddress(cardtable, index)), 0);
   }
 }
+#endif
 
 void MacroAssembler::subptr(Register dst, int32_t imm32) {
   LP64_ONLY(subq(dst, imm32)) NOT_LP64(subl(dst, imm32));
