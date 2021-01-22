@@ -34,6 +34,7 @@
 #include "oops/oop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/globals_extension.hpp"
 #include "runtime/java.hpp"
 #include "services/management.hpp"
@@ -2712,6 +2713,12 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args,
       // Currently the minimum size and the initial heap sizes are the same.
       // Can be overridden with -XX:InitialHeapSize.
       FLAG_SET_CMDLINE(uintx, InitialHeapSize, (uintx)long_initial_heap_size);
+	  
+	  if (EnableTeraCache) {
+		  assertf(TeraCacheSize != 0, "Initialize TeraCache size -XX:TeraCacheSize=<num>");
+		  MaxHeapSize = MaxHeapSize - TeraCacheSize;
+		  FLAG_SET_CMDLINE(uintx, MaxHeapSize, (uintx)MaxHeapSize);
+	  }
     // -Xmx
     } else if (match_option(option, "-Xmx", &tail) || match_option(option, "-XX:MaxHeapSize=", &tail)) {
       julong long_max_heap_size = 0;
@@ -2722,6 +2729,7 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args,
         describe_range_error(errcode);
         return JNI_EINVAL;
       }
+
       FLAG_SET_CMDLINE(uintx, MaxHeapSize, (uintx)long_max_heap_size);
     // Xmaxf
     } else if (match_option(option, "-Xmaxf", &tail)) {

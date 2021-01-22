@@ -65,7 +65,7 @@ void TeraCache::tc_new_region() {
 	_region = new_region(NULL);
 
 	// Initialize the size of the region
-	_start_pos_region = (char *)rc_rstralloc0(_region, 2147483648 * sizeof(char));
+	_start_pos_region = (char *)rc_rstralloc0(_region,  TeraCacheSize * sizeof(char));
 	_start_pos_region = (char *)align_ptr_up(_region, CardTableModRefBS::ct_max_alignment_constraint());
 
 	// Check if the allocation happens succesfully

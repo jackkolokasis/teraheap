@@ -2421,6 +2421,9 @@ class CommandLineFlags {
 																			\
   product(bool, TeraCacheStatistics, false,                                 \
           "Print TeraCache statistics")                                     \
+		                                                                    \
+  product(uintx, TeraCacheSize, 0,                                          \
+          "Initial TeraCache total size (in bytes)")                        \
                                                                             \
   product(bool, CacheGenerationEnabled, false,                              \
           "Enable Cache generation in ParalellGC")                          \
