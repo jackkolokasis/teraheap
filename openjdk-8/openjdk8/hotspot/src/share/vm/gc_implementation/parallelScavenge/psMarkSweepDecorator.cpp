@@ -35,6 +35,7 @@
 #include "gc_implementation/shared/spaceDecorator.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/globals.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include <cstring>
 
 PSMarkSweepDecorator* PSMarkSweepDecorator::_destination_decorator = NULL;
@@ -134,8 +135,13 @@ void PSMarkSweepDecorator::precompact() {
 	/* Prefetch interval */
 	const intx interval = PrefetchScanIntervalInBytes;
 
+#if !DISABLE_TERACACHE
 	/* Get TeraCache instance */
 	TeraCache* tc = Universe::teraCache();
+
+	/* Get the current allocation top pointer in TeraCache */
+	HeapWord* tc_alloc_top_pointer = (HeapWord *) Universe::teraCache()->tc_region_cur_ptr();
+#endif
 
 	/* Previous object */
 	HeapWord* prev_compact_top = NULL;
@@ -181,6 +187,8 @@ void PSMarkSweepDecorator::precompact() {
 
 				// Encoding the pointer should preserve the mark
 				assertf(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
+
+				// Mark TeraCache Card Table
 
 				// Move to the next object
 				q += size;
@@ -383,6 +391,20 @@ void PSMarkSweepDecorator::precompact() {
 	}
 
 	_first_dead = first_dead;
+
+#if TERA_CARDS
+	// Invalidate tera cards for the new objects that will be allocated in the
+	// EnableTeraCache. Objects that are moved in TeraCache might have backward
+	// pointers to the heap. So we invalidate these cards that map the new
+	// allocated objects and they will be cleared during the next minor GC.
+	if (EnableTeraCache && 
+			tc_alloc_top_pointer != (HeapWord *)Universe::teraCache()->tc_region_cur_ptr()) {
+		BarrierSet *bs = Universe::heap()->barrier_set();
+		ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+
+		modBS->tc_invalidate(tc_alloc_top_pointer, (HeapWord *)Universe::teraCache()->tc_region_cur_ptr());
+	}
+#endif
 
 	// Update compaction top
 	dest->set_compaction_top(compact_top);

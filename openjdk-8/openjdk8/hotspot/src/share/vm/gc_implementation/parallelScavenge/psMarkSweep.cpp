@@ -270,9 +270,8 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
       }
 
 #if TERA_CARDS
-	  if (EnableTeraCache && !Universe::teraCache()->tc_empty()) {
-		  modBS->tc_invalidate();
-	  }
+	//  if (EnableTeraCache && !Universe::teraCache()->tc_empty())
+	//	  modBS->tc_invalidate();
 #endif
     }
 

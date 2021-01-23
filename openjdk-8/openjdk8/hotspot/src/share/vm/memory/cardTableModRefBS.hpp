@@ -447,7 +447,7 @@ public:
   // ModRefBS functions.
   virtual void invalidate(MemRegion mr, bool whole_heap = false);
 #if TERA_CARDS
-  virtual void tc_invalidate();
+  virtual void tc_invalidate(HeapWord *start, HeapWord *end);
 #endif
   void clear(MemRegion mr);
   void dirty(MemRegion mr);

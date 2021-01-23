@@ -726,10 +726,11 @@ void CardTableModRefBS::invalidate(MemRegion mr, bool whole_heap) {
 }
 
 #if TERA_CARDS
-void CardTableModRefBS::tc_invalidate() {
+void CardTableModRefBS::tc_invalidate(HeapWord *start, HeapWord* end) {
   assert((HeapWord*)align_size_down((uintptr_t)mr.start(), HeapWordSize) == mr.start(), "Unaligned start");
   assert((HeapWord*)align_size_up  ((uintptr_t)mr.end(),   HeapWordSize) == mr.end(),   "Unaligned end"  );
-  dirty_MemRegion(_tc_whole_heap);
+  //dirty_MemRegion(_tc_whole_heap);
+  dirty_MemRegion(MemRegion(start, end));
 }
 #endif
 

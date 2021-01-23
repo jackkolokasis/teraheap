@@ -27,6 +27,7 @@
 
 #include "memory/barrierSet.hpp"
 #include "memory/sharedDefines.h"
+#include "utilities/globalDefinitions.hpp"
 
 // This kind of "BarrierSet" allows a "CollectedHeap" to detect and
 // enumerate ref fields that have been modified (since the last
@@ -97,7 +98,7 @@ public:
   // is true, the caller asserts that the entire heap is being invalidated,
   // which may admit an optimized implementation for some barriers.
 #if TERA_CARDS
-  virtual void tc_invalidate() = 0;
+  virtual void tc_invalidate(HeapWord *start, HeapWord *end) = 0;
 #endif
 
   // The caller guarantees that "mr" contains no references.  (Perhaps it's
