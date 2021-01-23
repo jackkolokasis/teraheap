@@ -7,18 +7,33 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.util.LinkedList;
 
-public class List_Large {
+public class MultiList {
+	
+	public static void mem_info(String str)
+	{
+		System.out.println("=========================================");
+		System.out.println(str + "\n");
+		System.out.println("=========================================");
+		for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
+			System.out.println(memoryPoolMXBean.getName());
+			System.out.println(memoryPoolMXBean.getUsage().getUsed());
+		}
+	}
+
+	public static void gc()
+	{
+		System.out.println("=========================================");
+		System.out.println("Call GC");
+		System.gc();
+		System.out.println("=========================================");
+	}
+
 
     public static void main(String[] args) {
-        int num_elements = 10000000;
+        //int num_elements = 10000000;
+        int num_elements = 100000;
 
-        System.out.println("=========================================");
-        System.out.println("Memory Before\n");
-        for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
-            System.out.println(memoryPoolMXBean.getName());
-            System.out.println(memoryPoolMXBean.getUsage().getUsed());
-        }
-        System.out.println("=========================================");
+		mem_info("Memory Before");
 
         System.out.println("=========================================");
         System.out.println("Create List 1");
@@ -31,10 +46,7 @@ public class List_Large {
         for (int i = 0; i < num_elements; i++)
           linkedList.add(i);
         
-        System.out.println("=========================================");
-        System.out.println("Call GC");
-        System.gc();
-        System.out.println("=========================================");
+		gc();
 
         System.out.println("=========================================");
         System.out.println("Create List2");
@@ -47,10 +59,7 @@ public class List_Large {
         for (int i = 0; i < num_elements; i++)
           linkedList2.add(i);
         
-        System.out.println("=========================================");
-        System.out.println("Call GC");
-        System.gc();
-        System.out.println("=========================================");
+        gc();
         
         System.out.println("=========================================");
         System.out.println("Create List3");
@@ -63,22 +72,13 @@ public class List_Large {
         for (int i = 0; i < num_elements; i++)
           linkedList3.add(i);
 
-        System.out.println("=========================================");
-        System.out.println("Call GC");
-        System.gc();
-        System.out.println("=========================================");
+        gc();
         
         System.out.println("=========================================");
         System.out.println("First Element = " + linkedList.getFirst());
         System.out.println("Last Element = " + linkedList.getLast());
         System.out.println("=========================================");
 
-        System.out.println("=========================================");
-        System.out.println("Memory After\n");
-        for(MemoryPoolMXBean memoryPoolMXBean: ManagementFactory.getMemoryPoolMXBeans()){
-            System.out.println(memoryPoolMXBean.getName());
-            System.out.println(memoryPoolMXBean.getUsage().getUsed());
-        }
-        System.out.println("=========================================");
+		mem_info("Memory After");
     }
 }

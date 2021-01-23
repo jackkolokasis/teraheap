@@ -1,0 +1,69 @@
+Trying to stop full GC
+
+  1. I tried using flags
+    -XX:+UseCMSInitiatingOccupancyOnly
+    -XX:CMSInitiatingOccupancyFraction=10 -XX:+ScavengeBeforeFullGC
+    -XX:+CMSScavengeBeforeRemark
+
+  2. UseParallelGC
+        By default the old generation uses UseParallelOldGen
+       
+
+ParallelScavengeHeap::failed_mem_allocate
+    There are five levels
+
+    // Third level allocation failure.
+    //   After mark sweep and young generation allocation failure,
+    //   allocate in old generation.
+    if (result == NULL) {
+        result = old_gen()->allocate(size);
+    }
+
+    do_full_collection()
+
+
+DAG notes
+---------
+The abstract execution process of a job in Spark is probably this: 
+
+Job submission
+    |
+    +-> Driver converts RDD to DAG
+        |
+        +-> According to DAG into 
+            |
+            +-> Task
+                |
+                +-> Task submit to Executor
+                    |
+                    +-> Result.
+
+DAGScheduler.scala
+    val waiter = submitJob(rdd, func, partitions, callSite, resultHandler, properties)
+
+    ThreadUtils.awaitReady(waiter.completionFuture, Duration.Inf) 
+
+    submit the job and then creates a JobWaiter to wait the reuslt of
+    the job execution in a blocking manner.
+
+
+Through newResultStage we got the last Stage (finalStage) of the most
+DAG, the most Stage is the ResultStage. If we traverse backwards we
+can know the entire DAG, this we will analyze the implementation of
+newResultStage later. 
+
+Then look at the handleJobSubmitted function ,
+
+After getting the last stage of the DAG, submit it through
+submitStage. 
+
+It is no accident that submitStage must actually submit
+the task to the Executor. 
+
+Let's first see how the newResultStage
+generates the DAG in order.
+
+
+ClosureCleaner.scala
+
+

@@ -1,0 +1,38 @@
+#Using fmap
+
+## Prepare Kernel
+```bash
+sudo awk -F\' '$1=="menuentry " {print $2}' /etc/grub2.cf
+sudo grub2-set-default 4
+sudo reboot
+```
+
+## Prepare Fmap
+
+### Set Memory for Fmap
+```bash
+vim driver/main.c
+```
+Gia na elegxeis posh mnhmh tha desmefsei h fmap kaneis
+
+vim driver/main.c
+
+vriskeis th grammh static long perma_mmap_buf_size
+kai analoga me to megethos pou thes xrisimopoieis to antistoixo define
+pou uparxei apo panw.
+Gia na ginei apply to kainourgio megethos pou tha desmefsei h fmap
+prepei na kaneis rebuild thn fmap.
+
+cd driver
+make clean;make 
+
+Gia na fortwseis thn fmap arkei na trexeis to arxeio
+00_load-it-sith6.sh 
+prwta omws prepei na valeis to device pou tha apothikevei ta dedomena
+h fmap.Auto to kaneis
+me to na allaxeis th metavlhth DEVICE pou einai sth prwth grammh tou
+arxeiou 00_load-it-sith6.sh.
+Otan fortwseis th dmap tha emfanistei to device /dev/dmap/dmap1 opou
+xrisimopoieis gia na kaneis ta peiramata sou.
+Gia na kaneis unload thn fmap arkei na trexeis to 00_remove-it.sh to
+opoio de paizei mallon auth ti stigmi.
