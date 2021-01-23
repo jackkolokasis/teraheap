@@ -1,4 +1,3 @@
-
 import java.io.*; 
 import java.lang.*; 
 import java.util.Scanner;
@@ -46,24 +45,28 @@ class Extend_Lambda
 
 	public static void main(String args[]) 
 	{ 
-		// lambda expression to implement above 
+		// Lambda expression to implement above 
 		// functional interface. This interface 
 		// by default implements abstractFun() 
 		FuncInterface fobj = (int x)->System.out.println(2*x); 
-		int num_elements = 1000;
+		int num_elements = 50000;
 		
 
 		mem_info("Memory Information");
 		gc();
 		mem_info("Memory Information");
-
+	
 		fobj.abstractFun(5); 
 
 		LinkedList<Integer> linkedList = new @Cache LinkedList<Integer>(); 
 
+		mem_info("Memory Information");
+		gc();
+		mem_info("Memory Information");
+
 		for (int i = 0; i < num_elements; i++)
 		{
-			linkedList.add(i);
+			linkedList.add(new Integer(i));
 		}
 
 		fobj.abstractFun(1000); 
@@ -74,14 +77,11 @@ class Extend_Lambda
 
 		fobj.abstractFun(2000); 
 
-		mem_info("Memory Information");
-		gc();
-		mem_info("Memory Information");
 		
 		LinkedList<Integer> linkedList2 = new LinkedList<Integer>(); 
-		for (int i = 1000; i < 2000; i++)
+		for (int i = 0; i < num_elements; i++)
 		{
-		linkedList2.add(i);
+			linkedList2.add(new Integer(i));
 		}
 
 		String str = new @Cache String("Jack Kolokasis");
@@ -118,6 +118,7 @@ class Extend_Lambda
 			x += linkedList2.get(i).hashCode();
 		}
 		System.out.println("Hashcode Element = " + x);
+		System.out.println("String = " + str);
 		
 		mem_info("Memory Information");
 		gc();

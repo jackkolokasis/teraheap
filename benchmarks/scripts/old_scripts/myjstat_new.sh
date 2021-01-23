@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ###################################################
 #
@@ -51,23 +51,26 @@ done
 driverId=$(jps | grep "SparkSubmit" |\
     awk '{split($0, array, " "); print array[1]}')
 
-#jstat -gcutil ${driverId} 1000 > ${OUTPUT}_${i}.txt &
-
-listIds=$(echo ${processId} | sed 's/ /,/g')
+jstat -gcutil ${driverId} 1000 > ${OUTPUT}_${i}.txt &
 
 # Concantenate in an array all the process of spark 
 # (executors + master)
-listIds=$(echo "${listIds},${driverId}")
+processId+=(${driverId})
 
-echo ${listIds}
+# Convert bash array into a delimited string
+str=$( IFS=','; echo "${processId[*]}" )
 
 # Perf events trace
-perf stat -o ${PERF_OUTPUT} \
-    -e task-clock,cycles,instructions,branches,branch-misses \
-    -e stalled-cycles-frontend,stalled-cycles-backend \
-    -e cache-references,cache-misses \
-    -e LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses \
-    -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores,L1-dcache-store-misses \
-    -e mem-loads,mem-stores,page-faults -p ${listIds} &
+#perf stat -e cache-references,cache-misses,major-faults,minor-faults \
+#          -p ${listIds}
+
+# Perf events trace
+perf stat -e task-clock,cycles,instructions,branches,branch-misses \
+          -e stalled-cycles-frontend,stalled-cycles-backend \
+          -e cache-references,cache-misses \
+          -e LLC-loads,LLC-load-misses,LLC-stores,LLC-store-misses \
+          -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores,L1-dcache-store-misses \
+          -e mem-loads,mem-stores,page-faults \
+          -p ${str} > ${PERF_OUTPUT} &
 
 exit

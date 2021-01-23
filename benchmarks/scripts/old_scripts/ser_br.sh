@@ -26,16 +26,16 @@
 
 export PYSPARK_PYTHON=python3 
 
-DEVICES=( "Optane" )
-PARTITIONS=( 100 )
+DEVICES=( "SSD" )
+PARTITIONS=( 200 )
 #BENCHMARKS=("KMeans" "LinearRegression" "LogisticRegression" "MatrixFactorization" "SVM")
-MEM_PER_EXECUTOR=200
+MEM_PER_EXECUTOR=32
 EXECUTORS=1
 LOG_START="start.txt"
 LOG_END="stop.txt"
 
 #BENCHMARKS=( "KMeans" "LinearRegression" "LogisticRegression" )
-BENCHMARKS=( "KMeans")
+BENCHMARKS=( "SVM" )
 
 # Print error/usage script message
 usage() {
@@ -345,30 +345,18 @@ parseResult() {
     popd 2>&1 >/dev/null
 
     # Parse Garbage Collection Time
-    for executorId in {0..6}
+    for (( executorId=0; executorId<$EXECUTORS; executorId++ ))
     do 
         gcTime=$(tail -n 1 ${benchDir}/gcTime_${executorId}.txt | awk '{print $NF}')
         
         echo "GCTime_${executorId};${gcTime}" >> ${benchDir}/total_time.txt
     done
 
-    # Driver parse result
-    # Calculation serialization and deserialization time
-    #serTime=$(cat ${fileToParse} |grep "KryoSerializationStream" \
-    #    | awk -F ' ' '{sum+=$NF} END {print sum}')
-    ## serTime=$(bc <<<"scale=2; ${serTime} / 1000 / 60")
-    #serTime=$(convertTime $serTime)
+    cat ${benchDir}/profiler.txt |grep ".kryo.io.Input" > ${benchDir}/deser.txt
+    cat ${benchDir}/profiler.txt |grep ".kryo.io.Output" > ${benchDir}/ser.txt
 
-    #deserTime=$(cat ${fileToParse} |grep "KryoDeserializationStream" \
-    #    | awk -F ' ' '{sum+=$NF} END {print sum}')
-    ## deserTime=$(bc <<<"scale=2; ${deserTime} / 1000 / 60")
-    #deserTime=$(convertTime $deserTime)
-
-    #echo "SerTime_6;${serTime}" >> ${benchDir}/total_time.txt
-    #echo "DeserTime_6;${deserTime}" >> ${benchDir}/total_time.txt
-
-    # Remove driver output file
-    rm ${fileToParse} 
+    ./breakdown.py ${benchDir}/ser.txt 0 >> ${benchDir}/total_time.txt
+    ./breakdown.py ${benchDir}/deser.txt 1 >> ${benchDir}/total_time.txt
 }
 
 ##
@@ -454,7 +442,7 @@ do
 done
 
 # Check if NVMe device is mounted correctly
-#checkDevices nvme0n1
+# checkDevices nvme0n1
 
 mkdir -p ${OUTPUT_PATH}
 
@@ -484,16 +472,13 @@ do
             exportLogFile ${RUN_DIR} ${TYPE} ${DATA_SIZE} ${partitions}
 
             # JSTAT Statistics [background process]
-            ./myjstat.sh ${RUN_DIR}/gcTime ${EXECUTORS} ${RUN_DIR}/perf.txt &
+            ./myjstat.sh ${RUN_DIR}/gcTime ${EXECUTORS} ${RUN_DIR}/profiler &
 
             # Drop caches
             sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 
             # IOSTAT Statistics [background process]
             iostat -xmt 1 > ${RUN_DIR}/iostat.txt & 
-
-            # JVM Profiler - Executor [background process]
-            #./jvmProfile.sh ${RUN_DIR}/flamegraph.svg &
 
             # Get current CPU utilization
             getCPU ${LOG_START}
@@ -503,7 +488,6 @@ do
                 > ${RUN_DIR}/tmp_out.txt
             
             # Get current CPU utilization
-            # TODO Uncomment
             getCPU ${LOG_END}
 
             # Calculate cpu utilization
@@ -524,8 +508,7 @@ do
             # Clean executors log files
             # cleanWorkDirs
             mv /opt/spark/spark-2.3.0-kolokasis/work/app-* ${RUN_DIR}/
-            mv /opt/spark/spark-2.3.0-kolokasis/logs/app-* ${RUN_DIR}/
-            mv ~/gc_time_test ${RUN_DIR}/
+            #mv ~/gc_time_test ${RUN_DIR}/
 
             # Collect Spark Metrics Value
             #/opt/spark/spark-2.3.0-kolokasis/bin/spark-submit \
