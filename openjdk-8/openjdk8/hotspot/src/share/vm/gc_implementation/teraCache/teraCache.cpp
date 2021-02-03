@@ -78,6 +78,12 @@ void TeraCache::tc_new_region() {
 // Return the start address of the region
 char* TeraCache::tc_get_addr_region(void) {
 	assertf((char *)(_start_pos_region) != NULL, "Region is not allocated");
+
+#if DEBUG_TERACACHE
+	printf("===========================\n");
+	printf("TC_START_ADDR = %p\n", _start_pos_region);
+	printf("===========================\n");
+#endif
 	return _start_pos_region;
 }
 

@@ -564,6 +564,12 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			if(oop(q)->is_gc_marked() && oop(q)->forwardee() != NULL) {
 				HeapWord* compaction_top = (HeapWord*)oop(q)->forwardee();
 
+#if DEBUG_TERACACHE
+				std::cerr << "[COMPACT_1] | " << "O = " << q 
+						  << " | MARK = "     << oop(q)->mark()
+						  << " | TC = "       << oop(q)->get_obj_state();
+#endif
+
 				/* Copy object to the new destination */
 				Copy::aligned_conjoint_words(q, compaction_top, size);
 
@@ -571,12 +577,9 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					oop(compaction_top)->set_obj_in_tc();
 			    
 #if DEBUG_TERACACHE
-				std::cerr << "[COMPACT_1] | " << "O = " << q 
-						  << " | MARK = "     << oop(q)->mark()
-						  << " | TC = "     << oop(q)->get_obj_state()
-				          << "=> NEW_ADDR = " << compaction_top 
+				std::cerr << "=> NEW_ADDR = " << compaction_top 
 						  << " | NEW_MARK = " << oop(compaction_top)->mark()
-						  << " | NEW_TC = "     << oop(q)->get_obj_state()
+						  << " | NEW_TC = "     << oop(compaction_top)->get_obj_state()
 						  << std::endl;
 #endif
 
@@ -684,6 +687,13 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  // copy object and reinit its mark
 		  assertf(q != compaction_top, "everything in this pass should be moving");
 
+#if DEBUG_TERACACHE
+		  if (EnableTeraCache) {
+			  std::cerr << "[COMPACT] | "    << "O = " << q 
+						<< " | MARK = "      << oop(q)->mark() 
+						<< " | STATE = "     << oop(q)->get_obj_state();
+		  }
+#endif
 
 		  Copy::aligned_conjoint_words(q, compaction_top, size);
 
@@ -697,10 +707,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 
 #if DEBUG_TERACACHE
 		  if (EnableTeraCache) {
-			  std::cerr << "[COMPACT] | "    << "O = " << q 
-						<< " | MARK = "      << oop(q)->mark() 
-						<< " | STATE = "     << oop(q)->get_obj_state() 
-				        << "=> NEW_ADDR = "  << compaction_top 
+			  std::cerr << "=> NEW_ADDR = "  << compaction_top 
 						<< " | NEW_MARK = "  << oop(compaction_top)->mark() 
 						<< " | NEW_STATE = " << oop(compaction_top)->get_obj_state() 
 					    << std::endl;

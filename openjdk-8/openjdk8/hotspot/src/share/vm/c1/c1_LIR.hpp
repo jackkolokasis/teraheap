@@ -427,7 +427,7 @@ class LIR_OprDesc: public CompilationResourceObj {
   RegNr xmm_regnrHi() const    { assert(is_double_xmm()   && !is_virtual(), "type check"); return (RegNr)hi_reg_half(); }
   int   vreg_number() const    { assert(is_virtual(),                       "type check"); return (RegNr)data(); }
 
-  LIR_OprPtr* pointer()  const                   { assert(is_pointer(), "type check");      return (LIR_OprPtr*)this; }
+  LIR_OprPtr* pointer()  const                   { assertf(is_pointer(), "type check");      return (LIR_OprPtr*)this; }
   LIR_Const* as_constant_ptr() const             { return pointer()->as_constant(); }
   LIR_Address* as_address_ptr() const            { return pointer()->as_address(); }
 
@@ -883,9 +883,9 @@ class    LIR_OpTypeCheck;
 class    LIR_OpCompareAndSwap;
 class    LIR_OpProfileCall;
 class    LIR_OpProfileType;
-#ifdef ASSERT
+//#ifdef ASSERT
 class    LIR_OpAssert;
-#endif
+//#endif
 
 // LIR operation codes
 enum LIR_Code {
@@ -1148,9 +1148,9 @@ class LIR_Op: public CompilationResourceObj {
   virtual LIR_OpCompareAndSwap* as_OpCompareAndSwap() { return NULL; }
   virtual LIR_OpProfileCall* as_OpProfileCall() { return NULL; }
   virtual LIR_OpProfileType* as_OpProfileType() { return NULL; }
-#ifdef ASSERT
+//#ifdef ASSERT
   virtual LIR_OpAssert* as_OpAssert() { return NULL; }
-#endif
+//#endif
 
   virtual void verify() const {}
 };
@@ -1856,7 +1856,7 @@ class LIR_OpDelay: public LIR_Op {
   CodeEmitInfo* call_info() const { return info(); }
 };
 
-#ifdef ASSERT
+//#ifdef ASSERT
 // LIR_OpAssert
 class LIR_OpAssert : public LIR_Op2 {
  friend class LIR_OpVisitState;
@@ -1879,7 +1879,7 @@ class LIR_OpAssert : public LIR_Op2 {
   virtual LIR_OpAssert* as_OpAssert()            { return this; }
   virtual void print_instr(outputStream* out) const PRODUCT_RETURN;
 };
-#endif
+//#endif
 
 // LIR_OpCompareAndSwap
 class LIR_OpCompareAndSwap : public LIR_Op {
@@ -2297,9 +2297,9 @@ class LIR_List: public CompilationResourceObj {
 
   void xadd(LIR_Opr src, LIR_Opr add, LIR_Opr res, LIR_Opr tmp) { append(new LIR_Op2(lir_xadd, src, add, res, tmp)); }
   void xchg(LIR_Opr src, LIR_Opr set, LIR_Opr res, LIR_Opr tmp) { append(new LIR_Op2(lir_xchg, src, set, res, tmp)); }
-#ifdef ASSERT
+//#ifdef ASSERT
   void lir_assert(LIR_Condition condition, LIR_Opr opr1, LIR_Opr opr2, const char* msg, bool halt) { append(new LIR_OpAssert(condition, opr1, opr2, msg, halt)); }
-#endif
+//#endif
 };
 
 void print_LIR(BlockList* blocks);

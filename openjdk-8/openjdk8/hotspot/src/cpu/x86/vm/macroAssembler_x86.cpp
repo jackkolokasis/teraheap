@@ -3449,6 +3449,7 @@ void MacroAssembler::store_check(Register obj) {
 		lea(r11, tc_start_addr);
 
 		cmpptr(obj, r11); 
+		
 		jcc(Assembler::greaterEqual, in_tera_cache);
 
 		store_check_part_1(obj);

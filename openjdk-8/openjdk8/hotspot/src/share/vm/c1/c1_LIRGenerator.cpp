@@ -22,6 +22,10 @@
  *
  */
 
+#include "adfiles/ad_x86_64.hpp"
+#include "c1/c1_LIR.hpp"
+#include "c1/c1_ValueType.hpp"
+#include "nativeInst_x86.hpp"
 #include "precompiled.hpp"
 #include "c1/c1_Compilation.hpp"
 #include "c1/c1_FrameMap.hpp"
@@ -32,10 +36,14 @@
 #include "ci/ciArrayKlass.hpp"
 #include "ci/ciInstance.hpp"
 #include "ci/ciObjArray.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "utilities/bitMap.inline.hpp"
+#include "utilities/debug.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/ostream.hpp"
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/g1/heapRegion.hpp"
 #endif // INCLUDE_ALL_GCS
@@ -1570,58 +1578,133 @@ void LIRGenerator::G1SATBCardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_Opr
 
 void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* new_val) {
 
-  assert(sizeof(*((CardTableModRefBS*)_bs)->byte_map_base) == sizeof(jbyte), "adjust this code");
-  LIR_Const* card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->byte_map_base);
-  if (addr->is_address()) {
-    LIR_Address* address = addr->as_address_ptr();
-    // ptr cannot be an object because we use this barrier for array card marks
-    // and addr can point in the middle of an array.
-    LIR_Opr ptr = new_pointer_register();
-    if (!address->index()->is_valid() && address->disp() == 0) {
-      __ move(address->base(), ptr);
-    } else {
-      assert(address->disp() != max_jint, "lea doesn't support patched addresses!");
-      __ leal(addr, ptr);
-    }
-    addr = ptr;
-  }
-  assert(addr->is_register(), "must be a register at this point");
+	assertf(sizeof(*((CardTableModRefBS*)_bs)->byte_map_base) == sizeof(jbyte), "adjust this code");
+	LIR_Const* card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->byte_map_base);
+
+	// An address in x86_x64 is interpreted as: base + index * scalar + disp
+	// We check if the `addr` has an address type and then:
+	//		(1) If the index and disp are null => move the value of the base
+	//		register to the new register
+	//		(2) Use load effective address to move the address of the new object
+	//
+	if (addr->is_address()) {
+		LIR_Address* address = addr->as_address_ptr();
+		// ptr cannot be an object because we use this barrier for array card marks
+		// and addr can point in the middle of an array.
+		LIR_Opr ptr = new_pointer_register();
+		if (!address->index()->is_valid() && address->disp() == 0) {
+			__ move(address->base(), ptr);
+		} else {
+			assertf(address->disp() != max_jint, "lea doesn't support patched addresses!");
+			__ leal(addr, ptr);
+		}
+		addr = ptr;
+	}
+
+	assertf(addr->is_register(), "must be a register at this point");
+
+	LabelObj* L = new LabelObj();
+	LabelObj* M = new LabelObj();
+
+#if TERA_C1
+	if (EnableTeraCache) {
+		if (addr->is_single_cpu()) {
+			LIR_Opr tc_tmp = new_register(T_ADDRESS);
+			__ move(LIR_OprFact::intptrConst((address)Universe::teraCache()->tc_get_addr_region()), tc_tmp);
+
+			assertf(tc_tmp->is_register(), "must be a register at this point");
+			assertf(tc_tmp->is_single_cpu(), "must be a single cpu");
+
+			__ cmp(lir_cond_greaterEqual, addr, tc_tmp);
+			__ branch(lir_cond_greaterEqual, T_INT, M->label());
+
+		} 
+		else if (addr->is_double_cpu()) {
+			LIR_Opr tc_tmp = new_register(T_LONG);
+			__ move(LIR_OprFact::intptrConst((address)Universe::teraCache()->tc_get_addr_region()), tc_tmp);
+
+			assertf(tc_tmp->is_register(), "must be a register at this point");
+			assertf(tc_tmp->is_double_cpu(), "must be double cpu");
+
+			__ cmp(lir_cond_greaterEqual, addr, tc_tmp);
+			__ branch(lir_cond_greaterEqual, T_INT, M->label());
+		} 
+		else 
+			ShouldNotReachHere();
+	}
+#endif
 
 #ifdef ARM
-  // TODO: ARM - move to platform-dependent code
-  LIR_Opr tmp = FrameMap::R14_opr;
-  if (VM_Version::supports_movw()) {
-    __ move((LIR_Opr)card_table_base, tmp);
-  } else {
-    __ move(new LIR_Address(FrameMap::Rthread_opr, in_bytes(JavaThread::card_table_base_offset()), T_ADDRESS), tmp);
-  }
+	// TODO: ARM - move to platform-dependent code
+	LIR_Opr tmp = FrameMap::R14_opr;
+	if (VM_Version::supports_movw()) {
+		__ move((LIR_Opr)card_table_base, tmp);
+	} else {
+		__ move(new LIR_Address(FrameMap::Rthread_opr, in_bytes(JavaThread::card_table_base_offset()), T_ADDRESS), tmp);
+	}
 
-  CardTableModRefBS* ct = (CardTableModRefBS*)_bs;
-  LIR_Address *card_addr = new LIR_Address(tmp, addr, (LIR_Address::Scale) -CardTableModRefBS::card_shift, 0, T_BYTE);
-  if(((int)ct->byte_map_base & 0xff) == 0) {
-    __ move(tmp, card_addr);
-  } else {
-    LIR_Opr tmp_zero = new_register(T_INT);
-    __ move(LIR_OprFact::intConst(0), tmp_zero);
-    __ move(tmp_zero, card_addr);
-  }
+	CardTableModRefBS* ct = (CardTableModRefBS*)_bs;
+	LIR_Address *card_addr = new LIR_Address(tmp, addr, (LIR_Address::Scale) -CardTableModRefBS::card_shift, 0, T_BYTE);
+
+	if(((int)ct->byte_map_base & 0xff) == 0) {
+		__ move(tmp, card_addr);
+	} else {
+		LIR_Opr tmp_zero = new_register(T_INT);
+		__ move(LIR_OprFact::intConst(0), tmp_zero);
+		__ move(tmp_zero, card_addr);
+	}
+
 #else // ARM
-  LIR_Opr tmp = new_pointer_register();
-  if (TwoOperandLIRForm) {
-    __ move(addr, tmp);
-    __ unsigned_shift_right(tmp, CardTableModRefBS::card_shift, tmp);
-  } else {
-    __ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp);
-  }
-  if (can_inline_as_constant(card_table_base)) {
-    __ move(LIR_OprFact::intConst(0),
-              new LIR_Address(tmp, card_table_base->as_jint(), T_BYTE));
-  } else {
-    __ move(LIR_OprFact::intConst(0),
-              new LIR_Address(tmp, load_constant(card_table_base),
-                              T_BYTE));
-  }
+
+	LIR_Opr tmp = new_pointer_register();
+
+	if (TwoOperandLIRForm) {
+		__ move(addr, tmp);
+		__ unsigned_shift_right(tmp, CardTableModRefBS::card_shift, tmp);
+	} else {
+		__ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp);
+	}
+	if (can_inline_as_constant(card_table_base)) {
+		__ move(LIR_OprFact::intConst(0),
+				new LIR_Address(tmp, card_table_base->as_jint(), T_BYTE));
+	} else {
+		__ move(LIR_OprFact::intConst(0),
+				new LIR_Address(tmp, load_constant(card_table_base), T_BYTE));
+	}
 #endif // ARM
+
+	__ branch(lir_cond_always, T_SHORT, L->label());
+
+	__ branch_destination(M->label());
+
+#if TERA_C1
+	if (EnableTeraCache) {
+		assertf(sizeof(*((CardTableModRefBS*)_bs)->tc_byte_map_base) == sizeof(jbyte), "adjust this code");
+		//LIR_Const* tera_card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->tc_byte_map_base);
+		LIR_Opr tera_card_table_base = new_register(T_LONG);
+		__ move(LIR_OprFact::intptrConst((address)((CardTableModRefBS*)_bs)->tc_byte_map_base), tera_card_table_base);
+
+		LIR_Opr tmp_reg = new_pointer_register();
+		if (TwoOperandLIRForm) {
+			__ move(addr, tmp_reg);
+			__ unsigned_shift_right(tmp_reg, CardTableModRefBS::card_shift, tmp_reg);
+		} else {
+			__ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp_reg);
+		}
+
+		//if (can_inline_as_constant(tera_card_table_base)) {
+		//	assertf(tera_card_table_base->as_jint() <= max_jint, "lea doesn't support patched addresses!");
+		//	__ move(LIR_OprFact::intConst(0),
+		//			new LIR_Address(tmp_reg, tera_card_table_base->as_jint(), T_BYTE));
+		//} else {
+		//	__ move(LIR_OprFact::intConst(0),
+		//			new LIR_Address(tmp_reg, load_constant(tera_card_table_base), T_BYTE));
+		//}
+			__ move(LIR_OprFact::intConst(0), new LIR_Address(tmp_reg, tera_card_table_base, T_BYTE));
+
+		__ branch_destination(L->label());
+	}
+#endif
 }
 
 

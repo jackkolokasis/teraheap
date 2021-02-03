@@ -2765,7 +2765,6 @@ void LIR_Assembler::comp_op(LIR_Condition condition, LIR_Opr opr1, LIR_Opr opr2,
     } else {
       ShouldNotReachHere();
     }
-
   } else if (opr1->is_single_xmm()) {
     XMMRegister reg1 = opr1->as_xmm_float_reg();
     if (opr2->is_single_xmm()) {
@@ -3866,7 +3865,7 @@ void LIR_Assembler::negate(LIR_Opr left, LIR_Opr dest) {
 
 
 void LIR_Assembler::leal(LIR_Opr addr, LIR_Opr dest) {
-  assert(addr->is_address() && dest->is_register(), "check");
+  assertf(addr->is_address() && dest->is_register(), "check");
   Register reg;
   reg = dest->as_pointer_register();
   __ lea(reg, as_Address(addr->as_address_ptr()));
@@ -3940,7 +3939,7 @@ void LIR_Assembler::volatile_move_op(LIR_Opr src, LIR_Opr dest, BasicType type, 
   }
 }
 
-#ifdef ASSERT
+//#ifdef ASSERT
 // emit run-time assertion
 void LIR_Assembler::emit_assert(LIR_OpAssert* op) {
   assert(op->code() == lir_assert, "must be");
@@ -3977,7 +3976,7 @@ void LIR_Assembler::emit_assert(LIR_OpAssert* op) {
   }
   __ bind(ok);
 }
-#endif
+//#endif
 
 void LIR_Assembler::membar() {
   // QQQ sparc TSO uses this,

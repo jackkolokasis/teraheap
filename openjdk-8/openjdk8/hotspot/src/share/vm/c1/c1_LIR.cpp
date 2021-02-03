@@ -1148,11 +1148,11 @@ void LIR_OpLock::emit_code(LIR_Assembler* masm) {
   }
 }
 
-#ifdef ASSERT
+//#ifdef ASSERT
 void LIR_OpAssert::emit_code(LIR_Assembler* masm) {
   masm->emit_assert(this);
 }
-#endif
+//#endif
 
 void LIR_OpDelay::emit_code(LIR_Assembler* masm) {
   masm->emit_delay(this);
@@ -1821,9 +1821,9 @@ const char * LIR_Op::name() const {
      // LIR_OpProfileType
      case lir_profile_type:          s = "profile_type";  break;
      // LIR_OpAssert
-#ifdef ASSERT
+//#ifdef ASSERT
      case lir_assert:                s = "assert";        break;
-#endif
+//#endif
      case lir_none:                  ShouldNotReachHere();break;
     default:                         s = "illegal_op";    break;
   }
@@ -2077,14 +2077,14 @@ void LIR_OpLock::print_instr(outputStream* out) const {
   out->print("[lbl:0x%x]", stub()->entry());
 }
 
-#ifdef ASSERT
+//#ifdef ASSERT
 void LIR_OpAssert::print_instr(outputStream* out) const {
   print_condition(out, condition()); out->print(" ");
   in_opr1()->print(out);             out->print(" ");
   in_opr2()->print(out);             out->print(", \"");
   out->print(msg());                 out->print("\"");
 }
-#endif
+//#endif
 
 
 void LIR_OpDelay::print_instr(outputStream* out) const {
