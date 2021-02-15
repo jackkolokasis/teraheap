@@ -22,6 +22,10 @@
  *
  */
 
+#include "opto/cfgnode.hpp"
+#include "opto/connode.hpp"
+#include "opto/subnode.hpp"
+#include "opto/type.hpp"
 #include "precompiled.hpp"
 #include "compiler/compileLog.hpp"
 #include "gc_implementation/g1/g1SATBCardTableModRefBS.hpp"
@@ -38,7 +42,9 @@
 #include "opto/rootnode.hpp"
 #include "opto/runtime.hpp"
 #include "runtime/deoptimization.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "utilities/globalDefinitions.hpp"
 
 //----------------------------GraphKit-----------------------------------------
 // Main utility constructor.
@@ -1623,10 +1629,10 @@ Node* GraphKit::store_oop(Node* ctl,
   set_control(ctl);
   if (stopped()) return top(); // Dead path ?
 
-  assert(bt == T_OBJECT, "sanity");
-  assert(val != NULL, "not dead path");
+  assertf(bt == T_OBJECT, "sanity");
+  assertf(val != NULL, "not dead path");
   uint adr_idx = C->get_alias_index(adr_type);
-  assert(adr_idx != Compile::AliasIdxTop, "use other store_to_memory factory" );
+  assertf(adr_idx != Compile::AliasIdxTop, "use other store_to_memory factory" );
 
   pre_barrier(true /* do_load */,
               control(), obj, adr, adr_idx, val, val_type,
@@ -3739,52 +3745,126 @@ void GraphKit::write_barrier_post(Node* oop_store,
     adr = obj;
   }
   // (Else it's an array (or unknown), and we want more precise card marks.)
-  assert(adr != NULL, "");
+  assertf(adr != NULL, "");
 
   IdealKit ideal(this, true);
 
   // Convert the pointer to an int prior to doing math on it
   Node* cast = __ CastPX(__ ctrl(), adr);
 
+  Node* card_adr = NULL;
+  Node* card_offset = NULL;
+
+#if DEBUG_C2
   // Divide by card size
-  assert(Universe::heap()->barrier_set()->kind() == BarrierSet::CardTableModRef,
-         "Only one we handle so far.");
-  Node* card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::card_shift) );
+  assertf(Universe::heap()->barrier_set()->kind() == BarrierSet::CardTableModRef,
+		  "Only one we handle so far.");
 
-  // Combine card table base and card offset
-  Node* card_adr = __ AddP(__ top(), byte_map_base_node(), card_offset );
-
+  card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::card_shift) );
+		  
   // Get the alias_index for raw card-mark memory
   int adr_type = Compile::AliasIdxRaw;
   Node*   zero = __ ConI(0); // Dirty card value
   BasicType bt = T_BYTE;
 
-  if (UseCondCardMark) {
-    // The classic GC reference write barrier is typically implemented
-    // as a store into the global card mark table.  Unfortunately
-    // unconditional stores can result in false sharing and excessive
-    // coherence traffic as well as false transactional aborts.
-    // UseCondCardMark enables MP "polite" conditional card mark
-    // stores.  In theory we could relax the load from ctrl() to
-    // no_ctrl, but that doesn't buy much latitude.
-    Node* card_val = __ load( __ ctrl(), card_adr, TypeInt::BYTE, bt, adr_type);
-    __ if_then(card_val, BoolTest::ne, zero);
-  }
+  if (EnableTeraCache) {
 
-  // Smash zero into card
-  if( !UseConcMarkSweepGC ) {
-    __ store(__ ctrl(), card_adr, zero, bt, adr_type);
-  } else {
-    // Specialized path for CM store barrier
-    __ storeCM(__ ctrl(), card_adr, zero, oop_store, adr_idx, bt, adr_type);
-  }
+	  Node* tc_adr = __ makecon(TypeRawPtr::make(
+				  (address)Universe::teraCache()->tc_get_addr_region()));
 
-  if (UseCondCardMark) {
-    __ end_if();
-  }
+	  assertf(adr->bottom_type()->isa_ptr() != NULL, "Error");
+	  assertf(tc_adr->bottom_type()->isa_ptr() != NULL, "Error");
 
-  // Final sync IdealKit and GraphKit.
-  final_sync(ideal);
+	  // Combine teracache card table base and card offset
+	  Node* tc_card_adr =  __ AddP(__ top(), tc_byte_map_base_node(), card_offset );
+
+	  // Combine heap card table base and card offset
+	  Node* card_adr =  __ AddP(__ top(), byte_map_base_node(), card_offset );
+
+	  __ if_then(adr, BoolTest::ge, tc_adr); {
+		  __ store(__ ctrl(), tc_card_adr, zero, bt, adr_type);
+	  
+		  // Final sync IdealKit and GraphKit.
+		  final_sync(ideal);
+	  } __ else_(); {
+		  __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+	  
+		  // Final sync IdealKit and GraphKit.
+		  final_sync(ideal);
+	  } __ end_if();
+  }
+  else {
+
+	  // Combine card table base and card offset
+	  card_adr = __ AddP(__ top(), byte_map_base_node(), card_offset );
+	  
+	  if (UseCondCardMark) {
+		  // The classic GC reference write barrier is typically implemented
+		  // as a store into the global card mark table.  Unfortunately
+		  // unconditional stores can result in false sharing and excessive
+		  // coherence traffic as well as false transactional aborts.
+		  // UseCondCardMark enables MP "polite" conditional card mark
+		  // stores.  In theory we could relax the load from ctrl() to
+		  // no_ctrl, but that doesn't buy much latitude.
+		  Node* card_val = __ load( __ ctrl(), card_adr, TypeInt::BYTE, bt, adr_type);
+		  __ if_then(card_val, BoolTest::ne, zero);
+	  }
+
+	  // Smash zero into card
+	  if( !UseConcMarkSweepGC ) {
+		  __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+	  } else {
+		  // Specialized path for CM store barrier
+		  __ storeCM(__ ctrl(), card_adr, zero, oop_store, adr_idx, bt, adr_type);
+	  }
+
+	  if (UseCondCardMark) {
+		  __ end_if();
+	  }
+
+	  // Final sync IdealKit and GraphKit.
+	  final_sync(ideal);
+  }
+#else
+	  assertf(Universe::heap()->barrier_set()->kind() == BarrierSet::CardTableModRef,
+			  "Only one we handle so far.");
+	  card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::card_shift) );
+
+	  // Combine card table base and card offset
+	  card_adr = __ AddP(__ top(), byte_map_base_node(), card_offset );
+
+	  // Get the alias_index for raw card-mark memory
+	  int adr_type = Compile::AliasIdxRaw;
+	  Node*   zero = __ ConI(0); // Dirty card value
+	  BasicType bt = T_BYTE;
+
+	  if (UseCondCardMark) {
+		  // The classic GC reference write barrier is typically implemented
+		  // as a store into the global card mark table.  Unfortunately
+		  // unconditional stores can result in false sharing and excessive
+		  // coherence traffic as well as false transactional aborts.
+		  // UseCondCardMark enables MP "polite" conditional card mark
+		  // stores.  In theory we could relax the load from ctrl() to
+		  // no_ctrl, but that doesn't buy much latitude.
+		  Node* card_val = __ load( __ ctrl(), card_adr, TypeInt::BYTE, bt, adr_type);
+		  __ if_then(card_val, BoolTest::ne, zero);
+	  }
+
+	  // Smash zero into card
+	  if( !UseConcMarkSweepGC ) {
+		  __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+	  } else {
+		  // Specialized path for CM store barrier
+		  __ storeCM(__ ctrl(), card_adr, zero, oop_store, adr_idx, bt, adr_type);
+	  }
+
+	  if (UseCondCardMark) {
+		  __ end_if();
+	  }
+	  
+	  // Final sync IdealKit and GraphKit.
+	  final_sync(ideal);
+#endif
 }
 
 // G1 pre/post barriers

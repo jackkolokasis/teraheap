@@ -22,6 +22,7 @@
  *
  */
 
+#include "oops/oop.hpp"
 #include "precompiled.hpp"
 #include "compiler/compileLog.hpp"
 #include "libadt/vectset.hpp"
@@ -1629,9 +1630,17 @@ PhaseMacroExpand::initialize_object(AllocateNode* alloc,
   } else {
     mark_node = makecon(TypeRawPtr::make((address)markOopDesc::prototype()));
   }
+
   rawmem = make_store(control, rawmem, object, oopDesc::mark_offset_in_bytes(), mark_node, T_ADDRESS);
 
   rawmem = make_store(control, rawmem, object, oopDesc::klass_offset_in_bytes(), klass_node, T_METADATA);
+  
+#if TERA_C2 
+  Node* tf_node = makecon(TypeLong::make((intptr_t) 0x7f3U));
+  rawmem = make_store(control, rawmem, object, oopDesc::teraflag_offset_in_bytes(), tf_node, T_LONG);
+#endif
+
+  //rawmem = make_store(control, rawmem, object, oopDesc::teraflag_offset_in_bytes(), 
   int header_size = alloc->minimum_header_size();  // conservatively small
 
   // Array length

@@ -2052,10 +2052,6 @@ template <class T> void assert_nothing(T *p) {}
       ++map;                                                             \
     }                                                                    \
   } else {                                                               \
-	if (EnableTeraCache)                                                 \
-	  {																	 \
-		std::cerr << "OOP ITER " << obj << std::endl;                     \
-	  }																	 \
     while (map < end_map) {                                              \
       InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                         \
         obj->obj_field_addr<oop>(map->offset()), map->count(),           \

@@ -114,6 +114,30 @@ class GraphKit : public Phase {
       return null();
     }
   }
+  
+#if TERA_C2
+  // Helper for byte_map_base
+  Node* tc_byte_map_base_node() {
+    // Get base of card map
+    CardTableModRefBS* ct = (CardTableModRefBS*)(Universe::heap()->barrier_set());
+    assert(sizeof(*ct->byte_map_base) == sizeof(jbyte), "adjust users of this code");
+    if (ct->tc_byte_map_base != NULL) {
+      //return makecon(TypeRawPtr::make((address)ct->tc_byte_map_base));
+      return makecon(TypeRawPtr::make((address)0xffffff));
+    } else {
+      return null();
+    }
+  }
+
+  // Helper to get the TeraCache start address
+  Node* tc_start__node() {
+	  // Get base of card map
+	  if (Universe::teraCache()->tc_get_addr_region() != NULL) 
+		  return makecon(TypeRawPtr::make((address)Universe::teraCache()->tc_get_addr_region()));
+	  else
+		  return null();
+  }
+#endif
 
   jint  find_int_con(Node* n, jint value_if_unknown) {
     return _gvn.find_int_con(n, value_if_unknown);
