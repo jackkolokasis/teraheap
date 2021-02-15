@@ -77,7 +77,7 @@ void IdealKit::if_then(Node* left, BoolTest::mask relop,
     if (left->bottom_type()->isa_int() != NULL) {
       bol = Bool(CmpI(left, right), relop);
     } else {
-      assert(left->bottom_type()->isa_long() != NULL, "what else?");
+      assertf(left->bottom_type()->isa_long() != NULL, "what else?");
       bol = Bool(CmpL(left, right), relop);
     }
 

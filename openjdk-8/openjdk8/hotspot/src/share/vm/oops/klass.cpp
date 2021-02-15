@@ -460,7 +460,9 @@ void Klass::klass_update_barrier_set_pre(void* p, oop v) {
 
 void Klass::klass_oop_store(oop* p, oop v) {
   assertf(!Universe::heap()->is_in_reserved((void*)p), "Should store pointer into metadata");
-  assertf(v == NULL || Universe::heap()->is_in_reserved((void*)v), "Should store pointer to an object");
+  assertf(v == NULL 
+		  || Universe::heap()->is_in_reserved((void*)v) 
+		  ||  Universe::teraCache()->tc_is_in((void*)v), "Should store pointer to an object");
 
   // do the store
   if (always_do_update_barrier) {
