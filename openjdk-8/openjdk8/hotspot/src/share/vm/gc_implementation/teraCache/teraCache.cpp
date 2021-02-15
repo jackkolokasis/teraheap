@@ -315,7 +315,6 @@ bool TeraCache::tc_empty() {
 }
 		
 void TeraCache::tc_clear_stacks() {
-	printf("[TC] CLEAR STACKS\n");
 	_tc_adjust_stack.clear(true);
 	_tc_stack.clear(true);
 }

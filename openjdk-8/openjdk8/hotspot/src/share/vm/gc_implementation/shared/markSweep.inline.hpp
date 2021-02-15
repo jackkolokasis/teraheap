@@ -98,7 +98,8 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		if (EnableTeraCache && !Universe::teraCache()->tc_check(obj))
 			assertf(obj->get_obj_state() == MOVE_TO_TERA  // Object will move to TC
 					|| obj->get_obj_state() == INIT_TF,      // TF init value
-					"Non valid teraflag value %p", obj);
+					"Non valid teraflag value %p | %lu ", 
+					obj, obj->get_obj_state());
 #endif
 
 		if (!obj->mark()->is_marked()) {

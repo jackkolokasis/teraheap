@@ -144,11 +144,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 	jbyte* start_card = byte_for(Universe::teraCache()->tc_get_addr_region());
 	jbyte* end_card = byte_for(sp_top - 1) + 1;
 
-	std::cout << "=========================================================" << std::endl;
-	printf("start card = %p\n", start_card);
-	printf("end_card = %p\n", end_card);
-	std::cout << "=========================================================" << std::endl;
-
 	assertf(start_card != end_card, "Sanity check");
 
 	 // Preventing scanning objects more than onece
@@ -158,10 +153,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 	// number of so that the complete slice is covered.
 	size_t slice_width = ssize * stripe_total;
 	
-	std::cout << "=========================================================" << std::endl;
-	printf("slice_width = %lu\n", slice_width);
-	std::cout << "=========================================================" << std::endl;
-
 	for (jbyte* slice = start_card; slice < end_card; slice += slice_width) {
 		jbyte* worker_start_card = slice + stripe_number * ssize;
 		if (worker_start_card >= end_card)
@@ -172,11 +163,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			worker_end_card = end_card;
 		}
 	
-		std::cout << "=========================================================" << std::endl;
-		printf("worker_start card = %p\n", worker_start_card);
-		printf("worker_end_card = %p\n", worker_end_card);
-		std::cout << "=========================================================" << std::endl;
-
 		// We do not want to scan objects more than once. In order to accomplish
 		// this, we assert that any object with an object head inside our
 		// 'slice' belongs to us. We may need to extend the range of scanned
@@ -185,12 +171,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		// Note! ending cards are exclusive!
 		HeapWord* slice_start = addr_for(worker_start_card);
 		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
-
-		std::cout << "=========================================================" << std::endl;
-		std::cout << "sp_top = " << sp_top << std::endl;
-		std::cout << "slice_start = " << slice_start << std::endl;
-		std::cout << "slice_end = " << slice_end << std::endl;
-		std::cout << "=========================================================" << std::endl;
 
 		// if there are not objects starting within the chunk, skip it.
 		bool check = start_array->object_starts_in_range(slice_start, slice_end);
@@ -201,10 +181,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 
 		// Update our beginning addr
 		HeapWord* first_object = start_array->object_start(slice_start);
-		std::cout << "=========================================================" << std::endl;
-		std::cout << "slice_start = " << slice_start << std::endl;
-		std::cout << "first_object = " << first_object << std::endl;
-		std::cout << "=========================================================" << std::endl;
 
 		oop* first_object_within_slice = (oop*) first_object;
 		if (first_object < slice_start) {
@@ -275,10 +251,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			jbyte* following_clean_card = current_card;
 
 			if (first_unclean_card < worker_end_card) {
-				printf("==================================================\n");
-				printf("First Unclean Card %p | Worker End Card %p | Addr %p\n",
-						first_unclean_card, worker_end_card, addr_for(first_unclean_card));
-				printf("==================================================\n");
 				oop* p = (oop*) start_array->object_start(addr_for(first_unclean_card));
 				assertf((HeapWord*)p <= addr_for(first_unclean_card), "checking");
 
@@ -300,10 +272,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				}
 
 				oop* to = (oop*)addr_for(following_clean_card);
-
-				printf("================================================\n");
-				printf("to = %p | slice_end = %p\n", to, slice_end);
-				printf("================================================\n");
 
 				// Test slice_end first!
 				if ((HeapWord*)to > slice_end) {
@@ -338,15 +306,9 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 					}
 					pm->drain_stacks_cond_depth();
 				} else {
-					printf("====================================\n");
-					printf("p = %p | to = %p \n", p, to);
-					printf("====================================\n");
 					while (p < to) {
 						oop m = oop(p);
 						assertf(m->is_oop_or_null(), "check for header");
-						printf("================================================\n");
-						printf("p = %p | to = %p\n", p, to);
-						printf("================================================\n");
 						m->tc_push_contents(pm);
 						p += m->size();
 					}
