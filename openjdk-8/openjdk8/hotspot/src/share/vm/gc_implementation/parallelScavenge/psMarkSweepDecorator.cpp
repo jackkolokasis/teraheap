@@ -137,10 +137,15 @@ void PSMarkSweepDecorator::precompact() {
 
 #if !DISABLE_TERACACHE
 	/* Get TeraCache instance */
-	TeraCache* tc = Universe::teraCache();
-
+	TeraCache* tc; 
 	/* Get the current allocation top pointer in TeraCache */
-	HeapWord* tc_alloc_top_pointer = (HeapWord *) Universe::teraCache()->tc_region_cur_ptr();
+	HeapWord* tc_alloc_top_pointer; 
+
+	if (EnableTeraCache) {
+		tc = Universe::teraCache();
+
+		tc_alloc_top_pointer = (HeapWord *) Universe::teraCache()->tc_region_cur_ptr();
+	}
 #endif
 
 	/* Previous object */

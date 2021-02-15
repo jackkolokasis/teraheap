@@ -38,11 +38,15 @@
 
 #define TERA_C1				     1  //< Enable C1 to support TeraCache, TODO Set to 1
 
+#define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
+
+#define DEBUG_C2			     1  //< Enable C1 to support TeraCache, TODO Set to 1
+
 #define CLOSURE					 0  //< Closure Calculation
 
 #define DEBUG_INTR               0  //< Debug Interpreter
 
-#define DEBUG_VECTORS			 1  //< Enable debug vectors in compaction phase
+#define DEBUG_VECTORS			 0  //< Enable debug vectors in compaction phase
 									//  to check every memmove operation if
 									//  overwrites other objects
 
