@@ -255,7 +255,8 @@ void PSMarkSweepDecorator::precompact() {
 
 			/* Increase compation pointer */
 			compact_top += size;
-			assertf(compact_top == prev_compact_top + size, "Compact top change");
+			assertf(compact_top == prev_compact_top + size,
+					"Compact top change | Obj = %p | Size = %d", oop(q), oop(q)->size());
 
 			assertf(compact_top <= dest->space()->end(), "Exceeding space in destination");
 
