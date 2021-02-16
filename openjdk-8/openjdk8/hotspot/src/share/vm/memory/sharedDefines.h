@@ -26,7 +26,7 @@
 
 #define DEBUG_ANNO_INTR     	 1	//< Debug @Cache annotation, TODO Disable in experiments
 
-#define DEBUG_TERACACHE     	 1	//< Debug prints for teraCache, TODO Disable in experiments
+#define DEBUG_TERACACHE     	 0	//< Debug prints for teraCache, TODO Disable in experiments
 
 #define DISABLE_TERACACHE		 0  //< Disable teraCache
 
@@ -39,6 +39,9 @@
 #define TERA_C1				     1  //< Enable C1 to support TeraCache, TODO Set to 1
 
 #define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
+
+#define MT_STACK				 1  //< Enable multi threaded stack in Minor GC 
+								    //  for TeraCache, TODO Set to 1
 
 #define DEBUG_C2			     1  //< Enable C1 to support TeraCache, TODO Set to 1
 

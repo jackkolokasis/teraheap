@@ -59,6 +59,11 @@ bool TeraCache::tc_is_in(void *p) {
 // TODO(JK:) Fix the size. For now I use a hard number for the size
 void TeraCache::tc_new_region() {
 	// Update Statistics
+	struct timeval start_time;
+	struct timeval end_time;
+
+	gettimeofday(&start_time, NULL);
+
 	total_active_regions++;
 
 	// Create a new region
@@ -73,6 +78,14 @@ void TeraCache::tc_new_region() {
 
 	// Initialize pointer
 	_next_pos_region = _start_pos_region;
+	
+	gettimeofday(&end_time, NULL);
+	
+	if (TeraCacheStatistics)
+		tclog_or_tty->print_cr("[STATISTICS] | INIT_TIME = %llu\n", 
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+
 }
 
 // Return the start address of the region
@@ -162,8 +175,13 @@ void TeraCache::scavenge()
 }
 		
 void TeraCache::tc_push_object(void *p, oop o) {
+
+#if MT_STACK
+	MutexLocker x(tera_cache_lock);
+#endif
 	_tc_stack.push(o);
 	_tc_adjust_stack.push((oop *)p);
+
 	assertf(!_tc_stack.is_empty(), "Sanity Check");
 	assertf(!_tc_adjust_stack.is_empty(), "Sanity Check");
 }
