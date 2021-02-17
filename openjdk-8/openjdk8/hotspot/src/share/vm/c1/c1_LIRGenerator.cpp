@@ -1378,7 +1378,6 @@ LIR_Opr LIRGenerator::load_constant(Constant* x) {
   return load_constant(LIR_OprFact::value_type(x->type())->as_constant_ptr());
 }
 
-
 LIR_Opr LIRGenerator::load_constant(LIR_Const* c) {
   BasicType t = c->type();
   for (int i = 0; i < _constants.length(); i++) {
@@ -1402,9 +1401,13 @@ LIR_Opr LIRGenerator::load_constant(LIR_Const* c) {
     }
   }
 
+  // Get a new register
   LIR_Opr result = new_register(t);
+  // Move the constant value to the appropriate register
   __ move((LIR_Opr)c, result);
-  _constants.append(c);
+  // Append the constant value to the constant vectors
+  _constants.append(c); 
+  // Add the register to the registers vector
   _reg_for_constants.append(result);
   return result;
 }
@@ -1578,6 +1581,20 @@ void LIRGenerator::G1SATBCardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_Opr
 
 void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* new_val) {
 
+	LIR_Const* card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->byte_map_base);
+	LIR_Opr heap_ct = load_constant(card_table_base);
+
+#if TERA_C1
+	// These registers are used for TeraCache and TeraCard tables
+	LIR_Const* tera_card_table_base = NULL;
+	LIR_Opr tera_ct = NULL;
+
+	if (EnableTeraCache) {
+		tera_card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->tc_byte_map_base);
+		tera_ct = load_constant(tera_card_table_base);
+	}
+#endif
+
 	// An address in x86_x64 is interpreted as: base + index * scalar + disp
 	// We check if the `addr` has an address type and then:
 	// 
@@ -1604,6 +1621,10 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
 	LabelObj* L = new LabelObj();
 	LabelObj* M = new LabelObj();
 
+#if TERA_C1
+	// Check if the object belongs to TeraCache or in the heap. If belongs to
+	// TeraCache then jump to mark the tera card tables, otherwise continue to
+	// mark the heap card tables.
 	if (EnableTeraCache) {
 		LIR_Opr tc_tmp = new_register(T_LONG);
 		__ move(LIR_OprFact::intptrConst((address)Universe::teraCache()->tc_get_addr_region()), tc_tmp);
@@ -1628,6 +1649,7 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
 		else 
 			ShouldNotReachHere();
 	}
+#endif
 
 #ifdef ARM
 	// TODO: ARM - move to platform-dependent code
@@ -1659,24 +1681,22 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
 	} else {
 		__ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp);
 	}
+		
+	if (can_inline_as_constant(card_table_base)) {
+		__ move(LIR_OprFact::intConst(0),
+				new LIR_Address(tmp, card_table_base->as_jint(), T_BYTE));
+	} else {
+		__ move(LIR_OprFact::intConst(0),
+				new LIR_Address(tmp, heap_ct, T_BYTE));
+	}
 
+#if TERA_C1
+	// Mark teracache card tables
 	if (EnableTeraCache) {
-
-		assertf(sizeof(*((CardTableModRefBS*)_bs)->byte_map_base) == sizeof(jbyte), "adjust this code");
-		LIR_Opr card_table_base = new_register(T_LONG);
-
-		__ move(LIR_OprFact::intptrConst((address)((CardTableModRefBS*)_bs)->byte_map_base), card_table_base);
-
-		__ move(LIR_OprFact::intConst(0), new LIR_Address(tmp, card_table_base, T_BYTE));
 
 		__ branch(lir_cond_always, T_SHORT, L->label());
 
 		__ branch_destination(M->label());
-
-		assertf(sizeof(*((CardTableModRefBS*)_bs)->tc_byte_map_base) == sizeof(jbyte), "adjust this code");
-		LIR_Opr tera_card_table_base = new_register(T_LONG);
-
-		__ move(LIR_OprFact::intptrConst((address)((CardTableModRefBS*)_bs)->tc_byte_map_base), tera_card_table_base);
 
 		LIR_Opr tmp_reg = new_pointer_register();
 
@@ -1687,45 +1707,17 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
 			__ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp_reg);
 		}
 
-		__ move(LIR_OprFact::intConst(0), new LIR_Address(tmp_reg, tera_card_table_base, T_BYTE));
+		if (can_inline_as_constant(tera_card_table_base)) {
+			__ move(LIR_OprFact::intConst(0),
+					new LIR_Address(tmp_reg, tera_card_table_base->as_jint(), T_BYTE));
+		} else {
+			__ move(LIR_OprFact::intConst(0), new LIR_Address(tmp_reg, tera_ct, T_BYTE));
+		}
 
 		__ branch_destination(L->label());
 	}
-	else {
-		assertf(sizeof(*((CardTableModRefBS*)_bs)->byte_map_base) == sizeof(jbyte), "adjust this code");
-		LIR_Const* card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->byte_map_base);
-
-		if (can_inline_as_constant(card_table_base)) {
-			__ move(LIR_OprFact::intConst(0),
-					new LIR_Address(tmp, card_table_base->as_jint(), T_BYTE));
-		} else {
-			__ move(LIR_OprFact::intConst(0),
-					new LIR_Address(tmp, load_constant(card_table_base), T_BYTE));
-		}
-	}
-
+#endif // TERA_C1
 #endif // ARM
-
-	//if (EnableTeraCache) {
-	//	__ branch(lir_cond_always, T_SHORT, L->label());
-
-	//	__ branch_destination(M->label());
-
-	//	assertf(sizeof(*((CardTableModRefBS*)_bs)->tc_byte_map_base) == sizeof(jbyte), "adjust this code");
-	//	LIR_Opr tera_card_table_base = new_register(T_LONG);
-	//	__ move(LIR_OprFact::intptrConst((address)((CardTableModRefBS*)_bs)->tc_byte_map_base), tera_card_table_base);
-
-	//	LIR_Opr tmp_reg = new_pointer_register();
-	//	if (TwoOperandLIRForm) {
-	//		__ move(addr, tmp_reg);
-	//		__ unsigned_shift_right(tmp_reg, CardTableModRefBS::card_shift, tmp_reg);
-	//	} else {
-	//		__ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp_reg);
-	//	}
-	//	__ move(LIR_OprFact::intConst(0), new LIR_Address(tmp_reg, tera_card_table_base, T_BYTE));
-
-	//	__ branch_destination(L->label());
-	//}
 }
 
 
