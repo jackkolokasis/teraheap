@@ -42,9 +42,6 @@
 
 #define MT_STACK				 1  //< Enable multi threaded stack in Minor GC 
 								    //  for TeraCache, TODO Set to 1
-
-#define DEBUG_C2			     1  //< Enable C1 to support TeraCache, TODO Set to 1
-
 #define CLOSURE					 0  //< Closure Calculation
 
 #define DEBUG_INTR               0  //< Debug Interpreter

@@ -3755,7 +3755,7 @@ void GraphKit::write_barrier_post(Node* oop_store,
   Node* card_adr = NULL;
   Node* card_offset = NULL;
 
-#if DEBUG_C2
+#if TERA_C2
   // Divide by card size
   assertf(Universe::heap()->barrier_set()->kind() == BarrierSet::CardTableModRef,
 		  "Only one we handle so far.");
@@ -3780,17 +3780,17 @@ void GraphKit::write_barrier_post(Node* oop_store,
 
 	  // Combine heap card table base and card offset
 	  Node* card_adr =  __ AddP(__ top(), byte_map_base_node(), card_offset );
-
+	  
 	  __ if_then(adr, BoolTest::ge, tc_adr); {
-		  __ store(__ ctrl(), tc_card_adr, zero, bt, adr_type);
+	      __ store(__ ctrl(), tc_card_adr, zero, bt, adr_type);
 	  
-		  // Final sync IdealKit and GraphKit.
-		  final_sync(ideal);
+	      // Final sync IdealKit and GraphKit.
+	      final_sync(ideal);
 	  } __ else_(); {
-		  __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+	      __ store(__ ctrl(), card_adr, zero, bt, adr_type);
 	  
-		  // Final sync IdealKit and GraphKit.
-		  final_sync(ideal);
+	      // Final sync IdealKit and GraphKit.
+	      final_sync(ideal);
 	  } __ end_if();
   }
   else {

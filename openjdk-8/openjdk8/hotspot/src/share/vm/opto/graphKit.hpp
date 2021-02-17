@@ -122,8 +122,7 @@ class GraphKit : public Phase {
     CardTableModRefBS* ct = (CardTableModRefBS*)(Universe::heap()->barrier_set());
     assert(sizeof(*ct->byte_map_base) == sizeof(jbyte), "adjust users of this code");
     if (ct->tc_byte_map_base != NULL) {
-      //return makecon(TypeRawPtr::make((address)ct->tc_byte_map_base));
-      return makecon(TypeRawPtr::make((address)0xffffff));
+      return makecon(TypeRawPtr::make((address)ct->tc_byte_map_base));
     } else {
       return null();
     }
