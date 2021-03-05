@@ -54,6 +54,7 @@
 #include "services/memoryService.hpp"
 #include "utilities/events.hpp"
 #include "utilities/stack.inline.hpp"
+#include <sys/select.h>
 
 elapsedTimer        PSMarkSweep::_accumulated_time;
 jlong               PSMarkSweep::_time_of_last_gc   = 0;
@@ -548,6 +549,14 @@ void PSMarkSweep::deallocate_stacks() {
 }
 
 void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
+#if !DISABLE_TERACACHE
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraCache && TeraCacheStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif
+
   // Recursively traverse all live objects and mark them
   // Trace output
   GCTraceTime tm("phase 1", PrintGCDetails && Verbose, true, _gc_timer);
@@ -630,6 +639,15 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 
 	  // Unload nmethods.
 	  CodeCache::do_unloading(is_alive_closure(), purged_class);
+	  
+#if DISABLE_PRECOMPACT
+	  // In TeraCache we avoid to unload classes. We do not support class
+	  // unloading. So, when we run dacapo benchmarks test that we need
+	  // TeraCache to be eneabled to estimate the barriers overhead, we need to
+	  // unload classes.
+	  // Prune dead klasses from subklass/sibling/impleme
+	  Klass::clean_weak_klass_links(is_alive_closure());
+#endif
 
 	  // Delete entries for dead interned strings.
 	  StringTable::unlink(is_alive_closure());
@@ -673,11 +691,29 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 
 #endif
 
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && TeraCacheStatistics) {
+		gettimeofday(&end_time, NULL);
+
+		tclog_or_tty->print_cr("[STATISTICS] | PHASE1 = %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+	}
+#endif
+
   _gc_tracer->report_object_count_after_gc(is_alive_closure());
 }
 
 
 void PSMarkSweep::mark_sweep_phase2() {
+#if !DISABLE_TERACACHE
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraCache && TeraCacheStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif
+
   GCTraceTime tm("phase 2", PrintGCDetails && Verbose, true, _gc_timer);
   trace("2");
 
@@ -697,6 +733,16 @@ void PSMarkSweep::mark_sweep_phase2() {
 
   // This will also compact the young gen spaces.
   old_gen->precompact();
+
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && TeraCacheStatistics) {
+		gettimeofday(&end_time, NULL);
+
+		tclog_or_tty->print_cr("[STATISTICS] | PHASE2 = %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+	}
+#endif
 }
 
 // This should be moved to the shared markSweep code!
@@ -708,6 +754,13 @@ static PSAlwaysTrueClosure always_true;
 
 // Update the reference address of the object
 void PSMarkSweep::mark_sweep_phase3() {
+#if !DISABLE_TERACACHE
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraCache && TeraCacheStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif
   // Adjust the pointers to reflect the new locations
   GCTraceTime tm("phase 3", PrintGCDetails && Verbose, true, _gc_timer);
   trace("3");
@@ -757,9 +810,26 @@ void PSMarkSweep::mark_sweep_phase3() {
 
   young_gen->adjust_pointers();
   old_gen->adjust_pointers();
+
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && TeraCacheStatistics) {
+		gettimeofday(&end_time, NULL);
+
+		tclog_or_tty->print_cr("[STATISTICS] | PHASE3 = %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+	}
+#endif
 }
 
 void PSMarkSweep::mark_sweep_phase4() {
+#if !DISABLE_TERACACHE
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraCache && TeraCacheStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif
   EventMark m("4 compact heap");
   GCTraceTime tm("phase 4", PrintGCDetails && Verbose, true, _gc_timer);
   trace("4");
@@ -774,6 +844,16 @@ void PSMarkSweep::mark_sweep_phase4() {
 
   old_gen->compact();
   young_gen->compact();
+
+#if !DISABLE_TERACACHE
+	if (EnableTeraCache && TeraCacheStatistics) {
+		gettimeofday(&end_time, NULL);
+
+		tclog_or_tty->print_cr("[STATISTICS] | PHASE4 = %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+	}
+#endif
 }
 
 jlong PSMarkSweep::millis_since_last_gc() {
