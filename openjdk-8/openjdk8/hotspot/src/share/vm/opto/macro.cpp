@@ -1635,7 +1635,7 @@ PhaseMacroExpand::initialize_object(AllocateNode* alloc,
 
   rawmem = make_store(control, rawmem, object, oopDesc::klass_offset_in_bytes(), klass_node, T_METADATA);
   
-#if TERA_C2 
+#if TERA_FLAG 
   Node* tf_node = makecon(TypeLong::make((intptr_t) 0x7f3U));
   rawmem = make_store(control, rawmem, object, oopDesc::teraflag_offset_in_bytes(), tf_node, T_LONG);
 #endif

@@ -94,12 +94,12 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		}
 #endif
 
-#if !DISABLE_TERACACHE
+#if TEST_CLONE
 		if (EnableTeraCache && !Universe::teraCache()->tc_check(obj))
 			assertf(obj->get_obj_state() == MOVE_TO_TERA  // Object will move to TC
 					|| obj->get_obj_state() == INIT_TF,      // TF init value
-					"Non valid teraflag value %p | %lu ", 
-					obj, obj->get_obj_state());
+					"Non valid teraflag value %p | %lu | %s", 
+					obj, obj->get_obj_state(), obj->klass()->internal_name());
 #endif
 
 		if (!obj->mark()->is_marked()) {
@@ -128,6 +128,7 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 // Debug Trace TeraCache objects to check if they point back to heap
 template <class T> inline void MarkSweep::trace_tera_cache(T* p, bool assert_on) {
 	//assertf(Universe::heap()->is_in_reserved(p), "should be in object space");
+	assertf(false, "HERE");
 	T heap_oop = oopDesc::load_heap_oop(p);
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
@@ -153,21 +154,28 @@ template <class T> inline void MarkSweep::trace_tera_cache(T* p, bool assert_on)
 
 template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 	//  assert(Universe::heap()->is_in_reserved(p), "should be in object space");
-	assertf(false, "HERE");
 	T heap_oop = oopDesc::load_heap_oop(p);
 
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-
 #if CLOSURE
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
-			Universe::teraCache()->tc_increase_forward_ptrs();
+			if (TeraCacheStatistics)
+				Universe::teraCache()->tc_increase_forward_ptrs();
 			return;
 		}
 
+#if TEST_CLONE
+		if (EnableTeraCache && !Universe::teraCache()->tc_check(obj))
+			assertf(obj->get_obj_state() == MOVE_TO_TERA  // Object will move to TC
+					|| obj->get_obj_state() == INIT_TF,   // TF init value
+					"Non valid teraflag value %p | %lu ", 
+					obj, obj->get_obj_state());
+
+#endif
 		if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
 			if (!obj->mark()->is_marked())
 			{
@@ -176,17 +184,17 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 
 			obj->set_tera_cache();
 
+#if DEBUG_TERACACHE
 			if (EnableTeraCache)
 			{
-				std::cerr << "[TERA_MARK_AND_PUSH]" 
-					<< " | OBJECT = " 
-					<< (HeapWord*)obj
-					<< " | MARKED = "
-					<< obj->mark()->is_marked()
-					<< " | STATE = "
-					<< obj->get_obj_state()
+				std::cerr <<"[TERA_MARK_AND_PUSH]" 
+					<< " | P = " << p
+					<< " | OBJECT = " << (HeapWord*)obj
+					<< " | MARKED = " << obj->mark()
+					<< " | TERA = "   << obj->get_obj_state()
 					<< std::endl;
 			}
+#endif
 			_marking_stack.push(obj);
 		}
 #endif

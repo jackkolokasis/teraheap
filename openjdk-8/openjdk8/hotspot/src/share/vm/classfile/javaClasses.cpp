@@ -164,7 +164,9 @@ Handle java_lang_String::basic_create(int length, TRAPS) {
   // and the char array it points to end up in the same cache line.
   oop obj;
   obj = InstanceKlass::cast(SystemDictionary::String_klass())->allocate_instance(CHECK_NH);
+#if TERA_FLAG
   assertf(obj->get_obj_state() == 2035, "Sanity Check");
+#endif
 
   // Create the char array.  The String object must be handlized here
   // because GC can happen as a result of the allocation attempt.

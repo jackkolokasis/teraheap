@@ -228,13 +228,11 @@ void PSMarkSweepDecorator::precompact() {
 				compaction_max_size = pointer_delta(compact_end, compact_top);
 			}
 
-		if (q != compact_top) 
-			{
+			if (q != compact_top) {
 				oop(q)->forward_to(oop(compact_top));
 				assertf(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
 			} 
-			else 
-			{
+			else {
 				/*
 				 * In this case objects will not change posision in the heap. As
 				 * a result their new location should be the same as the current
@@ -398,7 +396,7 @@ void PSMarkSweepDecorator::precompact() {
 
 	_first_dead = first_dead;
 
-#if TERA_CARDS
+#if !DISABLE_TERACACHE
 	// Invalidate tera cards for the new objects that will be allocated in the
 	// EnableTeraCache. Objects that are moved in TeraCache might have backward
 	// pointers to the heap. So we invalidate these cards that map the new
@@ -579,8 +577,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 				/* Copy object to the new destination */
 				Copy::aligned_conjoint_words(q, compaction_top, size);
 
-				if (Universe::teraCache()->tc_check(oop(compaction_top)))
+				if (Universe::teraCache()->tc_check(oop(compaction_top))) {
+					assertf(Universe::teraCache()->tc_check(oop(compaction_top)), "Error");
 					oop(compaction_top)->set_obj_in_tc();
+				}
 			    
 #if DEBUG_TERACACHE
 				std::cerr << "=> NEW_ADDR = " << compaction_top 
@@ -606,7 +606,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 #endif
 
 				oop(q)->init_mark();
-
 
 				/* 
 				 * Set the object state to show that this place holds a valid object
@@ -705,8 +704,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 
 #if !DISABLE_PRECOMPACT
 		  // Change the value of teraflag in the new location of the object
-		  if (EnableTeraCache && Universe::teraCache()->tc_check(oop(compaction_top)))
-			oop(compaction_top)->set_obj_in_tc();
+		  if (EnableTeraCache && Universe::teraCache()->tc_check(oop(compaction_top))) {
+			  assertf(Universe::teraCache()->tc_check(oop(compaction_top)), "Error");
+			  oop(compaction_top)->set_obj_in_tc();
+		  }
 #endif
 
 		  oop(compaction_top)->init_mark();

@@ -35,10 +35,11 @@
 #endif // INCLUDE_ALL_GCS
 
 void ObjArrayKlass::oop_follow_contents(oop obj, int index) {
+
+#if DEBUG_TERACACHE
 	if (EnableTeraCache)
-	{
 		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
-	}
+#endif 
   if (UseCompressedOops) {
     objarray_follow_contents<narrowOop>(obj, index);
   } else {
@@ -59,11 +60,9 @@ void ObjArrayKlass::objarray_follow_contents(oop obj, int index) {
 	T* const beg = base + beg_index;
 	T* const end = base + end_index;
 
-#if CLOSURE
-	if (EnableTeraCache && obj->is_tera_cache())
-	{
+#if TEST_CLOSURE
+	if (EnableTeraCache && obj->is_tera_cache()) {
 		for (T* e = beg; e < end; e++) {
-			printf("ObjSetTeraCache\n");
 			MarkSweep::tera_mark_and_push<T>(e);
 		}
 	}

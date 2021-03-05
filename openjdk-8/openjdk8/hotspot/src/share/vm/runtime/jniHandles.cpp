@@ -30,7 +30,6 @@
 #include "runtime/mutexLocker.hpp"
 #include "runtime/thread.inline.hpp"
 
-
 JNIHandleBlock* JNIHandles::_global_handles       = NULL;
 JNIHandleBlock* JNIHandles::_weak_global_handles  = NULL;
 oop             JNIHandles::_deleted_handle       = NULL;
@@ -41,7 +40,7 @@ jobject JNIHandles::make_local(oop obj) {
     return NULL;                // ignore null handles
   } else {
     Thread* thread = Thread::current();
-    assertf(Universe::heap()->is_in_reserved(obj)
+    assert(Universe::heap()->is_in_reserved(obj)
 			|| Universe::teraCache()->tc_check(obj), "sanity check");
     return thread->active_handles()->allocate_handle(obj);
   }
@@ -54,7 +53,7 @@ jobject JNIHandles::make_local(Thread* thread, oop obj) {
   if (obj == NULL) {
     return NULL;                // ignore null handles
   } else {
-    assertf(Universe::heap()->is_in_reserved(obj)
+    assert(Universe::heap()->is_in_reserved(obj)
 			|| Universe::teraCache()->tc_check(obj), "sanity check");
     return thread->active_handles()->allocate_handle(obj);
   }
@@ -421,7 +420,7 @@ void JNIHandleBlock::weak_oops_do(BoolObjectClosure* is_alive,
 
 
 jobject JNIHandleBlock::allocate_handle(oop obj) {
-  assertf(Universe::heap()->is_in_reserved(obj)
+  assert(Universe::heap()->is_in_reserved(obj)
 		  || Universe::teraCache()->tc_check(obj), "sanity check");
   if (_top == 0) {
     // This is the first allocation or the initial block got zapped when

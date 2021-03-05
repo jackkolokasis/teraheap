@@ -220,6 +220,7 @@ void PSRefProcTaskExecutor::execute(EnqueueTask& task)
   manager->execute_and_wait(q);
 }
 
+
 // This method contains all heap specific policy for invoking scavenge.
 // PSScavenge::invoke_no_policy() will do nothing but attempt to
 // scavenge. It will not clean up after failed promotions, bail out if

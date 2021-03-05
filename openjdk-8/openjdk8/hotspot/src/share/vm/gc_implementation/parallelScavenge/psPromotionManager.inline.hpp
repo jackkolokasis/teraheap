@@ -28,6 +28,7 @@
 #include "gc_implementation/parallelScavenge/psOldGen.hpp"
 #include "gc_implementation/parallelScavenge/psPromotionManager.hpp"
 #include "gc_implementation/parallelScavenge/psScavenge.hpp"
+#include "memory/sharedDefines.h"
 
 inline PSPromotionManager* PSPromotionManager::manager_array(int index) {
   assert(_manager_array != NULL, "access of NULL manager_array");
@@ -79,6 +80,8 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
 	  //	[p]------->[o]-------------------
 
 	  // Save the forward pointer to the location pointed by p
+	  assertf(o->get_obj_state() != IN_TERA_CACHE, "Object is in TeraCache");
+
       oopDesc::encode_store_heap_oop_not_null(p, o);
     } else {
 

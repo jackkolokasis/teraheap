@@ -51,8 +51,10 @@
 template <class T>
 void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 #if CLOSURE
+#if DEBUG_TERACACHE
 	if (EnableTeraCache)
 		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+#endif
 #endif
 
 	// Get the object corresponding to the referent attribute
@@ -68,12 +70,11 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 		// Heap oop decription
 		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-#if CLOSURE
+#if TEST_CLOSURE
 	if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
 	{
 		// We have to keep it here (CHECK)
 		MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type());
-		//assertf(false, "Object in TeraCache");
 
 		goto TERACACHE;
 	}
@@ -87,12 +88,10 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 		// oop_follow_contents method of the parent class to process the
 		// reference instance
 		
-#if CLOSURE
+#if TEST_CLOSURE
 		// Check if the objects is marked to be moved in TeraCache
 		// Set the referent object to be moved in TeraCache
-		if (EnableTeraCache && obj->is_tera_cache())
-		{
-			printf("SetTeraCache\n");
+		if (EnableTeraCache && obj->is_tera_cache()) {
 			referent->set_tera_cache();
 		}
 #endif
@@ -108,7 +107,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
     } 
 	else 
 	{
-#if CLOSURE
+#if TEST_CLOSURE
 TERACACHE:
 #endif
 		// treat referent as normal oop
@@ -116,16 +115,11 @@ TERACACHE:
 				if(TraceReferenceGC && PrintGCDetails) {
 				gclog_or_tty->print_cr("Non NULL normal " INTPTR_FORMAT, 
 						(void *)obj);})
-#if CLOSURE
+#if TEST_CLOSURE
 		  if (EnableTeraCache && obj->is_tera_cache())
-		  {
-			  printf("SetTeraCache\n");
 			  MarkSweep::tera_mark_and_push(referent_addr);
-		  }
 		  else 
-		  {
 			  MarkSweep::mark_and_push(referent_addr);
-		  }
 #else
 	  MarkSweep::mark_and_push(referent_addr);
 #endif
@@ -152,7 +146,7 @@ TERACACHE:
 					}
 					)
 
-#if CLOSURE
+#if TEST_CLOSURE
 				if (EnableTeraCache && obj->is_tera_cache())
 				{
 					printf("SetTeraCache\n");
@@ -184,17 +178,12 @@ TERACACHE:
 			gclog_or_tty->print_cr("   Process next as normal " INTPTR_FORMAT, next_addr);
 			}
 			)
-#if CLOSURE
+#if TEST_CLOSURE
 		// Process the next attribute  
 		if (EnableTeraCache && obj->is_tera_cache())
-		{
-			printf("SetTeraCache\n");
 			MarkSweep::tera_mark_and_push(next_addr);
-		}
 		else 
-		{
 			MarkSweep::mark_and_push(next_addr);
-		}
 #else
 	MarkSweep::mark_and_push(next_addr);
 #endif

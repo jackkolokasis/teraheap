@@ -2271,6 +2271,7 @@ void InstanceKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
 			  }, \
 			  assert_nothing )
 }
+
 #if TERA_CARDS
 void InstanceKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
 

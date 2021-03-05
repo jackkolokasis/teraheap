@@ -24,7 +24,7 @@
 
 #define DEBUG_SLOWPATH_INTR		 0	//< Use only interpreter for object allocation
 
-#define DEBUG_ANNO_INTR     	 1	//< Debug @Cache annotation, TODO Disable in experiments
+#define DEBUG_ANNO_INTR     	 1	//< Debug @Cache annotation, TODO Disable in Spark experiments
 
 #define DEBUG_TERACACHE     	 0	//< Debug prints for teraCache, TODO Disable in experiments
 
@@ -40,15 +40,21 @@
 
 #define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
 
+#define TERA_INT			     1  //< Enable Interpreter to support TeraCache, TODO Set to 1
+
 #define MT_STACK				 1  //< Enable multi threaded stack in Minor GC 
 								    //  for TeraCache, TODO Set to 1
-#define CLOSURE					 0  //< Closure Calculation
+#define CLOSURE					 1  //< Closure Calculation TEST  !!!!!
 
 #define DEBUG_INTR               0  //< Debug Interpreter
 
 #define DEBUG_VECTORS			 0  //< Enable debug vectors in compaction phase
 									//  to check every memmove operation if
 									//  overwrites other objects
+
+#define TEST_CLOSURE             0
+
+#define TEST_CLONE				 0
 
 /**********************************
  * States of TeraFlag  

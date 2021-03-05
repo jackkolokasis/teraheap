@@ -121,9 +121,12 @@ ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m)
 
 void InstanceClassLoaderKlass::oop_follow_contents(oop obj) {
 #if CLOSURE
+
+#if DEBUG_TERACACHE
 	// Debugging
 	if (EnableTeraCache)
 		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+#endif
 	
 	InstanceKlass::oop_follow_contents(obj);
 

@@ -3442,7 +3442,7 @@ void MacroAssembler::store_check(Register obj) {
 
 	// We have to check if the object belongs to the TeraCache or in the Heap.
 	// So we compare the object address with start addresss of TeraCache
-#if TERA_CARDS
+#if TERA_INT
 	if (EnableTeraCache) {
 		AddressLiteral tc_start_addr((address)Universe::teraCache()->tc_get_addr_region(), relocInfo::none);
 		// Push the teraCache address in r11

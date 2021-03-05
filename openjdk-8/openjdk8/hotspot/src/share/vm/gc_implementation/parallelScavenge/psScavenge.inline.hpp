@@ -134,11 +134,11 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	// empty, and is_forwarded is true, At this point, just take out the new
 	// address directly. If there is no forward, then do a forward. 
 #if TERA_CARDS
-	if (EnableTeraCache && Universe::teraCache()->tc_check(o)) {
+	if (EnableTeraCache && Universe::teraCache()->tc_check(o)){
 		oopDesc::encode_store_heap_oop_not_null(p, o);
 		return;
 	}
-
+	  
 	oop new_obj = o->is_forwarded()
 		? o->forwardee()
 		: pm->copy_to_survivor_space<promote_immediately>(o);
@@ -275,7 +275,7 @@ class PSScavengeKlassClosure: public KlassClosure {
                              klass,
                              klass->external_name(),
                              klass->has_modified_oops() ? "true" : "false");
-    }
+   }
 #endif
 
     if (klass->has_modified_oops()) {

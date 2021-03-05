@@ -149,10 +149,13 @@ template <class T> void assert_nothing(T *p) {}
 }
 
 void InstanceMirrorKlass::oop_follow_contents(oop obj) {
-#if CLOSURE
+#if TEST_CLOSURE
+
+#if DEBUG_TERACACHE
 	// Debugging
 	if (EnableTeraCache)
 		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+#endif
 
 	InstanceKlass::oop_follow_contents(obj);
 
@@ -179,22 +182,20 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
 		assertf(java_lang_Class::is_primitive(obj), "Sanity check");
 	}
 
-	//if (EnableTeraCache && obj->is_tera_cache())
-	//{
-	//	InstanceMirrorKlass_OOP_ITERATE(                       \
-	//			start_of_static_fields(obj),                   \
-	//			java_lang_Class::static_oop_field_count(obj),  \
-	//			MarkSweep::tera_mark_and_push(p),              \
-	//			assert_is_in_closed_subset)
-	//}
-	//else 
-	//{
+	if (EnableTeraCache && obj->is_tera_cache()) {
+		InstanceMirrorKlass_OOP_ITERATE(                       \
+				start_of_static_fields(obj),                   \
+				java_lang_Class::static_oop_field_count(obj),  \
+				MarkSweep::tera_mark_and_push(p),              \
+				assert_is_in_closed_subset)
+	}
+	else {
 	InstanceMirrorKlass_OOP_ITERATE(                       \
 			start_of_static_fields(obj),                   \
 			java_lang_Class::static_oop_field_count(obj),  \
 			MarkSweep::mark_and_push(p),                   \
 			assert_is_in_closed_subset)
-	// }
+	}
 #else
 	// Debugging
 	if (EnableTeraCache)
