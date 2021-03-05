@@ -39,15 +39,15 @@ class TeraCache {
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
 		 *---------------------------------------------*/
-		uint64_t total_active_regions;      // Number of active regions
-		uint64_t total_merged_regions;      // Number of merged regions
+		static uint64_t total_active_regions;      // Number of active regions
+		static uint64_t total_merged_regions;      // Number of merged regions
 
-		uint64_t total_objects;             // Total number of objects located in TeraCache
-		uint64_t total_objects_size;        // Total number of objects size
+		static uint64_t total_objects;             // Total number of objects located in TeraCache
+		static uint64_t total_objects_size;        // Total number of objects size
 
-		uint64_t fwd_ptrs_per_fgc;	       // Total number of forward ptrs per FGC
-		uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
-		uint64_t trans_per_fgc;	           // Total number of objects transfered to 
+		static uint64_t fwd_ptrs_per_fgc;	       // Total number of forward ptrs per FGC
+		static uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
+		static uint64_t trans_per_fgc;	           // Total number of objects transfered to 
 									   // TeraCache per FGC
 
 	public:

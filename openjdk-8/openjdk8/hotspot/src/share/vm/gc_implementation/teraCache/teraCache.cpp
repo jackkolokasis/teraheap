@@ -8,19 +8,29 @@
 #include "memory/memRegion.hpp"
 #include "memory/sharedDefines.h"
 #include "runtime/globals.hpp"
-#include "runtime/mutexLocker.hpp"          // std::mutex
+#include "runtime/mutexLocker.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
 
 char*        TeraCache::_start_addr = NULL;
 char*        TeraCache::_stop_addr = NULL;
 region_t     TeraCache::_region = NULL;
+
 char*        TeraCache::_start_pos_region = NULL;
 char*        TeraCache::_next_pos_region = NULL; 
 HeapWord*    TeraCache::_parent_node = NULL;
+
 ObjectStartArray TeraCache::_start_array;
 Stack<oop, mtGC> TeraCache::_tc_stack;
 Stack<oop *, mtGC> TeraCache::_tc_adjust_stack;
+
+uint64_t TeraCache::total_active_regions;
+uint64_t TeraCache::total_merged_regions;
+uint64_t TeraCache::total_objects;
+uint64_t TeraCache::total_objects_size;
+uint64_t TeraCache::fwd_ptrs_per_fgc;
+uint64_t TeraCache::back_ptrs_per_fgc;
+uint64_t TeraCache::trans_per_fgc;
 
 // Constructor of TeraCache
 TeraCache::TeraCache()
@@ -34,9 +44,10 @@ TeraCache::TeraCache()
 	// Initilize counters for TeraCache
 	// These counters are used for experiments
 	total_active_regions = 0;
+	total_merged_regions = 0;
+
 	total_objects = 0;
 	total_objects_size = 0;
-	total_merged_regions = 0;
 }
 
 // Check if an object `ptr` belongs to the TeraCache. If the object belongs
@@ -353,10 +364,10 @@ void TeraCache::tc_init_counters() {
 //	- the current total size of objects in TeraCache until
 //	- the current total objects that are located in TeraCache
 void TeraCache::tc_print_statistics() {
-	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %d\n", fwd_ptrs_per_fgc);
-	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_BACK_PTRS = %d\n", back_ptrs_per_fgc);
-	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_TRANS_OBJ = %d\n", trans_per_fgc);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %lu\n", fwd_ptrs_per_fgc);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_BACK_PTRS = %lu\n", back_ptrs_per_fgc);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_TRANS_OBJ = %lu\n", trans_per_fgc);
 
-	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %d\n", total_objects);
-	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %d\n", total_objects_size);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
+	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
 }
