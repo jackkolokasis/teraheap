@@ -176,17 +176,24 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 					obj, obj->get_obj_state());
 
 #endif
-		if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
-			if (!obj->mark()->is_marked())
-			{
-				mark_object(obj);
-			}
 
-			obj->set_tera_cache();
+#if P_BALANCE
+		obj->set_tera_cache();
+
+		if (!obj->mark()->is_marked()) {
+			mark_object(obj);
+#endif
+
+#if P_AGGRESSIVE
+			if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
+				if (!obj->mark()->is_marked()) 
+					mark_object(obj);
+
+				obj->set_tera_cache();
+#endif
 
 #if DEBUG_TERACACHE
-			if (EnableTeraCache)
-			{
+			if (EnableTeraCache) {
 				std::cerr <<"[TERA_MARK_AND_PUSH]" 
 					<< " | P = " << p
 					<< " | OBJECT = " << (HeapWord*)obj

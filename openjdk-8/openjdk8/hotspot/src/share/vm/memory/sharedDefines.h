@@ -56,6 +56,26 @@
 
 #define TEST_CLONE				 0
 
+
+/**********************************
+ * Policies for TeraCache
+ **********************************/
+#define TC_POLICY				1	//< Enable TeraCahce Policies (Always ON)
+
+#define P_BALANCE				0	//< Balance Policy
+
+#define P_AGGRESSIVE            1	//< Aggressive Policy
+
+#define P_SIMPLE                1	//< Move Objects to TeraCache based on their
+									//  teraflag value. This policy should be
+									//  used in combination with P_Balance or
+									//  P_Aggressive
+
+#define P_SIZE                  0	//< Move Objects to TeraCache based on their
+									//  size. This policy should be used in
+									//  combination with P_Balance or
+									//  P_Aggressive
+
 /**********************************
  * States of TeraFlag  
  **********************************/
@@ -65,9 +85,12 @@
 
 #define INIT_TF				   2035	//< Initial object state
 
+
 /***********************************
  * Statistics
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for TeraCache
+
+
 
 #endif  // _SHARE_DEFINES_H_

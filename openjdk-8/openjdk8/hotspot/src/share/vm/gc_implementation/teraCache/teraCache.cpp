@@ -132,6 +132,8 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 	printf("[BEFORE TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %lu | NAME %s\n",
 			(HeapWord *)obj, tmp, size, obj->klass()->internal_name());
 #endif
+	if (TeraCacheStatistics)
+		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu\n", size);
 
 	// make heapwordsize
 	_next_pos_region = (char *) (((uint64_t) _next_pos_region) + size*sizeof(char*));

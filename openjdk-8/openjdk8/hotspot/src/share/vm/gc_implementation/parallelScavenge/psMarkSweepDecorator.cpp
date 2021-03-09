@@ -76,6 +76,25 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
   return _destination_decorator;
 }
 
+#if TC_POLICY
+// Implementation of policies that move objects to the TeraCache This function
+// takes as argument the position `q` of the object and its `size` in the Java
+// heap and return `true` if the policy is satisfied, and `false` otherwise.
+bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
+#if P_SIMPLE
+	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q));
+
+#elif P_SIZE
+	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q)) 
+			&& size >= TeraCacheThreshold;
+#else
+	return false;
+#endif
+
+}
+#endif
+
+
 // FIX ME FIX ME FIX ME FIX ME!!!!!!!!!
 // The object forwarding code is duplicated. Factor this out!!!!!
 //
@@ -181,8 +200,9 @@ void PSMarkSweepDecorator::precompact() {
 			size_t size = oop(q)->size();
 
 #if !DISABLE_PRECOMPACT
-			// Check if the object is marked to be moved to teracache
-			if (EnableTeraCache && oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q))) {
+			// Check if the object needs to be moved in TeraCache based on the
+			// current policy
+			if (EnableTeraCache && tc_policy(q, size)) {
 				// Take a pointer from the region
 				HeapWord* region_top = (HeapWord*) tc->tc_region_top(oop(q), size);
 				assertf(tc->tc_check(oop(region_top)), "Pointer from teraCache is not valid");
