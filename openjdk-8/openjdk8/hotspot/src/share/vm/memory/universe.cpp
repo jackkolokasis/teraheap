@@ -789,11 +789,8 @@ jint Universe::initialize_heap() {
 #if INCLUDE_ALL_GCS
     // We use this kind of heap for ParallelGC
     Universe::_collectedHeap = new ParallelScavengeHeap();
-    if (EnableTeraCache)
-    {
-      Universe::_teraCache = new TeraCache();
-      Universe::_teraCache->tc_new_region();
-    }
+	if (EnableTeraCache)
+		Universe::_teraCache = new TeraCache();
 #else  // INCLUDE_ALL_GCS
     fatal("UseParallelGC not supported in this VM.");
 #endif // INCLUDE_ALL_GCS

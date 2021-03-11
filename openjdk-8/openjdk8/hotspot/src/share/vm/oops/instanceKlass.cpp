@@ -2156,7 +2156,6 @@ void InstanceKlass::oop_follow_contents_tera_cache(oop obj, bool assert_on) {
 			  assert_is_in_closed_subset)
   }
   else {
-	  Universe::teraCache()->tc_trace_obj(obj);
 
 	  InstanceKlass_OOP_MAP_ITERATE( \
 			  obj, \

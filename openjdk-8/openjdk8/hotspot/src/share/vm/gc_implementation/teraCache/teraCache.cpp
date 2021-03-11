@@ -14,11 +14,6 @@
 
 char*        TeraCache::_start_addr = NULL;
 char*        TeraCache::_stop_addr = NULL;
-region_t     TeraCache::_region = NULL;
-
-char*        TeraCache::_start_pos_region = NULL;
-char*        TeraCache::_next_pos_region = NULL; 
-HeapWord*    TeraCache::_parent_node = NULL;
 
 ObjectStartArray TeraCache::_start_array;
 Stack<oop, mtGC> TeraCache::_tc_stack;
@@ -33,13 +28,13 @@ uint64_t TeraCache::back_ptrs_per_fgc;
 uint64_t TeraCache::trans_per_fgc;
 
 // Constructor of TeraCache
-TeraCache::TeraCache()
-{
-	init();
-	// Start address of memory map pool
-	_start_addr = (char *)start_addr_mem_pool();
-	// Stop address of memory map pool
-	_stop_addr  =  (char*)((char *)_start_addr + mem_pool_size());
+TeraCache::TeraCache() {
+	
+	uint64_t align = CardTableModRefBS::ct_max_alignment_constraint();
+	init(align);
+
+	_start_addr = start_addr_mem_pool();
+	_stop_addr  = stop_addr_mem_pool();
 
 	// Initilize counters for TeraCache
 	// These counters are used for experiments
@@ -49,6 +44,11 @@ TeraCache::TeraCache()
 	total_objects = 0;
 	total_objects_size = 0;
 }
+		
+void TeraCache::tc_shutdown() {
+	r_shutdown();
+}
+
 
 // Check if an object `ptr` belongs to the TeraCache. If the object belongs
 // then the function returns true, either it returns false.
@@ -65,50 +65,11 @@ bool TeraCache::tc_is_in(void *p) {
 	return cp >= _start_addr && cp < _stop_addr;
 }
 
-// Create a new region in the TeraCache. The size of regions is dynamically. 
-// TODO(JK:) Support multiple regions
-// TODO(JK:) Fix the size. For now I use a hard number for the size
-void TeraCache::tc_new_region() {
-	// Update Statistics
-	struct timeval start_time;
-	struct timeval end_time;
-
-	gettimeofday(&start_time, NULL);
-
-	total_active_regions++;
-
-	// Create a new region
-	_region = new_region(NULL);
-
-	// Initialize the size of the region
-	_start_pos_region = (char *)rc_rstralloc0(_region,  TeraCacheSize * sizeof(char));
-	_start_pos_region = (char *)align_ptr_up(_region, CardTableModRefBS::ct_max_alignment_constraint());
-
-	// Check if the allocation happens succesfully
-	assertf((char *)(_start_pos_region) !=  (char *) NULL, "Allocation Failed");
-
-	// Initialize pointer
-	_next_pos_region = _start_pos_region;
-	
-	gettimeofday(&end_time, NULL);
-	
-	if (TeraCacheStatistics)
-		tclog_or_tty->print_cr("[STATISTICS] | INIT_TIME = %llu\n", 
-				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
-				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
-
-}
-
 // Return the start address of the region
 char* TeraCache::tc_get_addr_region(void) {
-	assertf((char *)(_start_pos_region) != NULL, "Region is not allocated");
+	assertf((char *)(_start_addr) != NULL, "Region is not allocated");
 
-#if DEBUG_TERACACHE
-	printf("===========================\n");
-	printf("TC_START_ADDR = %p\n", _start_pos_region);
-	printf("===========================\n");
-#endif
-	return _start_pos_region;
+	return _start_addr;
 }
 
 // Get the size of TeraCache
@@ -116,9 +77,11 @@ size_t TeraCache::tc_get_size_region(void) {
 	return mem_pool_size();
 }
 
-// Get the allocation top pointer of the region
-char* TeraCache::tc_region_top(oop obj, size_t size)
-{
+// Allocate new object 'obj' with 'size' in words in TeraCache.
+// Return the allocated 'pos' position of the object
+char* TeraCache::tc_region_top(oop obj, size_t size) {
+	char *pos;			// Allocation position
+
 	MutexLocker x(tera_cache_lock);
 
 	// Update Statistics
@@ -126,38 +89,24 @@ char* TeraCache::tc_region_top(oop obj, size_t size)
 	total_objects++;
 	trans_per_fgc++;
 
-	char *tmp = _next_pos_region;
-
 #if DEBUG_TERACACHE
 	printf("[BEFORE TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %lu | NAME %s\n",
-			(HeapWord *)obj, tmp, size, obj->klass()->internal_name());
+			(HeapWord *)obj, cur_alloc_ptr(), size, obj->klass()->internal_name());
 #endif
+
+	pos = allocate(size);
+	
 	if (TeraCacheStatistics)
 		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu\n", size);
 
-	// make heapwordsize
-	_next_pos_region = (char *) (((uint64_t) _next_pos_region) + size*sizeof(char*));
+	_start_array.allocate_block((HeapWord *)pos);
 
-	if ((uint64_t) _next_pos_region % 8 != 0)
-	{
-		_next_pos_region = (char *)((((uint64_t)_next_pos_region) + (8 - 1)) & -8);
-	}
-
-	_start_array.allocate_block((HeapWord *)tmp);
-	//_start_array.allocate_block((HeapWord *)_next_pos_region);
-
-	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is out-of-space");
-
-	return tmp;
+	return pos;
 }
 
 // Get the allocation top pointer of the TeraCache
-char* TeraCache::tc_region_cur_ptr(void)
-{
-	assertf((char *)(_next_pos_region) != (char *) NULL, "Invalid pointer");
-	assertf((char *)(_next_pos_region) < (char *) _stop_addr, "Region is full");
-
-	return (char *) _next_pos_region;
+char* TeraCache::tc_region_cur_ptr(void) {
+	return cur_alloc_ptr();
 }
 
 // Pop the objects that are in `_tc_stack` and mark them as live object. These
@@ -219,130 +168,14 @@ void TeraCache::tc_adjust() {
 				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
 }
 
-// Check for backward pointers
-void TeraCache::tc_check_back_pointers(bool assert_on)
-{
-	if (_start_pos_region == _next_pos_region)
-	{
-		return;
-	}
-
-	HeapWord* q  = (HeapWord *) _start_pos_region;
-	HeapWord* t  = (HeapWord *) _next_pos_region;
-
-	while (q < t)
-	{
-		// Get the size of the object
-		size_t size = oop(q)->size();
-
-		if (assert_on)
-		{
-			// Follow the contents of the object
-			// True
-			oop(q)->follow_contents_tera_cache(true);
-		}
-		else
-		{
-			// Follow the contents of the object
-			// False
-			std::cerr << "HERE " << __func__ << std::endl;
-			oop(q)->follow_contents_tera_cache(false);
-		}
-
-		// Move to the next object
-		q+=size;
-	}
-}
-
-
 // Increase the number of forward ptrs from JVM heap to TeraCache
 void TeraCache::tc_increase_forward_ptrs() {
 	fwd_ptrs_per_fgc++;
 }
 
-
-void TeraCache::add_tc_back_ptr(HeapWord *dest)
-{
-	assertf(dest != NULL, "Object is empty");
-	assertf(_parent_node != NULL, "Parent node is empty");
-
-	// Check here for duplications
-	// TODO check for duplications
-
-	// Update vector with references from TeraCache to Heap
-	tc_to_heap_ptrs[dest]._v_src.push_back(_parent_node);
-
-	for (std::map<HeapWord*, back_ptr>::const_iterator it = tc_to_heap_ptrs.begin();
-				it != tc_to_heap_ptrs.end(); it++)
-	{
-		std::cerr << "DEBUG_CHECK " << it->first << std::endl;
-	}
-
-	return;
-}
-
-
-void TeraCache::tc_trace_obj(oop obj)
-{
-	_parent_node = (HeapWord*) obj;
-}
-
-
-void TeraCache::tc_update_heap_ptr(HeapWord* dest, HeapWord* new_dest)
-{
-	// Check if the map is empty
-	std::cerr << "DEBUG_CHECK | DEST = " << dest << " NEW_DEST = " << new_dest << std::endl;
-	if (tc_to_heap_ptrs.empty())
-	{
-		return;
-	}
-
-	// Check if the new_ptr has already been assigned
-	assertf(tc_to_heap_ptrs[dest]._new_dst == NULL, "Rewrite new destination ptr");
-
-	// Update the location of the dest ptr
-	tc_to_heap_ptrs[dest]._new_dst = new_dest;
-
-	return;
-}
-
-
-HeapWord* TeraCache::tc_heap_ptr(HeapWord* dest)
-{
-	// Check if the new_ptr has already been assigned
-	assertf(tc_to_heap_ptrs[dest]._new_dst != NULL, "Return null destination");
-
-	// Update the location of the dest ptr
-	return tc_to_heap_ptrs[dest]._new_dst;
-
-}
-
-// Clear back pointers at the end of each FGC
-void TeraCache::tc_clear_map(void)
-{
-	tc_to_heap_ptrs.clear();
-}
-
-void TeraCache::tc_print_map(void)
-{
-	for (std::map<HeapWord*, back_ptr>::const_iterator it = tc_to_heap_ptrs.begin();
-			it != tc_to_heap_ptrs.end(); it++)
-	{
-		std::cout << "Key = " << it->first << std::endl;
-		std::cout << "\t New Addr = " << it->second._new_dst << std::endl;
-
-		std::vector <HeapWord*> tmp = it->second._v_src;
-
-		std::cout << "\t Src <";
-		for (size_t i = 0; i < tmp.size(); i++)
-		{
-			std::cout << tmp[i] <<", " << std::endl;
-		}
-	}
-}
-
+// Check if the TeraCache is empty. If yes, return 'true', 'false' otherwise
 bool TeraCache::tc_empty() {
-	return (_start_pos_region == _next_pos_region);
+	return r_is_empty();
 }
 		
 void TeraCache::tc_clear_stacks() {

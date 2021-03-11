@@ -12,29 +12,22 @@ class TeraCache {
 	private:
 		static char*    _start_addr;          // TeraCache start address of mmap region
 		static char*    _stop_addr;           // TeraCache ends address of mmap region
-		static region_t _region;              // Region
-		static char*    _start_pos_region;    // Start address of region
-		static char*    _next_pos_region;     // Next allocated region in region
 
-		// TODO Test this I am not sure until now
 		static ObjectStartArray _start_array; // Keeps track of where objects 
 											  // start in a 512b block
 
-		//===============================================
-		// TODO Remove
-		static HeapWord* _parent_node;		 // Parent Node for debugging;
+		/*-----------------------------------------------
+		 * Stacks
+		 *---------------------------------------------*/
+		// Stack to keep back pointers (Objects that are pointed out of
+		// TeraCache objects) to mark them as alive durin mark_and_push phase of
+		// the Full GC.
+		static Stack<oop, mtGC>   _tc_stack;
 
-		struct back_ptr 
-		{
-			HeapWord* _new_dst = NULL;
-			std::vector<HeapWord*> _v_src;
-		};
-		// Pointers from teraCache to heap
-		std::map<HeapWord*, back_ptr> tc_to_heap_ptrs;  
-		//===============================================
-		//
-		static Stack<oop, mtGC>         _tc_stack;
-		static Stack<oop *, mtGC>       _tc_adjust_stack;
+		// Stack to keep the element addresses of objects that are located in
+		// TeraCache and point to objects in the heap. We adjust these pointers
+		// during adjust phase of the Full GC.
+		static Stack<oop *, mtGC> _tc_adjust_stack;
 
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
@@ -48,20 +41,19 @@ class TeraCache {
 		static uint64_t fwd_ptrs_per_fgc;	       // Total number of forward ptrs per FGC
 		static uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
 		static uint64_t trans_per_fgc;	           // Total number of objects transfered to 
-									   // TeraCache per FGC
-
+												   // TeraCache per FGC
 	public:
 		// Constructor
 		TeraCache(); 
+		
+		// Close TeraCache and unmap all the pages
+		void tc_shutdown(); 
 
 		// Check if this object is located in TeraCache
 		bool tc_check(oop ptr);
 
 		// Check if object p belongs to TeraCache
 		bool tc_is_in(void* p);
-
-		// Create new region
-		void tc_new_region(void);
 
 		bool tc_empty(void);
 
@@ -105,29 +97,6 @@ class TeraCache {
 		//	- the current total size of objects in TeraCache
 		//	- the current total objects that are located in TeraCache
 		void tc_print_statistics();
-
-
-		// TeraCache add back pointer to the map of back pointers
-		void add_tc_back_ptr(HeapWord *dest);
-		
-		// TeraCahce trace objects
-		void tc_trace_obj(oop obj);
-		
-		// Teracache update heap pointer
-		void tc_update_heap_ptr(HeapWord* dest, HeapWord *new_dest);
-		
-		HeapWord* tc_heap_ptr(HeapWord* dest);
-
-		// Clear back pointers at the end of each Full GC
-		void tc_clear_map(void);
-
-		// Print the elements of map
-		void tc_print_map(void);
-		
-		// Debuging
-		// Check for backward pointers
-		void tc_check_back_pointers(bool assert_on = false);
-
 };
 
 #endif

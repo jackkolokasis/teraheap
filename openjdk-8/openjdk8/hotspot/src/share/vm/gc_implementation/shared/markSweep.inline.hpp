@@ -127,29 +127,7 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 
 // Debug Trace TeraCache objects to check if they point back to heap
 template <class T> inline void MarkSweep::trace_tera_cache(T* p, bool assert_on) {
-	//assertf(Universe::heap()->is_in_reserved(p), "should be in object space");
 	assertf(false, "HERE");
-	T heap_oop = oopDesc::load_heap_oop(p);
-	if (!oopDesc::is_null(heap_oop)) {
-		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
-
-		// The object must belong to TeraCache only. If the object points back
-		// to the heap, then we have backward pointers.
-		if (assert_on) {
-			assertf(Universe::teraCache()->tc_check(obj), 
-					"Not allowed backward pointers: obj = %p | name = %s", obj, 
-					obj->klass()->internal_name());
-		}
-		else {
-			if (!Universe::teraCache()->tc_check(obj)) {
-#if TERA_FLAG
-				obj->set_tera_cache();
-#endif
-				Universe::teraCache()->add_tc_back_ptr((HeapWord *) obj);
-				Universe::teraCache()->tc_print_map();
-			}
-		}
-	}
 }
 
 template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {

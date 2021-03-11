@@ -90,14 +90,14 @@ jint ParallelScavengeHeap::initialize() {
 
 #if TERA_CARDS
   CardTableExtension* barrier_set;
-  if (EnableTeraCache)
-  {
+  if (EnableTeraCache) {
+
 	  _tera_cache_reserved = MemRegion(
 			  (HeapWord*)Universe::teraCache()->tc_get_addr_region(),
 			  (HeapWord*)(Universe::teraCache()->tc_get_addr_region() +
 				  Universe::teraCache()->tc_get_size_region()*sizeof(HeapWord*)));
 
-	  assertf(_tera_cache_reserved.start() > _reserved.end(), 
+	  assertf(_tera_cache_reserved.start() >= _reserved.end(), 
 			  "TeraCache should be in grater address than Heap");
 
 	  barrier_set = new CardTableExtension(_reserved, 3, _tera_cache_reserved);
