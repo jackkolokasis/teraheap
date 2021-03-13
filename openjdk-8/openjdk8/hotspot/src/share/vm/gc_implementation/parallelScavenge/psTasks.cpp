@@ -180,20 +180,33 @@ void OldToYoungRootsTask::do_it(GCTaskManager* manager, uint which) {
   assertf(_stripe_number < ParallelGCThreads, "Sanity");
 
   {
-    PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
+	  struct timeval start_time;
+	  struct timeval end_time;
+	  uint64_t ellapsed_time;
 
-    assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
-    CardTableExtension* card_table = (CardTableExtension *)Universe::heap()->barrier_set();
-    // FIX ME! Assert that card_table is the type we believe it to be.
+	  if (TeraCacheStatistics)
+		  gettimeofday(&start_time, NULL);
 
-    card_table->scavenge_contents_parallel(_gen->start_array(),
-                                           _gen->object_space(),
-                                           _gen_top,
-                                           pm,
-                                           _stripe_number,
-                                           _stripe_total);
-    // Do the real work
-    pm->drain_stacks(false);
+	  PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
+
+	  assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+	  CardTableExtension* card_table = (CardTableExtension *)Universe::heap()->barrier_set();
+	  // FIX ME! Assert that card_table is the type we believe it to be.
+
+	  card_table->scavenge_contents_parallel(_gen->start_array(), _gen->object_space(),
+			  _gen_top, pm, _stripe_number, _stripe_total);
+		
+	  if (TeraCacheStatistics) {
+		  gettimeofday(&end_time, NULL);
+
+		  ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
+			  ((end_time.tv_usec - start_time.tv_usec) / 1000);
+
+		  Universe::teraCache()->heap_ct_traversal_time(which, ellapsed_time);
+	  }
+
+	  // Do the real work
+	  pm->drain_stacks(false);
   }
 }
 
@@ -210,8 +223,10 @@ void TeraToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
 	{
 		struct timeval start_time;
 		struct timeval end_time;
+		uint64_t ellapsed_time;
 
-		gettimeofday(&start_time, NULL);
+		if (TeraCacheStatistics)
+			gettimeofday(&start_time, NULL);
 
 		PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
 
@@ -225,12 +240,14 @@ void TeraToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
 												  pm, _stripe_number, _stripe_total);
 #endif
 		
-		gettimeofday(&end_time, NULL);
-	
-		if (TeraCacheStatistics)
-			tclog_or_tty->print_cr("[STATISTICS] | MINOR_GC = %llu\n",
-				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
-				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+		if (TeraCacheStatistics) {
+			gettimeofday(&end_time, NULL);
+
+			ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
+				((end_time.tv_usec - start_time.tv_usec) / 1000);
+
+			Universe::teraCache()->tc_ct_traversal_time(which, ellapsed_time);
+		}
 
 		// Do the real work
 		pm->drain_stacks(false);

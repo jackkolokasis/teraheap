@@ -27,6 +27,10 @@ uint64_t TeraCache::fwd_ptrs_per_fgc;
 uint64_t TeraCache::back_ptrs_per_fgc;
 uint64_t TeraCache::trans_per_fgc;
 
+uint64_t TeraCache::dirty_cards[16];
+uint64_t TeraCache::tc_ct_trav_time[16];
+uint64_t TeraCache::heap_ct_trav_time[16];
+
 // Constructor of TeraCache
 TeraCache::TeraCache() {
 	
@@ -43,6 +47,12 @@ TeraCache::TeraCache() {
 
 	total_objects = 0;
 	total_objects_size = 0;
+
+	// Initialize arrays for the next minor collection
+	for (unsigned int i = 0; i < ParallelGCThreads; i++) {
+		tc_ct_trav_time[i] = 0;
+		heap_ct_trav_time[i] = 0;
+	}
 }
 		
 void TeraCache::tc_shutdown() {
@@ -97,7 +107,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 	pos = allocate(size);
 	
 	if (TeraCacheStatistics)
-		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu\n", size);
+		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu | Name = %s", size, obj->klass()->internal_name());
 
 	_start_array.allocate_block((HeapWord *)pos);
 
@@ -205,4 +215,53 @@ void TeraCache::tc_print_statistics() {
 
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
+}
+		
+// Keep for each thread the time that need to traverse the TeraCache
+// card table.
+// Each thread writes the time in a table based on each ID and then we
+// take the maximum time from all the threads as the total time.
+void TeraCache::tc_ct_traversal_time(unsigned int tid, uint64_t total_time) {
+	if (tc_ct_trav_time[tid]  < total_time)
+		tc_ct_trav_time[tid] = total_time;
+}
+
+// Keep for each thread the time that need to traverse the Heap
+// card table
+// Each thread writes the time in a table based on each ID and then we
+// take the maximum time from all the threads as the total time.
+void TeraCache::heap_ct_traversal_time(unsigned int tid, uint64_t total_time) {
+	if (heap_ct_trav_time[tid]  < total_time)
+		heap_ct_trav_time[tid] = total_time;
+}
+
+// Print the statistics of TeraCache at the end of each minorGC
+// Will print:
+//	- the time to traverse the TeraCache dirty card tables
+//	- the time to traverse the Heap dirty card tables
+//	- TODO number of dirty cards in TeraCache
+//	- TODO number of dirty cards in Heap
+void TeraCache::tc_print_mgc_statistics() {
+	uint64_t max_tc_ct_trav_time = 0;		//< Maximum traversal time of
+											// TeraCache card tables from all
+											// threads
+	uint64_t max_heap_ct_trav_time = 0;     //< Maximum traversal time of Heap
+											// card tables from all the threads
+
+	for (unsigned int i = 0; i < ParallelGCThreads; i++) {
+		if (max_tc_ct_trav_time < tc_ct_trav_time[i])
+			max_tc_ct_trav_time = tc_ct_trav_time[i];
+		
+		if (max_heap_ct_trav_time < heap_ct_trav_time[i])
+			max_heap_ct_trav_time = heap_ct_trav_time[i];
+	}
+
+	tclog_or_tty->print_cr("[STATISTICS] | TC_CT_TIME = %lu\n", max_tc_ct_trav_time);
+	tclog_or_tty->print_cr("[STATISTICS] | HEAP_CT_TIME = %lu\n", max_heap_ct_trav_time);
+
+	// Initialize arrays for the next minor collection
+	for (unsigned int i = 0; i < ParallelGCThreads; i++) {
+		tc_ct_trav_time[i] = 0;
+		heap_ct_trav_time[i] = 0;
+	}
 }

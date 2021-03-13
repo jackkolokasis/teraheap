@@ -42,6 +42,10 @@ class TeraCache {
 		static uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
 		static uint64_t trans_per_fgc;	           // Total number of objects transfered to 
 												   // TeraCache per FGC
+		static uint64_t dirty_cards[16];		   // Number of dirty cards
+		static uint64_t tc_ct_trav_time[16];	   // Time to traverse TeraCards card table
+		static uint64_t heap_ct_trav_time[16];	   // Time to traverse heap card tables
+
 	public:
 		// Constructor
 		TeraCache(); 
@@ -87,7 +91,7 @@ class TeraCache {
 		// Init the statistics counters of TeraCache to zero when a Full GC
 		// starts
 		void tc_init_counters();
-		
+
 		// Print the statistics of TeraCache at the end of each FGC
 		// Will print:
 		//	- the total forward pointers from the JVM heap to the
@@ -97,6 +101,26 @@ class TeraCache {
 		//	- the current total size of objects in TeraCache
 		//	- the current total objects that are located in TeraCache
 		void tc_print_statistics();
+
+		// Keep for each thread with 'tid' the 'total time' that needed to
+		// traverse the TeraCache card table.
+		// Each thread writes the time in a table based on each ID and then we
+		// take the maximum time from all the threads as the total time.
+		void tc_ct_traversal_time(unsigned int tid, uint64_t total_time);
+		
+		// Keep for each thread with 'tid' the 'total time' that needed to
+		// traverse the Heap card table.
+		// Each thread writes the time in a table based on each ID and then we
+		// take the maximum time from all the threads as the total time.
+		void heap_ct_traversal_time(unsigned int tid, uint64_t total_time);
+
+		// Print the statistics of TeraCache at the end of each minorGC
+		// Will print:
+		//	- the time to traverse the TeraCache dirty card tables
+		//	- the time to traverse the Heap dirty card tables
+		//	- TODO number of dirty cards in TeraCache
+		//	- TODO number of dirty cards in Heap
+		void tc_print_mgc_statistics();
 };
 
 #endif

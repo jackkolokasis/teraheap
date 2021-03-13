@@ -732,6 +732,10 @@ bool PSScavenge::invoke_no_policy() {
 
   _gc_tracer.report_gc_end(_gc_timer.gc_end(), _gc_timer.time_partitions());
 
+  // Print statistics for TeraCache
+  if (TeraCacheStatistics)
+	  Universe::teraCache()->tc_print_mgc_statistics();
+
   return !promotion_failure_occurred;
 }
 
