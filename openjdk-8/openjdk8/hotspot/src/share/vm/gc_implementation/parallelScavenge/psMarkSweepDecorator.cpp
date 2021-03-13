@@ -85,8 +85,8 @@ bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
 	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q));
 
 #elif P_SIZE
-	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q)) 
-			&& size >= TeraCacheThreshold;
+	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q))  
+		&& size >= TeraCacheThreshold;
 #else
 	return false;
 #endif
@@ -594,13 +594,17 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 						  << " | TC = "       << oop(q)->get_obj_state();
 #endif
 
-				/* Copy object to the new destination */
-				Copy::aligned_conjoint_words(q, compaction_top, size);
 
 				if (Universe::teraCache()->tc_check(oop(compaction_top))) {
-					assertf(Universe::teraCache()->tc_check(oop(compaction_top)), "Error");
+					// Size is in words. Each word is 8 bytes. I use memcpy instead of
+					// memmove to avoid the extra copy of the data in the buffer.
+					memcpy(compaction_top, q, size * 8);
+					// Change the value of teraflag in the new location of the object
 					oop(compaction_top)->set_obj_in_tc();
 				}
+				else
+					/* Copy object to the new destination */
+					Copy::aligned_conjoint_words(q, compaction_top, size);
 			    
 #if DEBUG_TERACACHE
 				std::cerr << "=> NEW_ADDR = " << compaction_top 
@@ -720,14 +724,19 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  }
 #endif
 
-		  Copy::aligned_conjoint_words(q, compaction_top, size);
-
 #if !DISABLE_PRECOMPACT
 		  // Change the value of teraflag in the new location of the object
 		  if (EnableTeraCache && Universe::teraCache()->tc_check(oop(compaction_top))) {
-			  assertf(Universe::teraCache()->tc_check(oop(compaction_top)), "Error");
+			  // Size is in words. Each word is 8 bytes. I use memcpy instead of
+			  // memmove to avoid the extra copy of the data in the buffer.
+			  memcpy(compaction_top, q, size * 8);
 			  oop(compaction_top)->set_obj_in_tc();
 		  }
+		  else 
+			  Copy::aligned_conjoint_words(q, compaction_top, size);
+
+#else
+		  Copy::aligned_conjoint_words(q, compaction_top, size);
 #endif
 
 		  oop(compaction_top)->init_mark();

@@ -290,18 +290,14 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 					*first_unclean_card++ = clean_card;
 				}
 
-				//const int interval = PrefetchScanIntervalInBytes;
-				const int interval = 0;
+				const int interval = PrefetchScanIntervalInBytes;
 				// scan all objects in the range
 				if (interval != 0) {
 					while (p < to) {
 						Prefetch::write(p, interval);
 						oop m = oop(p);
 						assertf(m->is_oop_or_null(), "check for header");
-						printf("================================================\n");
-						printf("to = %p | slice_end = %p\n", to, slice_end);
-						printf("================================================\n");
-						//m->push_contents(pm);
+						m->tc_push_contents(pm);
 						p += m->size();
 					}
 					pm->drain_stacks_cond_depth();
