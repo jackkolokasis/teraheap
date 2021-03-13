@@ -170,6 +170,23 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 				obj->set_tera_cache();
 #endif
 
+#if P_DISTINCT
+			if (obj->is_tc_to_old()) {
+				if (!obj->mark()->is_marked()) {
+					mark_object(obj); 
+					_marking_stack.push(obj);
+				}
+
+				return;
+			}
+
+			if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
+				if (!obj->mark()->is_marked()) 
+					mark_object(obj);
+
+				obj->set_tera_cache();
+#endif
+
 #if DEBUG_TERACACHE
 			if (EnableTeraCache) {
 				std::cerr <<"[TERA_MARK_AND_PUSH]" 

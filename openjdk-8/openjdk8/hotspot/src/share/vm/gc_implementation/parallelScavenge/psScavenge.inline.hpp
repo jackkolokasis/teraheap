@@ -60,7 +60,11 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 		return true;
 	}
 	else {
+#if P_DISTINCT
+		obj->set_tc_to_old();
+#else
 		obj->set_tera_cache();
+#endif
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
 
 		Universe::teraCache()->tc_push_object((void *)p, obj);

@@ -87,6 +87,11 @@ bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
 #elif P_SIZE
 	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold;
+
+#elif P_DISTINCT
+	return (oop(q)->is_tera_cache() 
+		&& !PSScavenge::is_obj_in_young(oop(q))  
+		&& size >= TeraCacheThreshold) || (oop(q)->is_tc_to_old());
 #else
 	return false;
 #endif

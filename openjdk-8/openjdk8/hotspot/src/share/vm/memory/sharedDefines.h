@@ -64,9 +64,11 @@
 
 #define P_BALANCE				0	//< Balance Policy
 
-#define P_AGGRESSIVE            1	//< Aggressive Policy
+#define P_AGGRESSIVE            0	//< Aggressive Policy
 
-#define P_SIMPLE                1	//< Move Objects to TeraCache based on their
+#define P_DISTINCT				1
+
+#define P_SIMPLE                0	//< Move Objects to TeraCache based on their
 									//  teraflag value. This policy should be
 									//  used in combination with P_Balance or
 									//  P_Aggressive
@@ -80,6 +82,9 @@
  * States of TeraFlag  
  **********************************/
 #define MOVE_TO_TERA			255	//< Move this object to tera cache
+
+#define TERA_TO_OLD		        328	//< Pointer from TeraCache to Old Gen. Move
+									// this object to TeraCache
 
 #define IN_TERA_CACHE    2147483561	//< This object is located in TeraCache
 
