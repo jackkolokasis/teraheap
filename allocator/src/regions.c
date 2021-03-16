@@ -14,6 +14,7 @@
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
 
 struct _mem_pool tc_mem_pool;
+int fd;
 
 #define align_size_up_(size, alignment) (((size) + ((alignment) - 1)) & ~((alignment) - 1))
 
@@ -27,12 +28,17 @@ void* align_ptr_up(void* ptr, size_t alignment) {
 
 // Initialize allocator
 void init(uint64_t align) {
-    int fd = -1;
+    fd = -1;
 
+#if ANONYMOUS
+	// Anonymous mmap
+	tc_mem_pool.mmap_start = mmap(0, DEV_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, fd, 0);
+#else
     fd = open(DEV, O_RDWR);
-
-	// Memory-mapped a raw device
+	// Memory-mapped a file over a storage device
 	tc_mem_pool.mmap_start = mmap(0, DEV_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+#endif
+
 	assertf(tc_mem_pool.mmap_start != MAP_FAILED, "Mapping Failed");
 
 	// Card table in JVM needs the start address of TeraCache to be align up
@@ -107,4 +113,31 @@ int r_is_empty() {
 void r_shutdown(void) {
 	printf("CALL HERE");
 	munmap(tc_mem_pool.mmap_start, DEV_SIZE);
+}
+
+// Give advise to kernel to expect page references in sequential order.  (Hence,
+// pages in the given range can be aggressively read ahead, and may be freed
+// soon after they are accessed.)
+void r_enable_seq() {
+	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_SEQUENTIAL);
+}
+
+// Give advise to kernel to expect page references in random order (Hence, read
+// ahead may be less useful than normally.)
+void r_enable_rand() {
+	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_NORMAL);
+}
+
+// Explicit write 'data' with 'size' in certain 'offset' using system call
+// without memcpy.
+void r_write(char *data, char *offset, size_t size) {
+	size_t s_check;
+	uint64_t check;
+	uint64_t diff = offset - tc_mem_pool.mmap_start;
+
+	check = lseek(fd, diff, SEEK_SET);
+	assertf(check != -1 && check == diff, "Sanity check: check = %lu", check);
+
+	s_check = write(fd, data, size * HEAPWORD);
+	assertf(s_check != -1 && s_check == size * HEAPWORD, "Sanity check: s_check = %lu", s_check);
 }

@@ -24,10 +24,10 @@ INCLUDEDIR = $(PREFIX)/include
 LIBHEADERS =  $(INCLUDEDIR)/regions.h
 LIBREGIONSOBJS = $(SRCDIR)/regions.o
 REGIONSLIBRARY = $(LIBDIR)/libregions.so
-APPOBJ = $(SRCDIR)/main.o
 TEST1OBJ = $(TESTDIR)/test1.o
-EXECUTABLE = regions.bin
+TEST2OBJ = $(TESTDIR)/test2.o 
 TEST1EXE = test1.bin
+TEST2EXE = test2.bin
 
 CC = gcc
 

@@ -10,10 +10,12 @@
  * Sith 6 
  ************************************************/
 #define DEV "/mnt/spark/file.txt"	   // Device name
-#define DEV_SIZE (210*1024LU*1024*1024)  // Device size (in bytes)
+#define DEV_SIZE (200*1024LU*1024*1024)  // Device size (in bytes)
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A);}
+
+#define ANONYMOUS 0
 
 #endif

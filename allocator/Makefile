@@ -14,13 +14,19 @@ include ./makefile.colors
 #rules
 .PHONY: all clean distclean
 
-all: app
+all: test1 test2
 
 lib: $(REGIONSLIBRARY)
 
-app: $(EXECUTABLE)
+test1: $(TEST1EXE)
 
-$(EXECUTABLE): $(APPOBJ) $(REGIONSLIBRARY)
+test2: $(TEST2EXE)
+
+$(TEST1EXE): $(TEST1OBJ) $(REGIONSLIBRARY)
+	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
+
+$(TEST2EXE): $(TEST2OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
 	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
@@ -36,11 +42,6 @@ $(REGIONSLIBRARY): $(LIBREGIONSOBJS)
 
 %.o: $(LIBHEADERS)
 
-test1: $(TEST1EXE)
-
-$(TEST1EXE): $(TEST1OBJ) $(REGIONSLIBRARY)
-	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
 install:
 	@echo -e '[$(BGREEN)INSTALL$(RESET)]' $(REGIONSLIBRARY)
@@ -63,12 +64,12 @@ uninstall:
 	@rm $(INSTALL_PREFIX)/include/regions.h
 
 clean:
-	@echo -e '[$(BRED)RM$(RESET)]' $(APPOBJ)
-	@$(RM) $(LIBREGIONSOBJS) $(APPOBJ)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1OBJ) $(TEST2OBJ)
+	@$(RM) $(LIBREGIONSOBJS) $(TEST1OBJ) $(TEST2OBJ)
 
 distclean: clean
-	@echo -e '[$(BRED)RM$(RESET)]' $(EXECUTABLE) $(TEST1EXE)
-	@$(RM) $(EXECUTABLE) $(TEST1EXE)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1EXE) $(TEST2EXE)
+	@$(RM) $(TEST1EXE) $(TEST2EXE)
 	@echo -e '[$(BRED)RM$(RESET)]' $(REGIONSLIBRARY)
 	@$(RM) $(REGIONSLIBRARY)
 	@echo -e '[$(BRED)RM$(RESET)]' $(LIBDIR)

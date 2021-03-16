@@ -1,11 +1,14 @@
 /**************************************************
 *
-* file: Makefile
+* file: test1.c
 *
 * @Author:   Iacovos G. Kolokasis
 * @Version:  09-03-2021 
 * @email:    kolokasis@ics.forth.gr
 *
+* Test to verify:
+*	- allocator initialization
+*	- object allocation in the correct positions
 ***************************************************/
 
 #include <stdio.h>
@@ -30,9 +33,6 @@ int main() {
 	printf("Stop Address: %p\n", stop_addr_mem_pool());
 	printf("Mem Pool Size: %lu\n", mem_pool_size());
 	
-	assertf((stop_addr_mem_pool() - start_addr_mem_pool()) == mem_pool_size(), 
-			"Size is wrong");
-
 	printf("\n");
 
 	obj1 = allocate(1);
