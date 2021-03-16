@@ -586,6 +586,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 	if (EnableTeraCache)
 	{
 		HeapWord* const end = _first_dead;
+
+		// Give advise to kernel to prefetch pages for TeraCache random
+		Universe::teraCache()->tc_enable_rand();
+
 		while (q < end) {
 			/* Get the size of the object */
 			size_t size = oop(q)->size();
@@ -603,7 +607,11 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 				if (Universe::teraCache()->tc_check(oop(compaction_top))) {
 					// Size is in words. Each word is 8 bytes. I use memcpy instead of
 					// memmove to avoid the extra copy of the data in the buffer.
+#if EXPLICIT
+					Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
+#else
 					memcpy(compaction_top, q, size * 8);
+#endif
 					// Change the value of teraflag in the new location of the object
 					oop(compaction_top)->set_obj_in_tc();
 				}
@@ -734,7 +742,12 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  if (EnableTeraCache && Universe::teraCache()->tc_check(oop(compaction_top))) {
 			  // Size is in words. Each word is 8 bytes. I use memcpy instead of
 			  // memmove to avoid the extra copy of the data in the buffer.
+#if EXPLICIT
+			  Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
+#else
 			  memcpy(compaction_top, q, size * 8);
+#endif
+			  // Change the value of teraflag in the new location of the object
 			  oop(compaction_top)->set_obj_in_tc();
 		  }
 		  else 

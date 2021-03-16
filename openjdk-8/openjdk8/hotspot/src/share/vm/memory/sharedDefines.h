@@ -56,6 +56,9 @@
 
 #define TEST_CLONE				 0
 
+#define EXPLICIT				 1  //< Enable explicit I/O path for the writes
+									// in TeraCache during major GC
+
 
 /**********************************
  * Policies for TeraCache

@@ -265,3 +265,19 @@ void TeraCache::tc_print_mgc_statistics() {
 		heap_ct_trav_time[i] = 0;
 	}
 }
+
+// Give advise to kernel to expect page references in sequential order
+void TeraCache::tc_enable_seq() {
+	r_enable_seq();
+}
+
+// Give advise to kernel to expect page references in random order
+void TeraCache::tc_enable_rand() {
+	r_enable_rand();
+}
+		
+// Explicit (using systemcall) write 'data' with 'size' to the specific
+// 'offset' in the file.
+void TeraCache::tc_write(char *data, char *offset, size_t size) {
+	r_write(data, offset, size);
+}

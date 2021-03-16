@@ -853,6 +853,10 @@ void PSMarkSweep::mark_sweep_phase4() {
 				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
 				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
 	}
+
+	if (EnableTeraCache)
+		// Give advise to kernel to prefetch pages for TeraCache sequentially
+		Universe::teraCache()->tc_enable_seq();
 #endif
 }
 

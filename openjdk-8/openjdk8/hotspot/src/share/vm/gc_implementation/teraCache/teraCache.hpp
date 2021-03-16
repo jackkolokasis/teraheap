@@ -121,6 +121,16 @@ class TeraCache {
 		//	- TODO number of dirty cards in TeraCache
 		//	- TODO number of dirty cards in Heap
 		void tc_print_mgc_statistics();
+
+		// Give advise to kernel to expect page references in sequential order
+		void tc_enable_seq();
+
+		// Give advise to kernel to expect page references in random order
+		void tc_enable_rand();
+		
+		// Explicit (using systemcall) write 'data' with 'size' to the specific
+		// 'offset' in the file.
+		void tc_write(char *data, char *offset, size_t size);
 };
 
 #endif
