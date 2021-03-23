@@ -281,3 +281,22 @@ void TeraCache::tc_enable_rand() {
 void TeraCache::tc_write(char *data, char *offset, size_t size) {
 	r_write(data, offset, size);
 }
+
+// Explicit (using systemcall) asynchronous write 'data' with 'size' to
+// the specific 'offset' in the file.
+void TeraCache::tc_awrite(char *data, char *offset, size_t size) {
+	r_awrite(data, offset, size);
+}
+		
+// We need to ensure that all the writes in TeraCache using asynchronous
+// I/O have been completed succesfully.
+int TeraCache::tc_areq_completed() {
+	return r_areq_completed();
+
+}
+		
+// Fsync writes in TeraCache
+// We need to make an fsync when we use fastmap
+void TeraCache::tc_fsync() {
+	r_fsync();
+}

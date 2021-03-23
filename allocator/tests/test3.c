@@ -1,15 +1,15 @@
 /**************************************************
 *
-* file: test2.c
+* file: test3.c
 *
 * @Author:   Iacovos G. Kolokasis
-* @Version:  09-03-2021 
+* @Version:  20-03-2021 
 * @email:    kolokasis@ics.forth.gr
 *
 * Test to verify:
-*	- explicit write using system call
+*	- allocator initialization
 *	- object allocation in the correct positions
-*	- read object using mmap
+*	using asynchronous I/O
 ***************************************************/
 
 #include <stdio.h>
@@ -20,6 +20,7 @@
 #define PAGE_SIZE 4096
 
 int main() {
+	int i;
 	char *obj1, *obj2, *obj3, *obj4;
 	char tmp[80]; 
 	char tmp2[160]; 
@@ -47,20 +48,44 @@ int main() {
 	tmp4[4194303] = '\0';
 	
 	obj1 = allocate(10);
-	r_write(tmp, obj1, 10);
-	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
+	r_awrite(tmp, obj1, 10);
 	
 	obj2 = allocate(20);
-	r_write(tmp2, obj2, 20);
-	assertf(strlen(obj2) == 159, "Error in size");
+	r_awrite(tmp2, obj2, 20);
 	
 	obj3 = allocate(131072);
-	r_write(tmp3, obj3, 131072);
-	assertf(strlen(obj3) == 1048575, "Error in size %lu", strlen(obj3));
-
+	r_awrite(tmp3, obj3, 131072);
+	
 	obj4 = allocate(524288);
-	r_write(tmp4, obj4, 524288);
-	assertf(strlen(obj4) == 4194303, "Error in size");
+	r_awrite(tmp4, obj4, 524288);
 
+	while (!r_areq_completed());
+
+	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
+	assertf(strlen(obj2) == 159, "Error in size");
+	assertf(strlen(obj3) == 1048575, "Error in size");
+	assertf(strlen(obj4) == 4194303, "Error in size");
+	
+	for (i = 0; i < 4096; i++) {
+		obj1 = allocate(10);
+		r_awrite(tmp, obj1, 10);
+
+		obj2 = allocate(20);
+		r_awrite(tmp2, obj2, 20);
+
+		obj3 = allocate(131072);
+		r_awrite(tmp3, obj3, 131072);
+
+		obj4 = allocate(524288);
+		r_awrite(tmp4, obj4, 524288);
+	}
+
+	while (!r_areq_completed());
+
+	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
+	assertf(strlen(obj2) == 159, "Error in size");
+	assertf(strlen(obj3) == 1048575, "Error in size");
+	assertf(strlen(obj4) == 4194303, "Error in size");
+	
 	return 0;
 }

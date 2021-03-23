@@ -553,6 +553,8 @@ void PSMarkSweepDecorator::verify_compacted_objects()
 }
 #endif
 
+
+
 void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   // Copy all live objects to their new location
   // Used by MarkSweep::mark_sweep_phase4()
@@ -607,17 +609,40 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 				if (Universe::teraCache()->tc_check(oop(compaction_top))) {
 					// Size is in words. Each word is 8 bytes. I use memcpy instead of
 					// memmove to avoid the extra copy of the data in the buffer.
-#if EXPLICIT
+#if SYNC
 					Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
-#else
-					memcpy(compaction_top, q, size * 8);
-#endif
 					// Change the value of teraflag in the new location of the object
 					oop(compaction_top)->set_obj_in_tc();
+					/* Initialize mark word of the destination */
+					oop(compaction_top)->init_mark();
+#elif FMAP
+					// Change the value of teraflag in the new location of the object
+					oop(q)->set_obj_in_tc();
+					/* Initialize mark word of the destination */
+					oop(q)->init_mark();
+					Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
+
+					Universe::teraCache()->tc_fsync();
+#elif ASYNC
+					// Change the value of teraflag in the new location of the object
+					oop(q)->set_obj_in_tc();
+					/* Initialize mark word of the destination */
+					oop(q)->init_mark();
+					Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#else
+					memcpy(compaction_top, q, size * 8);
+					// Change the value of teraflag in the new location of the object
+					oop(compaction_top)->set_obj_in_tc();
+					/* Initialize mark word of the destination */
+					oop(compaction_top)->init_mark();
+#endif
 				}
-				else
+				else {
 					/* Copy object to the new destination */
 					Copy::aligned_conjoint_words(q, compaction_top, size);
+					/* Initialize mark word of the destination */
+					oop(compaction_top)->init_mark();
+				}
 			    
 #if DEBUG_TERACACHE
 				std::cerr << "=> NEW_ADDR = " << compaction_top 
@@ -625,9 +650,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 						  << " | NEW_TC = "     << oop(compaction_top)->get_obj_state()
 						  << std::endl;
 #endif
-
-				/* Initialize mark word of the destination */
-				oop(compaction_top)->init_mark();
 
 #if DEBUG_VECTORS
 				_verify_objects.push_back(compaction_top);
@@ -641,7 +663,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 							  << " | STATE = " 	   << oop(q)->get_obj_state() 
 				        	  << "=> NEW_ADDR = "  << q  << std::endl;
 #endif
-
 				oop(q)->init_mark();
 
 				/* 
@@ -742,22 +763,35 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  if (EnableTeraCache && Universe::teraCache()->tc_check(oop(compaction_top))) {
 			  // Size is in words. Each word is 8 bytes. I use memcpy instead of
 			  // memmove to avoid the extra copy of the data in the buffer.
-#if EXPLICIT
+#if SYNC
 			  Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
+			  oop(compaction_top)->set_obj_in_tc();
+			  oop(compaction_top)->init_mark();
+#elif FMAP
+			  oop(q)->set_obj_in_tc();
+			  oop(q)->init_mark();
+			  Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
+			  Universe::teraCache()->tc_fsync();
+#elif ASYNC
+			  oop(q)->set_obj_in_tc();
+			  oop(q)->init_mark();
+			  Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
 #else
 			  memcpy(compaction_top, q, size * 8);
-#endif
-			  // Change the value of teraflag in the new location of the object
 			  oop(compaction_top)->set_obj_in_tc();
+			  oop(compaction_top)->init_mark();
+#endif
 		  }
-		  else 
+		  else {
 			  Copy::aligned_conjoint_words(q, compaction_top, size);
-
+			  // Change the value of teraflag in the new location of the object
+			  oop(compaction_top)->init_mark();
+		  }
 #else
 		  Copy::aligned_conjoint_words(q, compaction_top, size);
+		  oop(compaction_top)->init_mark();
 #endif
 
-		  oop(compaction_top)->init_mark();
 
 #if DEBUG_TERACACHE
 		  if (EnableTeraCache) {
@@ -776,7 +810,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  }
 #endif
 
-		  assertf(oop(compaction_top)->klass() != NULL, "should have a class");
+		  //assertf(oop(compaction_top)->klass() != NULL, "should have a class");
 
 		  debug_only(prev_q = q);
 		  q += size;
@@ -795,4 +829,9 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   if (mangle_free_space) {
     space()->mangle_unused_area();
   }
+
+#if ASYNC
+  while(!Universe::teraCache()->tc_areq_completed());
+#endif
+
 }

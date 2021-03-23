@@ -56,9 +56,17 @@
 
 #define TEST_CLONE				 0
 
-#define EXPLICIT				 1  //< Enable explicit I/O path for the writes
+#define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
+#define ASYNC				     1  //< Asynchronous I/O path for the writes in
+									// TeraCache
+
+#define FMAP				     0  //< When we use fastmap we need to ensure
+									// that all the writes in buffered cached
+									// will be flushed to the device because the
+									// memory of fast map is different from
+									// buffer cache. 
 
 /**********************************
  * Policies for TeraCache

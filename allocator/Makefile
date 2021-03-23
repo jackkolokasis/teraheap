@@ -12,9 +12,9 @@ include ./Makefile_common.mk
 include ./makefile.colors
 
 #rules
-.PHONY: all clean distclean
+.PHONY: all lib test1 test2 test3 test4 clean distclean test
 
-all: test1 test2
+all: test1 test2 test3 test4
 
 lib: $(REGIONSLIBRARY)
 
@@ -22,19 +22,31 @@ test1: $(TEST1EXE)
 
 test2: $(TEST2EXE)
 
+test3: $(TEST3EXE)
+
+test4: $(TEST4EXE)
+
 $(TEST1EXE): $(TEST1OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
 	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
 $(TEST2EXE): $(TEST2OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+
+$(TEST3EXE): $(TEST3OBJ) $(REGIONSLIBRARY)
+	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+
+$(TEST4EXE): $(TEST4OBJ) $(REGIONSLIBRARY)
+	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
 
 $(REGIONSLIBRARY): $(LIBREGIONSOBJS)
 	@echo -e '[$(BBLUE)MKDIR$(RESET)]' $(LIBDIR)
 	@$(MKDIR) $(LIBDIR)
 	@echo -e '[$(BYELLOW)LINK$(RESET)]' $(REGIONSLIBRARY)
-	@$(CC) $(LIBREGIONSOBJS) -shared -o $(REGIONSLIBRARY)
+	@$(CC) $(LIBREGIONSOBJS) -shared -o $(REGIONSLIBRARY) $(LDFLAGS)
 
 %.o: %.c
 	@echo -e '[$(BGREEN)GCC$(RESET)]' $<
@@ -42,6 +54,8 @@ $(REGIONSLIBRARY): $(LIBREGIONSOBJS)
 
 %.o: $(LIBHEADERS)
 
+test:
+	./test3.bin
 
 install:
 	@echo -e '[$(BGREEN)INSTALL$(RESET)]' $(REGIONSLIBRARY)
@@ -64,12 +78,12 @@ uninstall:
 	@rm $(INSTALL_PREFIX)/include/regions.h
 
 clean:
-	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1OBJ) $(TEST2OBJ)
-	@$(RM) $(LIBREGIONSOBJS) $(TEST1OBJ) $(TEST2OBJ)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ)
+	@$(RM) $(LIBREGIONSOBJS) $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ)
 
 distclean: clean
-	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1EXE) $(TEST2EXE)
-	@$(RM) $(TEST1EXE) $(TEST2EXE)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE)
+	@$(RM) $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE)
 	@echo -e '[$(BRED)RM$(RESET)]' $(REGIONSLIBRARY)
 	@$(RM) $(REGIONSLIBRARY)
 	@echo -e '[$(BRED)RM$(RESET)]' $(LIBDIR)

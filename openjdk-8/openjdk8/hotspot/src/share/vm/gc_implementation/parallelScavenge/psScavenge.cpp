@@ -427,9 +427,9 @@ bool PSScavenge::invoke_no_policy() {
 		  // the old gen
 		  uint stripe_total = active_workers;
 		  for (uint i = 0; i < stripe_total; i++) {
-			  q->enqueue(new TeraToHeapRootsTask(Universe::teraCache(), 
-						 (HeapWord*)Universe::teraCache()->tc_region_cur_ptr(), 
-						 i, stripe_total));
+		      q->enqueue(new TeraToHeapRootsTask(Universe::teraCache(), 
+		    			 (HeapWord*)Universe::teraCache()->tc_region_cur_ptr(), 
+		    			 i, stripe_total));
 		  }
 	  }
 #endif

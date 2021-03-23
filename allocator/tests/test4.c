@@ -7,7 +7,7 @@
 * @email:    kolokasis@ics.forth.gr
 *
 * Test to verify:
-*	- explicit write using system call
+*	- explicit write using system call with fastmap
 *	- object allocation in the correct positions
 *	- read object using mmap
 ***************************************************/
@@ -48,19 +48,23 @@ int main() {
 	
 	obj1 = allocate(10);
 	r_write(tmp, obj1, 10);
-	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
 	
 	obj2 = allocate(20);
 	r_write(tmp2, obj2, 20);
-	assertf(strlen(obj2) == 159, "Error in size");
 	
 	obj3 = allocate(131072);
 	r_write(tmp3, obj3, 131072);
-	assertf(strlen(obj3) == 1048575, "Error in size %lu", strlen(obj3));
 
 	obj4 = allocate(524288);
 	r_write(tmp4, obj4, 524288);
-	assertf(strlen(obj4) == 4194303, "Error in size");
 
+	// In fast map we need to do an fsync
+	r_fsync();
+
+	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
+	assertf(strlen(obj2) == 159, "Error in size");
+	assertf(strlen(obj3) == 1048575, "Error in size %lu", strlen(obj3));
+	assertf(strlen(obj4) == 4194303, "Error in size");
+	
 	return 0;
 }

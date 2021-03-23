@@ -21,13 +21,17 @@ LIBDIR = $(PREFIX)/lib
 INCLUDEDIR = $(PREFIX)/include
 
 ## Depended files
-LIBHEADERS =  $(INCLUDEDIR)/regions.h
-LIBREGIONSOBJS = $(SRCDIR)/regions.o
+LIBHEADERS =  $(INCLUDEDIR)/regions.h $(INCLUDEDIR)/asyncIO.h
+LIBREGIONSOBJS = $(SRCDIR)/regions.o $(SRCDIR)/asyncIO.o
 REGIONSLIBRARY = $(LIBDIR)/libregions.so
 TEST1OBJ = $(TESTDIR)/test1.o
-TEST2OBJ = $(TESTDIR)/test2.o 
+TEST2OBJ = $(TESTDIR)/test2.o
+TEST3OBJ = $(TESTDIR)/test3.o
+TEST4OBJ = $(TESTDIR)/test4.o
 TEST1EXE = test1.bin
 TEST2EXE = test2.bin
+TEST3EXE = test3.bin
+TEST4EXE = test4.bin
 
 CC = gcc
 
@@ -37,7 +41,9 @@ DEBUGFLAG = -ggdb3
 OFLAG = -o
 WALLFLAG = -Wall -Werror
 OPTIMZEFLAG = -O3
+AIOFLAG = -lrt
 
+LDFLAGS = $(AIOFLAG)
 CFLAGS = $(BINFLAG) $(WALLFLAG) $(OPTIMIZEFLAG)
 
 ## Commands

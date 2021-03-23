@@ -7,16 +7,17 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <aio.h>
 
 #include "../include/regions.h"
 #include "../include/sharedDefines.h"
+#include "../include/asyncIO.h"
 
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
+#define align_size_up_(size, alignment) (((size) + ((alignment) - 1)) & ~((alignment) - 1))
 
 struct _mem_pool tc_mem_pool;
 int fd;
-
-#define align_size_up_(size, alignment) (((size) + ((alignment) - 1)) & ~((alignment) - 1))
 
 intptr_t align_size_up(intptr_t size, intptr_t alignment) {
 	return align_size_up_(size, alignment);
@@ -47,6 +48,10 @@ void init(uint64_t align) {
 	tc_mem_pool.cur_alloc_ptr = tc_mem_pool.start_address;
 	tc_mem_pool.size = 0;
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
+
+#if TEST
+	req_init();
+#endif
 }
 
 
@@ -131,13 +136,32 @@ void r_enable_rand() {
 // Explicit write 'data' with 'size' in certain 'offset' using system call
 // without memcpy.
 void r_write(char *data, char *offset, size_t size) {
-	size_t s_check;
-	uint64_t check;
+	ssize_t s_check;
 	uint64_t diff = offset - tc_mem_pool.mmap_start;
 
-	check = lseek(fd, diff, SEEK_SET);
-	assertf(check != -1 && check == diff, "Sanity check: check = %lu", check);
+	s_check = pwrite(fd, data, size * HEAPWORD, diff);
+	assertf(s_check == size * HEAPWORD, "Sanity check: s_check = %ld", s_check);
+}
+	
+// Explicit asynchronous write 'data' with 'size' in certain 'offset' using
+// system call without memcpy.
+// Do not use r_awrite with r_write
+void r_awrite(char *data, char *offset, size_t size) {
+	
+	uint64_t diff = offset - tc_mem_pool.mmap_start;
 
-	s_check = write(fd, data, size * HEAPWORD);
-	assertf(s_check != -1 && s_check == size * HEAPWORD, "Sanity check: s_check = %lu", s_check);
+	req_add(fd, data, size * HEAPWORD, diff);
+}
+	
+// Check if all the asynchronous requestes have been completed
+// Return 1 on succesfull, and 0 otherwise
+int	r_areq_completed() {
+	return is_all_req_completed();
+}
+	
+// We need to ensure that all the writes will be flushed from buffer
+// cur_alloc_ptrcur_alloc_ptrhe and they will be written to the device.
+void r_fsync() {
+	int check = fsync(fd);
+	assertf(check == 0, "Error in fsync");
 }

@@ -25,8 +25,9 @@ extern "C" {
 		uint64_t size;
 	};
 
-	extern struct _mem_pool tc_mem_pool;
-	extern int fd;
+	extern struct _mem_pool tc_mem_pool;	// Allocator pool
+	extern int fd;							// File descriptor for the opended file
+	extern int num_reqs;					// Number of asynchronous write requests
 
 	// Initialize allocator with start address 'heap_end + 1'. The end of the
 	// heap.
@@ -66,6 +67,19 @@ extern "C" {
 	// Explicit write 'data' with 'size' in certain 'offset' using system call
 	// without memcpy.
 	void	   r_write(char *data, char *offset, size_t size);
+	
+	// Explicit asynchronous write 'data' with 'size' in certain 'offset' using
+	// system call without memcpy.
+	void	   r_awrite(char *data, char *offset, size_t size);
+	
+	// Check if all the asynchronous requestes have been completed
+	// Return 1 on succesfull, and 0 otherwise
+	int		   r_areq_completed(void);
+
+	// We need to ensure that all the writes will be flushed from buffer
+	// cur_alloc_ptrcur_alloc_ptrhe and they will be written to the device.
+	void		r_fsync(void);
+
 	
 #ifdef __cplusplus
 }

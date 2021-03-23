@@ -131,6 +131,19 @@ class TeraCache {
 		// Explicit (using systemcall) write 'data' with 'size' to the specific
 		// 'offset' in the file.
 		void tc_write(char *data, char *offset, size_t size);
+		
+		// Explicit (using systemcall) asynchronous write 'data' with 'size' to
+		// the specific 'offset' in the file.
+		void tc_awrite(char *data, char *offset, size_t size);
+
+		// We need to ensure that all the writes in TeraCache using asynchronous
+		// I/O have been completed succesfully.
+		int tc_areq_completed();
+		
+
+		// Fsync writes in TeraCache
+		// We need to make an fsync when we use fastmap
+		void tc_fsync();
 };
 
 #endif
