@@ -173,14 +173,14 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
 
 		// if there are not objects starting within the chunk, skip it.
-		bool check = start_array->object_starts_in_range(slice_start, slice_end);
+		bool check = start_array->tc_object_starts_in_range(slice_start, slice_end);
 
 		if (!check){
 			continue;
 		}
 
 		// Update our beginning addr
-		HeapWord* first_object = start_array->object_start(slice_start);
+		HeapWord* first_object = start_array->tc_object_start(slice_start);
 
 		oop* first_object_within_slice = (oop*) first_object;
 		if (first_object < slice_start) {
@@ -194,7 +194,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		if (slice_end < (HeapWord*)sp_top) {
 			// The substaction is important! An object may start precisely at
 			// slice end
-			HeapWord* last_object = start_array->object_start(slice_end - 1);
+			HeapWord* last_object = start_array->tc_object_start(slice_end - 1);
 			slice_end = last_object + oop(last_object)->size();
 			// worker_end_card is exclusive, so bumb it one past the end of
 			// last_object's covered span.
@@ -233,7 +233,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 					// we will attempt to scan it twice. The test against "last_scanned"
 					// prevents the redundant object scan, but it does not prevent newly
 					// marked cards from being cleaned.
-					HeapWord* last_object_in_dirty_region = start_array->object_start(addr_for(current_card)-1);
+					HeapWord* last_object_in_dirty_region = start_array->tc_object_start(addr_for(current_card)-1);
 					size_t size_of_last_object = oop(last_object_in_dirty_region)->size();
 
 					HeapWord* end_of_last_object = last_object_in_dirty_region + size_of_last_object;
@@ -251,7 +251,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			jbyte* following_clean_card = current_card;
 
 			if (first_unclean_card < worker_end_card) {
-				oop* p = (oop*) start_array->object_start(addr_for(first_unclean_card));
+				oop* p = (oop*) start_array->tc_object_start(addr_for(first_unclean_card));
 				assertf((HeapWord*)p <= addr_for(first_unclean_card), "checking");
 
 				// "p" should always be >= "last_scanned" because newly GC

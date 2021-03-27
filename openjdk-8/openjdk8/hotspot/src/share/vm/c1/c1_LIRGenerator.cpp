@@ -1702,9 +1702,9 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
 
 		if (TwoOperandLIRForm) {
 			__ move(addr, tmp_reg);
-			__ unsigned_shift_right(tmp_reg, CardTableModRefBS::card_shift, tmp_reg);
+			__ unsigned_shift_right(tmp_reg, CardTableModRefBS::tc_card_shift, tmp_reg);
 		} else {
-			__ unsigned_shift_right(addr, CardTableModRefBS::card_shift, tmp_reg);
+			__ unsigned_shift_right(addr, CardTableModRefBS::tc_card_shift, tmp_reg);
 		}
 
 		if (can_inline_as_constant(tera_card_table_base)) {

@@ -63,6 +63,9 @@ class TeraCache {
 
 		// Get region allocation address
 		char* tc_get_addr_region(void);
+		
+		// Get region stop address
+		char* tc_stop_addr_region(void);
 
 		// Get the size of TeraCache
 		size_t tc_get_size_region(void);

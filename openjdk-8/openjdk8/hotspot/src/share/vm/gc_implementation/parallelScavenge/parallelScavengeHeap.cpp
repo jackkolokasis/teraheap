@@ -94,8 +94,7 @@ jint ParallelScavengeHeap::initialize() {
 
 	  _tera_cache_reserved = MemRegion(
 			  (HeapWord*)Universe::teraCache()->tc_get_addr_region(),
-			  (HeapWord*)(Universe::teraCache()->tc_get_addr_region() +
-				  Universe::teraCache()->tc_get_size_region()*sizeof(HeapWord*)));
+			  (HeapWord*)Universe::teraCache()->tc_stop_addr_region());
 
 	  assertf(_tera_cache_reserved.start() >= _reserved.end(), 
 			  "TeraCache should be in grater address than Heap");

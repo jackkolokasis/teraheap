@@ -150,7 +150,10 @@ class CardTableModRefBS: public ModRefBarrierSet {
   // in, um, words.
   inline size_t cards_required(size_t covered_words);
   inline size_t compute_byte_map_size();
+#if TERA_CARDS
+  inline size_t tc_cards_required(size_t covered_words);
   inline size_t tc_compute_byte_map_size();
+#endif
 
   // Finds and return the index of the region, if any, to which the given
   // region would be contiguous.  If none exists, assign a new region and
@@ -197,7 +200,7 @@ class CardTableModRefBS: public ModRefBarrierSet {
 	  }
 	  else
 	  {
-		  jbyte* result = &tc_byte_map_base[uintptr_t(p) >> card_shift];
+		  jbyte* result = &tc_byte_map_base[uintptr_t(p) >> tc_card_shift];
 
 		  assertf(result >= _tc_byte_map && result < _tc_byte_map + _tc_byte_map_size,
 				  "out of bounds accessor for tc_card marking array");
@@ -328,6 +331,12 @@ public:
     card_shift                  = 9,
     card_size                   = 1 << card_shift,
     card_size_in_words          = card_size / sizeof(HeapWord)
+
+#if TERA_CARDS
+    ,tc_card_shift              = TERA_CARD_SIZE,
+    tc_card_size                = 1 << tc_card_shift,
+    tc_card_size_in_words       = tc_card_size / sizeof(HeapWord)
+#endif
   };
 
   static int clean_card_val()      { return clean_card; }
@@ -429,6 +438,9 @@ public:
   }
 
   HeapWord* align_to_card_boundary(HeapWord* p) {
+#if TERA_CARDS
+	  assertf(0, "Check this path");
+#endif
     jbyte* pcard = byte_for(p + card_size_in_words - 1);
     return addr_for(pcard);
   }
@@ -473,6 +485,10 @@ public:
   }
 
   static uintx ct_max_alignment_constraint();
+  
+#if TERA_CARDS
+  static uint64_t tc_ct_max_alignment_constraint();
+#endif
 
   // Apply closure "cl" to the dirty cards containing some part of
   // MemRegion "mr".
@@ -512,7 +528,7 @@ public:
 	else {
 		size_t delta = pointer_delta(p, tc_byte_map_base, sizeof(jbyte));
 
-		HeapWord* result = (HeapWord*) (delta << card_shift);
+		HeapWord* result = (HeapWord*) (delta << tc_card_shift);
 		assertf(_tc_whole_heap.contains(result),
 				"Returning result = %p out of bounds of card marking arrays _whole_heap = [%p, %p]",
 				result, _tc_whole_heap.start(), _tc_whole_heap.end());

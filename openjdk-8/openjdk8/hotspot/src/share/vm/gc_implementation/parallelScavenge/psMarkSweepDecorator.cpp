@@ -622,7 +622,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					oop(q)->init_mark();
 					Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
 
-					Universe::teraCache()->tc_fsync();
 #elif ASYNC
 					// Change the value of teraflag in the new location of the object
 					oop(q)->set_obj_in_tc();
@@ -771,7 +770,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			  oop(q)->set_obj_in_tc();
 			  oop(q)->init_mark();
 			  Universe::teraCache()->tc_write((char *)q, (char *)compaction_top, size);
-			  Universe::teraCache()->tc_fsync();
 #elif ASYNC
 			  oop(q)->set_obj_in_tc();
 			  oop(q)->init_mark();
@@ -830,8 +828,11 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
     space()->mangle_unused_area();
   }
 
+  if (EnableTeraCache) {
 #if ASYNC
   while(!Universe::teraCache()->tc_areq_completed());
+#elif FMAP
+  Universe::teraCache()->tc_fsync();
 #endif
-
+  }
 }

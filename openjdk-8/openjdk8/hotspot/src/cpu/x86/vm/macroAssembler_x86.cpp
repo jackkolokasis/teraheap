@@ -3537,7 +3537,7 @@ void MacroAssembler::store_check_part_2(Register obj) {
 void MacroAssembler::tc_store_check_part_1(Register obj) {
   BarrierSet* bs = Universe::heap()->barrier_set();
   assertf(bs->kind() == BarrierSet::CardTableModRef, "Wrong barrier set kind");
-  shrptr(obj, CardTableModRefBS::card_shift);
+  shrptr(obj, CardTableModRefBS::tc_card_shift);
 }
 
 #if TERA_CARDS

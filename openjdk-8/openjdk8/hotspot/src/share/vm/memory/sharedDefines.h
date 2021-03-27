@@ -68,16 +68,23 @@
 									// memory of fast map is different from
 									// buffer cache. 
 
+#define TERA_CARD_SIZE			 14 // This is the size of each card in
+									// TeraCache card table. The size is in bit
+									// e.g 9 = 512bytes
+
 /**********************************
  * Policies for TeraCache
  **********************************/
 #define TC_POLICY				1	//< Enable TeraCahce Policies (Always ON)
 
-#define P_BALANCE				0	//< Balance Policy
+#define P_BALANCE				0	//< Balance Policy. Move the first neighbors
+									//  of cached data
 
-#define P_AGGRESSIVE            0	//< Aggressive Policy
+#define P_AGGRESSIVE            0	//< Aggressive Policy. Move all the closure
 
-#define P_DISTINCT				1
+#define P_DISTINCT				1   //< Move objects to TeraCache based on their
+									//  size. We use -XX:TeraCacheThreshold to
+									//  define the size lmit 
 
 #define P_SIMPLE                0	//< Move Objects to TeraCache based on their
 									//  teraflag value. This policy should be

@@ -3754,6 +3754,7 @@ void GraphKit::write_barrier_post(Node* oop_store,
 
   Node* card_adr = NULL;
   Node* card_offset = NULL;
+  Node* tc_card_offset = NULL;
 
 #if TERA_C2
   // Divide by card size
@@ -3761,6 +3762,7 @@ void GraphKit::write_barrier_post(Node* oop_store,
 		  "Only one we handle so far.");
 
   card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::card_shift) );
+  tc_card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::tc_card_shift) );
 		  
   // Get the alias_index for raw card-mark memory
   int adr_type = Compile::AliasIdxRaw;
@@ -3776,7 +3778,7 @@ void GraphKit::write_barrier_post(Node* oop_store,
 	  assertf(tc_adr->bottom_type()->isa_ptr() != NULL, "Error");
 
 	  // Combine teracache card table base and card offset
-	  Node* tc_card_adr =  __ AddP(__ top(), tc_byte_map_base_node(), card_offset );
+	  Node* tc_card_adr =  __ AddP(__ top(), tc_byte_map_base_node(), tc_card_offset );
 
 	  // Combine heap card table base and card offset
 	  Node* card_adr =  __ AddP(__ top(), byte_map_base_node(), card_offset );

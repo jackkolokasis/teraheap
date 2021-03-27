@@ -34,7 +34,7 @@ uint64_t TeraCache::heap_ct_trav_time[16];
 // Constructor of TeraCache
 TeraCache::TeraCache() {
 	
-	uint64_t align = CardTableModRefBS::ct_max_alignment_constraint();
+	uint64_t align = CardTableModRefBS::tc_ct_max_alignment_constraint();
 	init(align);
 
 	_start_addr = start_addr_mem_pool();
@@ -82,6 +82,14 @@ char* TeraCache::tc_get_addr_region(void) {
 	return _start_addr;
 }
 
+// Return the end address of the region
+char* TeraCache::tc_stop_addr_region(void) {
+	assertf((char *)(_start_addr) != NULL, "Region is not allocated");
+	assertf((char *)(_stop_addr) != NULL, "Region is not allocated");
+
+	return _stop_addr;
+}
+
 // Get the size of TeraCache
 size_t TeraCache::tc_get_size_region(void) {
 	return mem_pool_size();
@@ -109,7 +117,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 	if (TeraCacheStatistics)
 		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu | Name = %s", size, obj->klass()->internal_name());
 
-	_start_array.allocate_block((HeapWord *)pos);
+	_start_array.tc_allocate_block((HeapWord *)pos);
 
 	return pos;
 }

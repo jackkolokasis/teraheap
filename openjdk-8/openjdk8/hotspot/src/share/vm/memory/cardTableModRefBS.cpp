@@ -61,9 +61,14 @@ size_t CardTableModRefBS::compute_byte_map_size()
 }
 
 #if TERA_CARDS
-size_t CardTableModRefBS::tc_compute_byte_map_size()
-{
-  assertf(_tc_guard_index == cards_required(_tc_whole_heap.word_size()) - 1,
+size_t CardTableModRefBS::tc_cards_required(size_t covered_words) {
+  // Add one for a guard card, used to detect errors.
+  const size_t words = align_size_up(covered_words, tc_card_size_in_words);
+  return words / tc_card_size_in_words + 1;
+}
+
+size_t CardTableModRefBS::tc_compute_byte_map_size() {
+  assertf(_tc_guard_index == tc_cards_required(_tc_whole_heap.word_size()) - 1,
                                         "unitialized, check declaration order");
   assertf(_tc_page_size != 0, "unitialized, check declaration order");
   const size_t granularity = os::vm_allocation_granularity();
@@ -82,7 +87,7 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
 	_byte_map_size(compute_byte_map_size()),
 
 	_tc_whole_heap(tc_whole_heap),
-	_tc_guard_index(cards_required(tc_whole_heap.word_size()) - 1),
+	_tc_guard_index(tc_cards_required(tc_whole_heap.word_size()) - 1),
 	_tc_last_valid_index(_tc_guard_index - 1),
 	_tc_page_size(os::vm_page_size()),
 	_tc_byte_map_size(tc_compute_byte_map_size())
@@ -100,9 +105,9 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   
   // 0x7f6100600000 & 0xff (Heap)
   // 0x7f62258180200 & 0xff (TeraCache) assertions do not work for TeraCache
-  assertf((uintptr_t(tc_low_bound)  & (card_size - 1))  == 0, "heap must start at card boundary %p | %p", low_bound, tc_low_bound);
-  assertf((uintptr_t(tc_high_bound) & (card_size - 1))  == 0, "heap must end at card boundary");
-  assertf(card_size <= 512, "card_size  must be less than 512");
+  assertf((uintptr_t(tc_low_bound)  & (tc_card_size - 1))  == 0, "heap must start at card boundary %p | %p", low_bound, tc_low_bound);
+  assertf((uintptr_t(tc_high_bound) & (tc_card_size - 1))  == 0, "heap must end at card boundary");
+  assertf(tc_card_size <= (1 << TERA_CARD_SIZE), "card_size  must be less equall %d", (1 << TERA_CARD_SIZE));
 
   _covered = new MemRegion[max_covered_regions];
   _committed = new MemRegion[max_covered_regions];
@@ -151,7 +156,7 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   assertf(byte_for(high_bound - 1) <= &_byte_map[_last_valid_index], "Checking end of map"); 
   
   _tc_byte_map = (jbyte*) tc_heap_rs.base();
-  tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> card_shift);
+  tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> tc_card_shift);
 
 #if DEBUG_TERACACHE
   printf("======================================================\n");
@@ -823,6 +828,12 @@ MemRegion CardTableModRefBS::dirty_card_range_after_reset(MemRegion mr,
 uintx CardTableModRefBS::ct_max_alignment_constraint() {
   return card_size * os::vm_page_size();
 }
+
+#if TERA_CARDS
+uint64_t CardTableModRefBS::tc_ct_max_alignment_constraint() {
+  return (uint64_t) tc_card_size * (uint64_t) os::vm_page_size();
+}
+#endif
 
 void CardTableModRefBS::verify_guard() {
   // For product build verification

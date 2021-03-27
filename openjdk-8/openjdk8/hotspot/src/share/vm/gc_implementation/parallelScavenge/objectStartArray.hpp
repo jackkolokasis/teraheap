@@ -44,8 +44,12 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   MemRegion       _reserved_region;
   MemRegion       _covered_region;
   MemRegion       _blocks_region;
-  jbyte*          _raw_base;
-  jbyte*          _offset_base;
+  jbyte*          _raw_base;		// Heap object start array base
+  jbyte*          _offset_base;		// Heap offset base
+#if TERA_CARDS
+  short*		  _tc_raw_base;		// TeraCache object start array base
+  short*		  _tc_offset_base;	// TeraCache offset base
+#endif
 
  public:
 
@@ -57,6 +61,12 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     block_shift                  = 9,
     block_size                   = 1 << block_shift,
     block_size_in_words          = block_size / sizeof(HeapWord)
+
+#if TERA_CARDS
+	,tc_block_shift              = TERA_CARD_SIZE,
+	tc_block_size				 = 1 << tc_block_shift,
+    tc_block_size_in_words       = tc_block_size / sizeof(HeapWord)
+#endif
   };
 
  protected:
@@ -65,11 +75,24 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   jbyte* block_for_addr(void* p) const {
     assertf(_covered_region.contains(p),
            "out of bounds access to object start array");
-    jbyte* result = &_offset_base[uintptr_t(p) >> block_shift];
+	jbyte* result = &_offset_base[uintptr_t(p) >> block_shift];
     assertf(_blocks_region.contains(result),
            "out of bounds result in byte_for");
     return result;
   }
+ 
+#if TERA_CARDS
+  // Mapping from address to object start array entry for TeraCache
+  short* tc_block_for_addr(void* p) const {
+    assertf(_covered_region.contains(p),
+           "out of bounds access to object start array");
+	short* result = &_tc_offset_base[uintptr_t(p) >> tc_block_shift];
+
+    assertf(_blocks_region.contains(result),
+           "out of bounds result in byte_for");
+    return result;
+  }
+#endif
 
   // Mapping from object start array entry to address of first word
   HeapWord* addr_for_block(jbyte* p) {
@@ -81,6 +104,19 @@ class ObjectStartArray : public CHeapObj<mtGC> {
            "out of bounds accessor from card marking array");
     return result;
   }
+  
+#if TERA_CARDS
+  // Mapping from object start array entry to address of first word
+  HeapWord* tc_addr_for_block(short* p) {
+    assertf(_blocks_region.contains(p),
+           "out of bounds access to object start array");
+    size_t delta = pointer_delta(p, _tc_offset_base, sizeof(short));
+    HeapWord* result = (HeapWord*) (delta << tc_block_shift);
+    assertf(_covered_region.contains(result),
+           "out of bounds accessor from card marking array");
+    return result;
+  }
+#endif
 
   // Mapping that includes the derived offset.
   // If the block is clean, returns the last address in the covered region.
@@ -99,19 +135,43 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     }
 
     size_t delta = pointer_delta(p, _offset_base, sizeof(jbyte));
-	//printf("==================================================================\n");
-	//printf("P = %p | OFFSET_BASE = %p | DELTA = %lu \n", p, _offset_base, delta);
     HeapWord* result = (HeapWord*) (delta << block_shift);
-	//printf("Result = %p | *p = %c \n", result, *p);
     result += *p;
-	//printf("Result = %p \n", result);
-	//printf("==================================================================\n");
 
     assertf(_covered_region.contains(result),
            "out of bounds accessor from card marking array");
 
     return result;
   }
+  
+#if TERA_CARDS
+  // Mapping that includes the derived offset for TeraCache.
+  // If the block is clean, returns the last address in the covered region.
+  // If the block is < index 0, returns the start of the covered region.
+  HeapWord* tc_offset_addr_for_block (short* p) const {
+    // We have to do this before the assert
+    if (p < _tc_raw_base) {
+      return _covered_region.start();
+    }
+
+    assertf(_blocks_region.contains(p),
+           "out of bounds access to object start array");
+
+    if (*p == clean_block) {
+      return _covered_region.end();
+    }
+
+    size_t delta = pointer_delta(p, _tc_offset_base, sizeof(short));
+    HeapWord* result = (HeapWord*) (delta << tc_block_shift);
+
+    result += *p;
+
+    assertf(_covered_region.contains(result),
+           "out of bounds accessor from card marking array");
+
+    return result;
+  }
+#endif
 
  public:
 
@@ -145,6 +205,22 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     // tty->print_cr("[%p]", p);
   }
 
+#if TERA_CARDS
+  void tc_allocate_block(HeapWord* p) {
+    assertf(_covered_region.contains(p), "Must be in covered region");
+    short* block = tc_block_for_addr(p);
+    HeapWord* block_base = tc_addr_for_block(block);
+    size_t offset = pointer_delta(p, block_base, sizeof(HeapWord*));
+
+    assertf(offset < 32767, "Sanity %lu", offset);
+    // When doing MT offsets, we can't assert this.
+    //assert(offset > *block, "Found backwards allocation");
+    *block = (short)offset;
+
+    // tty->print_cr("[%p]", p);
+  }
+#endif
+
   // Optimized for finding the first object that crosses into
   // a given block. The blocks contain the offset of the last
   // object in that block. Scroll backwards by one, and the first
@@ -152,20 +228,11 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   HeapWord* object_start(HeapWord* addr) const {
     assertf(_covered_region.contains(addr), "Must be in covered region");
     jbyte* block = block_for_addr(addr);
-	//printf("==========================================================\n");
-	//printf("Block = %p\n", block);
-	//printf("==========================================================\n");
     HeapWord* scroll_forward = offset_addr_for_block(block--);
-	//printf("==========================================================\n");
-	//printf("ADDR = %p | Scroll = %p | Block = %p\n", addr, scroll_forward, block);
-	//printf("==========================================================\n");
     while (scroll_forward > addr) {
       scroll_forward = offset_addr_for_block(block--);
     }
 
-	//printf("==========================================================\n");
-	//printf("ADDR = %p | Scroll = %p\n", addr, scroll_forward);
-	//printf("==========================================================\n");
     HeapWord* next = scroll_forward;
     while (next <= addr) {
       scroll_forward = next;
@@ -176,6 +243,30 @@ class ObjectStartArray : public CHeapObj<mtGC> {
     return scroll_forward;
   }
 
+#if TERA_CARDS
+  // Optimized for finding the first object that crosses into
+  // a given block in TeraCache. The blocks contain the offset of the last
+  // object in that block. Scroll backwards by one, and the first
+  // object hit should be at the beginning of the block
+  HeapWord* tc_object_start(HeapWord* addr) const {
+    assertf(_covered_region.contains(addr), "Must be in covered region");
+    short* block = tc_block_for_addr(addr);
+    HeapWord* scroll_forward = tc_offset_addr_for_block(block--);
+    while (scroll_forward > addr) {
+      scroll_forward = tc_offset_addr_for_block(block--);
+    }
+
+    HeapWord* next = scroll_forward;
+    while (next <= addr) {
+      scroll_forward = next;
+      next += oop(next)->size();
+    }
+    assertf(scroll_forward <= addr, "wrong order for current and arg");
+    assertf(addr <= next, "wrong order for arg and next");
+    return scroll_forward;
+  }
+#endif
+
   bool is_block_allocated(HeapWord* addr) {
     assert(_covered_region.contains(addr), "Must be in covered region");
     jbyte* block = block_for_addr(addr);
@@ -184,11 +275,19 @@ class ObjectStartArray : public CHeapObj<mtGC> {
 
     return true;
   }
+ 
 
   // Return true if an object starts in the range of heap addresses.
   // If an object starts at an address corresponding to
   // "start", the method will return true.
   bool object_starts_in_range(HeapWord* start_addr, HeapWord* end_addr) const;
+  
+#if TERA_CARDS
+  // Return true if an object starts in the range of teracache addresses.
+  // If an object starts at an address corresponding to
+  // "start", the method will return true.
+  bool tc_object_starts_in_range(HeapWord* start_addr, HeapWord* end_addr) const;
+#endif
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_OBJECTSTARTARRAY_HPP
