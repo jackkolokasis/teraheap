@@ -49,9 +49,7 @@ void init(uint64_t align) {
 	tc_mem_pool.size = 0;
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
 
-#if TEST
 	req_init();
-#endif
 }
 
 

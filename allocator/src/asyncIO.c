@@ -11,9 +11,10 @@ struct ioRequest request[MAX_REQS];
 void req_init() {
 	int i;
 	
-	for (i = 0; i < MAX_REQS; i++)
+	for (i = 0; i < MAX_REQS; i++) {
 		request[i].state = 0;
 		request[i].buffer = NULL;
+	}
 }
 
 // Check to find available slot in the i/o request array for the new i/o

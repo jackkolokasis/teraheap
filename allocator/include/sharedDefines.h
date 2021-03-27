@@ -18,8 +18,6 @@
 
 #define ANONYMOUS 0
 
-#define TEST 1
-
 #define SEG_SIZE 1073741824				 //< Segment size
 
 #define MAX_REQS 64						 //< Maximum requests

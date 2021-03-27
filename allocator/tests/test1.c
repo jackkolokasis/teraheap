@@ -11,12 +11,13 @@
 *	- object allocation in the correct positions
 ***************************************************/
 
+#include <stdint.h>
 #include <stdio.h>
 #include "../include/sharedDefines.h"
 #include "../include/regions.h"
 
-#define CARD_SIZE 512
-#define PAGE_SIZE 4096
+#define CARD_SIZE ((uint64_t) (1 << 9))
+#define PAGE_SIZE ((uint64_t) (1 << 12))
 
 int main() {
 	char *obj1;
