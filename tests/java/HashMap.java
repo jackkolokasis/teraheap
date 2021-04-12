@@ -28,7 +28,7 @@ public class HashMap {
 	}
 
 	public static void main(String[] args) {
-		int num_elements = 10000000;
+		int num_elements = 9;
 
 		System.out.println(Runtime.getRuntime().maxMemory());
 		
@@ -40,7 +40,11 @@ public class HashMap {
 		{
 			h_map.put("Bangalore" + i, "22");
 		}
-
+		
+		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
+			System.out.println(e.getKey() + " = " + e.getValue());
+		}
+		
 		gc();
 		
 		h_map.put("Dali", "22");
@@ -57,7 +61,18 @@ public class HashMap {
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
 			System.out.println(e.getKey() + " = " + e.getValue());
 		}
-		
+
+		gc();
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Apostolos Andreas" + i, "22");
+		}
+		gc();
+		gc();
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Moires" + i, "22");
+		}
 		gc();
 		
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
@@ -65,10 +80,12 @@ public class HashMap {
 		}
 
 		h_map.put("Ammochostos", "5608");
+		  
+		h_map.put("Jack" + 1999, "22");
 		
 		for (int i = num_elements/2; i < num_elements; i++)
 		{
-			h_map.put("Paphos" + i, "22");
+		  h_map.put("Paphos" + i, "22");
 		}
 		
 		gc();
@@ -78,10 +95,19 @@ public class HashMap {
 		}
 
 		gc();
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Karpasia" + i, "22");
+		}
 
 		h_map.put("Mia milia", "22");
 		
 		gc();
+		
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Kerineia" + i, "22");
+		}
 		
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
 			System.out.println(e.getKey() + " = " + e.getValue());
@@ -92,8 +118,35 @@ public class HashMap {
 			h_map.put("Heraklion" + i, "22");
 		}
 		gc();
+		
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Troodos" + i, "22");
+		}
+
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
 			System.out.println(e.getKey() + " = " + e.getValue());
+		}
+		
+		gc();
+		
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Achna" + i, "22");
+		}
+		
+		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
+			System.out.println(e.getKey() + " = " + e.getValue());
+		}
+		
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Maria" + i, "22");
+		}
+		
+		for (int i = num_elements/2; i < num_elements; i++)
+		{
+		  h_map.put("Nikos" + i, "22");
 		}
 	}
 }

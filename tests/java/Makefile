@@ -20,7 +20,7 @@ GDB=gdb
 TARGET=Array_List.class Array_List_Int.class Simple_Array.class List_Small.class List_Large.class \
 	   MultiList.class Simple_Lambda.class Extend_Lambda.class Test_Reflection.class \
 	   Test_String.class Array_List_Scalar.class Test_Reference.class \
-	   HashMap.class Array.class
+	   HashMap.class Array.class Rehashing.class Clone.class
 	
 all: $(TARGET)
 
@@ -72,6 +72,12 @@ HashMap.class: HashMap.java
 Array.class: Array.java
 	$(JAVAC) $<
 
+Rehashing.class: Rehashing.java
+	$(JAVAC) $<
+
+Clone.class: Clone.java
+	$(JAVAC) $<
+
 debug:
 	-$(GDB) $(JAVA) $f
 
@@ -79,6 +85,8 @@ clean:
 	-rm core.*
 	-rm hs_err_pid*
 	-rm err out
+	-rm hotspot_pid*
+	-rm replay_pid*
 
 distclean: clean
 	-rm -f *.class
