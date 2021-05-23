@@ -2,36 +2,6 @@
 #include <jni.h>
 #include <iostream>
 
-//JNIEXPORT jstring 
-//JNICALL Java_com_teraCache_TeraCache_test (JNIEnv *env, jobject teraCache, jstring str)
-//{
-//    jclass sringClass;
-//    jmethodID cid;
-//    jstring result;
-//
-//    // Find class
-//    stringClass = (*env)->FindClass(env, "java/lang/String");
-//    if (stringClass == NULL) {
-//        return NULL; /* exception trhown */
-//    }
-//
-//    // Get the method ID for the String(char[]) constructor */
-//    // To obtain method id of a constructor pass "<init>" as method
-//    // name
-//    cid = (*env)->GetMethodID(env, stringClass, "<init>", "()");
-//
-//    if (cid == NULL) {
-//        return NULL; /* exception trhown */
-//    }
-//
-//    result = (*env)->NewObject(env, stingClass, cid, obj);
-//
-//    // Free local references
-//    (*env)->DeleteLocalRef(env, stringClass);
-//
-//    return result;
-//}
-
 JNIEXPORT void 
 JNICALL Java_com_teraCache_TeraCache_sayHello (JNIEnv *env, jobject jobj)
 {
@@ -87,8 +57,8 @@ JNICALL Java_com_teraCache_TeraCache_cache (JNIEnv *env, jobject obj, jobject va
         std::cout << "ERROR" << std::endl;
         return NULL; /* exception trhown */
     }
-    
-    std::cout << "Cache Objects" << std::endl;
+
+
     result = env->NewObject(my_class, cid, value, size, cTag);
 
     if (result == NULL) {
@@ -99,4 +69,3 @@ JNICALL Java_com_teraCache_TeraCache_cache (JNIEnv *env, jobject obj, jobject va
     return result;
 
 }
-
