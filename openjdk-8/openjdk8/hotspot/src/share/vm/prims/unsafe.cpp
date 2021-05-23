@@ -598,6 +598,15 @@ UNSAFE_ENTRY(jlong, Unsafe_AllocateMemory(JNIEnv *env, jobject unsafe, jlong siz
   return addr_to_java(x);
 UNSAFE_END
 
+UNSAFE_ENTRY(void, Unsafe_TcMarkObject(JNIEnv *env, jobject unsafe, jobject obj))
+  UnsafeWrapper("Unsafe_TcMarkObject");
+  
+  oop o = JNIHandles::resolve_non_null(obj);
+  o->set_mark_tc();
+
+UNSAFE_END
+
+
 UNSAFE_ENTRY(jlong, Unsafe_ReallocateMemory(JNIEnv *env, jobject unsafe, jlong addr, jlong size))
   UnsafeWrapper("Unsafe_ReallocateMemory");
   void* p = addr_from_java(addr);
@@ -1591,6 +1600,10 @@ static JNINativeMethod methods_18[] = {
     {CC"putAddress",         CC"("ADR""ADR")V",          FN_PTR(Unsafe_SetNativeAddress)},
 
     {CC"allocateMemory",     CC"(J)"ADR,                 FN_PTR(Unsafe_AllocateMemory)},
+
+	// Mark object to be moved in TeraCache
+    {CC"tcMarkObject",       CC"("OBJ")V",               FN_PTR(Unsafe_TcMarkObject)},
+
     {CC"reallocateMemory",   CC"("ADR"J)"ADR,            FN_PTR(Unsafe_ReallocateMemory)},
     {CC"freeMemory",         CC"("ADR")V",               FN_PTR(Unsafe_FreeMemory)},
 

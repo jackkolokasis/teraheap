@@ -100,7 +100,7 @@ size_t TeraCache::tc_get_size_region(void) {
 char* TeraCache::tc_region_top(oop obj, size_t size) {
 	char *pos;			// Allocation position
 
-	MutexLocker x(tera_cache_lock);
+	//MutexLocker x(tera_cache_lock);
 
 	// Update Statistics
 	total_objects_size += size;
@@ -114,8 +114,10 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 
 	pos = allocate(size);
 	
+#if VERBOSE_TC
 	if (TeraCacheStatistics)
 		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu | Name = %s", size, obj->klass()->internal_name());
+#endif
 
 	_start_array.tc_allocate_block((HeapWord *)pos);
 

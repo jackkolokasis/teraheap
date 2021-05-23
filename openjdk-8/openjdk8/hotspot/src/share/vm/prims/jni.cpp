@@ -1395,8 +1395,9 @@ static instanceOop alloc_object(jclass clazz, TRAPS) {
 
 	k()->check_valid_for_instantiation(false, CHECK_NULL);
 	InstanceKlass::cast(k())->initialize(CHECK_NULL);
-	instanceOop ih = NULL;
+	instanceOop ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
 
+	/**
 	if (EnableTeraCache)
 	{
 		if (!strstr(InstanceKlass::cast(k())->signature_name(), "DeserializedMemoryEntry")) 
@@ -1420,6 +1421,7 @@ static instanceOop alloc_object(jclass clazz, TRAPS) {
 	else {
 		ih = InstanceKlass::cast(k())->allocate_instance(THREAD);
 	}
+	**/
 
 	return ih;
 }

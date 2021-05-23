@@ -1138,5 +1138,12 @@ public final class Unsafe {
     private static void throwIllegalAccessError() {
        throw new IllegalAccessError();
     }
+    
+	/**
+     * Mark object to be moved to TeraCache
+	 *
+     * @param o object/array to update tera mark word
+     */
+    public native void tcMarkObject(Object o);
 
 }

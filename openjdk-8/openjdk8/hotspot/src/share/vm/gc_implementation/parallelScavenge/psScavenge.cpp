@@ -423,6 +423,9 @@ bool PSScavenge::invoke_no_policy() {
 #if TERA_CARDS
 	  if (EnableTeraCache && !Universe::teraCache()->tc_empty())
 	  {
+		  // Give advise to kernel to prefetch pages for TeraCache random
+		  Universe::teraCache()->tc_enable_rand();
+
 		  // There are objects from TeraCache to heap if there are objects in
 		  // the old gen
 		  uint stripe_total = active_workers;
@@ -732,9 +735,15 @@ bool PSScavenge::invoke_no_policy() {
 
   _gc_tracer.report_gc_end(_gc_timer.gc_end(), _gc_timer.time_partitions());
 
-  // Print statistics for TeraCache
-  if (TeraCacheStatistics)
-	  Universe::teraCache()->tc_print_mgc_statistics();
+  if (EnableTeraCache) {
+	  // Give advise to kernel to prefetch pages for TeraCache sequentially
+	  Universe::teraCache()->tc_enable_seq();
+
+	  // Print statistics for TeraCache
+	  if (TeraCacheStatistics)
+		  Universe::teraCache()->tc_print_mgc_statistics();
+  }
+
 
   return !promotion_failure_occurred;
 }

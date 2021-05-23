@@ -236,6 +236,7 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   // Make sure klass is initialized
   klass->initialize(CHECK);
   
+#if DEBUG_ANNO_INTR
   int alloc_cache = get_alloc_gen(pool, method(thread), bci(thread));
 
   // At this point the class may not be fully initialized
@@ -268,13 +269,16 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
       // Allocate object to Old Generation directly
       // obj = klass->allocate_instance(true, CHECK);
 
-#if DEBUG_ANNO_INTR
 #if TERA_FLAG
       obj->set_tera_cache();
 #endif
-#endif
-
   }
+#else
+    oop obj = klass->allocate_instance(CHECK); // The interpreter establishes the object strength entrance
+#if TERA_FLAG
+	obj->set_obj_state();
+#endif
+#endif
 
   // The secured result is stored in JavaThread with JavaThread and
   // return

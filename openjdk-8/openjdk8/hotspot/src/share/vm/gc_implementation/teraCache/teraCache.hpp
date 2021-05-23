@@ -15,7 +15,7 @@ class TeraCache {
 
 		static ObjectStartArray _start_array; // Keeps track of where objects 
 											  // start in a 512b block
-
+											  
 		/*-----------------------------------------------
 		 * Stacks
 		 *---------------------------------------------*/

@@ -82,14 +82,15 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
 // heap and return `true` if the policy is satisfied, and `false` otherwise.
 bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
 #if P_SIMPLE
-	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q));
+	return oop(q)->is_tera_cache() && !oop(q)->is_mark_tc() && !PSScavenge::is_obj_in_young(oop(q));
 
 #elif P_SIZE
-	return oop(q)->is_tera_cache() && !PSScavenge::is_obj_in_young(oop(q))  
+	return oop(q)->is_tera_cache() && !oop(q)->is_mark_tc() && !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold;
 
 #elif P_DISTINCT
 	return (oop(q)->is_tera_cache() 
+		&& !oop(q)->is_mark_tc() 
 		&& !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold) || (oop(q)->is_tc_to_old());
 #else
@@ -561,6 +562,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 
   HeapWord*       q = space()->bottom();
   HeapWord* const t = _end_of_live;
+#if FMAP_ASYNC
+  bool	trans_to_tc = false;
+#endif
+
   debug_only(HeapWord* prev_q = NULL);
 
   if (q < t && _first_dead > q && !oop(q)->is_gc_marked()) {
@@ -590,7 +595,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		HeapWord* const end = _first_dead;
 
 		// Give advise to kernel to prefetch pages for TeraCache random
-		Universe::teraCache()->tc_enable_rand();
+		// Universe::teraCache()->tc_enable_rand();
 
 		while (q < end) {
 			/* Get the size of the object */
@@ -628,6 +633,9 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					/* Initialize mark word of the destination */
 					oop(q)->init_mark();
 					Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#if FMAP_ASYNC
+					trans_to_tc = true;
+#endif
 #else
 					memcpy(compaction_top, q, size * 8);
 					// Change the value of teraflag in the new location of the object
@@ -641,6 +649,8 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					Copy::aligned_conjoint_words(q, compaction_top, size);
 					/* Initialize mark word of the destination */
 					oop(compaction_top)->init_mark();
+					if (!oop(compaction_top)->is_mark_tc())
+						oop(compaction_top)->set_obj_state();
 				}
 			    
 #if DEBUG_TERACACHE
@@ -663,6 +673,8 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 				        	  << "=> NEW_ADDR = "  << q  << std::endl;
 #endif
 				oop(q)->init_mark();
+				if (!oop(q)->is_mark_tc())
+					oop(q)->set_obj_state();
 
 				/* 
 				 * Set the object state to show that this place holds a valid object
@@ -774,6 +786,9 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			  oop(q)->set_obj_in_tc();
 			  oop(q)->init_mark();
 			  Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#if FMAP_ASYNC
+			  trans_to_tc = true;
+#endif
 #else
 			  memcpy(compaction_top, q, size * 8);
 			  oop(compaction_top)->set_obj_in_tc();
@@ -784,10 +799,15 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			  Copy::aligned_conjoint_words(q, compaction_top, size);
 			  // Change the value of teraflag in the new location of the object
 			  oop(compaction_top)->init_mark();
+			  if (!oop(compaction_top)->is_mark_tc())
+				  oop(compaction_top)->set_obj_state();
 		  }
 #else
 		  Copy::aligned_conjoint_words(q, compaction_top, size);
 		  oop(compaction_top)->init_mark();
+
+		  if (!oop(compaction_top)->is_mark_tc())
+			  oop(compaction_top)->set_obj_state();
 #endif
 
 
@@ -831,6 +851,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   if (EnableTeraCache) {
 #if ASYNC
   while(!Universe::teraCache()->tc_areq_completed());
+#if FMAP_ASYNC
+  if (trans_to_tc)
+	  Universe::teraCache()->tc_fsync();
+#endif
 #elif FMAP
   Universe::teraCache()->tc_fsync();
 #endif

@@ -20,11 +20,15 @@
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
-#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+//#if !NDEBUG
+//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+//#elif
+#define assertf(A, M, ...) ;
+//#endif
 
 #define DEBUG_SLOWPATH_INTR		 0	//< Use only interpreter for object allocation
 
-#define DEBUG_ANNO_INTR     	 1	//< Debug @Cache annotation, TODO Disable in Spark experiments
+#define DEBUG_ANNO_INTR     	 0	//< Debug @Cache annotation, TODO Disable in Spark experiments
 
 #define DEBUG_TERACACHE     	 0	//< Debug prints for teraCache, TODO Disable in experiments
 
@@ -68,7 +72,13 @@
 									// memory of fast map is different from
 									// buffer cache. 
 
-#define TERA_CARD_SIZE			 14 // This is the size of each card in
+#define FMAP_ASYNC				 0  //< When we use fastmap we need to ensure
+									// that all the writes in buffered cached
+									// will be flushed to the device because the
+									// memory of fast map is different from
+									// buffer cache. 
+
+#define TERA_CARD_SIZE			14  // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
@@ -99,6 +109,12 @@
 /**********************************
  * States of TeraFlag  
  **********************************/
+#define MARK_TO_TERA			527	//< Mark HashMap in Spark. By marking
+									// Hashmap we mark the root object for all
+									// the cached RDD partitions in TC. We do
+									// not move HashMap but only partitions in
+									// TeraCache.
+
 #define MOVE_TO_TERA			255	//< Move this object to tera cache
 
 #define TERA_TO_OLD		        328	//< Pointer from TeraCache to Old Gen. Move
@@ -113,6 +129,8 @@
  * Statistics
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for TeraCache
+
+#define VERBOSE_TC				  0  //< Print objects in T
 
 
 
