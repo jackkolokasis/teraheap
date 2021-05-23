@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema name="setQuery">
+    <!-- at SF 1 ~51,7Mb -->
+    <!-- sf 1978 ~100Gb -->
+    <!-- Default SF -->
+	<property name="SF" type="double">1</property>
+
+	<seed>1234567890</seed>
+	<rng name="PdgfDefaultRandom"/>
+	
+	<table name="setQuery">
+		<size>1000000*${SF}</size>
+		
+	    <field name="KSEQ" size="" type="INTEGER" primary="true" unique="true">
+			<gen_IdGenerator/>
+		</field>
+		<field name="K500K" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>500000</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K250K" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>250000</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K100K" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>100000</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K40K" size="" type="INTEGER">
+			<gen_LongGenerator>														
+				<min>1</min><max>40000</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K10K" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>10000</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K1K" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>1000</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K100" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>100</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K25" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>25</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K10" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>10</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K5" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>5</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K4" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>4</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="K2" size="" type="INTEGER">
+			<gen_LongGenerator>
+				<min>1</min><max>2</max>
+			</gen_LongGenerator>
+		</field>
+		<field name="S1" size="8" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S2" size="20" type="VARCHAR"> 
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S3" size="20" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S4" size="20" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S5" size="20" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S6" size="20" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S7" size="20" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+		<field name="S8" size="20" type="VARCHAR">
+			<gen_StaticValueGenerator>
+				<value>12345678900987654321</value>
+			</gen_StaticValueGenerator>
+		</field>
+	</table>
+</schema>
+

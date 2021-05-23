@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  <!DOCTYPE schema SYSTEM "structure/pdgfSchema.dtd">-->
+
+<schema name="item"  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="structure/pdgfSchema.xsd">	
+	<!-- All data is derived from this starting seed. 
+	If this seed is the same, the generated data will the same on each computer/node/platform. 
+	Change this seed to generate a different data set.-->
+	<seed>1234567890</seed>
+	
+	<rng name="PdgfDefaultRandom"/>
+<property name="SF" type="double">50000000</property>
+<table name="OS_ORDER">
+<size>100000*${SF}</size>
+<field name="ORDER_ID" size="" type="NUMERIC">
+    <gen_IdGenerator/>
+</field>
+<field name="BUYER_ID" size="" type="NUMERIC">
+    <gen_IdGenerator/>
+</field>
+<field name="CREATE_DT" size="20" type="VARCHAR">
+    <gen_DictList>
+        <file>dicts/date.dict</file>
+    </gen_DictList>
+</field>
+</table>
+<table name="OS_ORDER_ITEM">
+	<size>100000*${SF}</size>
+	<field name="ITEM_ID" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+	</field>
+	<field name="ORDER_ID" size="" type="NUMERIC">
+		<gen_PermutationReferenceGenerator>
+			<reference table="OS_ORDER" field="ORDER_ID" />
+		</gen_PermutationReferenceGenerator>
+	</field>
+	<field name="GOODS_ID" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+	</field>
+	<field name="GOODS_NUMBER" size="10" type="NUMERIC">
+		<gen_DoubleGenerator>
+			<minD>1</minD>
+			<maxD>999</maxD>
+			<decimalPlaces>0</decimalPlaces>
+		</gen_DoubleGenerator>
+	</field>
+	<field name="GOODS_PRICE" size="10" type="NUMERIC">
+		<gen_DoubleGenerator>
+			<minD>0.01</minD>
+			<maxD>1000.00</maxD>
+			<decimalPlaces>2</decimalPlaces>
+		</gen_DoubleGenerator>
+	</field>
+	<field name="GOODS_AMOUNT" size="" type="NUMERIC">
+	   <gen_FormulaGenerator>
+			<gen_OtherFieldValueGenerator>
+				<reference field="GOODS_NUMBER" />
+			</gen_OtherFieldValueGenerator>
+			<gen_OtherFieldValueGenerator>
+				<reference field="GOODS_PRICE" />
+			</gen_OtherFieldValueGenerator>
+			<formula>generator[0]*generator[1]</formula>
+			<decimalPlaces>2</decimalPlaces>
+		</gen_FormulaGenerator> 
+	</field>
+</table>
+</schema>

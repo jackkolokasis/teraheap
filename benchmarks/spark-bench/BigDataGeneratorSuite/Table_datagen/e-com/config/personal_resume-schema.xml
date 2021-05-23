@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  <!DOCTYPE schema SYSTEM "structure/pdgfSchema.dtd">-->
+
+<schema name="item"  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="structure/pdgfSchema.xsd">	
+	<!-- All data is derived from this starting seed. 
+	If this seed is the same, the generated data will the same on each computer/node/platform. 
+	Change this seed to generate a different data set.-->
+	<seed>1234567890</seed>
+	
+	<rng name="PdgfDefaultRandom"/>
+<property name="SF" type="double">50000000</property>
+<table name="Personal_resume">
+	<size>100000*${SF}</size>
+	<field name="Person_ID" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+    </field>
+	<field name="Person_name" size="50" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/name.dict</file>
+		</gen_DictList>
+	</field>
+	<field name="Person_contact" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+    </field>
+	<field name="Person_depart" size="500" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/depart.dict</file>
+		</gen_DictList>
+    </field>
+	<field name="Person_department" size="500" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/department.dict</file>
+		</gen_DictList>
+    </field>
+	<field name="Person_birthday" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+    </field>
+	<field name="Person_nativeplace" size="50" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/nativeplace.dict</file>
+		</gen_DictList>
+    </field>
+	<field name="Person_institute" size="500" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/institute.dict</file>
+		</gen_DictList>
+    </field>
+	<field name="Person_tittle" size="" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/tittle.dict</file>
+		</gen_DictList>
+    </field>
+	<field name="Person_interest" size="500" type="VARCHAR">
+		<gen_DictList>
+			<file>dicts/interest.dict</file>
+		</gen_DictList>
+    </field>
+	<field name="Person_experience" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+    </field>
+	<field name="Person_work" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+    </field>
+	<field name="Person_paper" size="" type="NUMERIC">
+		<gen_IdGenerator/>
+    </field>
+</table>
+</schema>

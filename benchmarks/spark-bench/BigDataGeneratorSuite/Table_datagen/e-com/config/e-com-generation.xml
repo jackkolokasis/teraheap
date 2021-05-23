@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<generation>
+ 
+	<!-- DEFAULT Scheduler for all Tables, if no table specific scheduler is specified-->
+	<scheduler name="DefaultScheduler"></scheduler>
+	<!-- DEFAULT output for all Tables, if no table specific output is specified-->
+	<output name="CSVRowOutput">
+		<fileTemplate>outputDir + table.getName() + fileEnding</fileTemplate>
+		<outputDir>output/</outputDir>
+		<fileEnding>.txt</fileEnding>
+		<delimiter>|</delimiter>
+	</output>
+
+	<schema name="e-com">
+		<tables>			
+		</tables>
+	</schema>
+</generation>

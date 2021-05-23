@@ -1,0 +1,711 @@
+CHANGELOG
+
+================================================================================
+SVN Rev 419-461 Januar 31 2012:
+================================================================================
+- encapsulated File creation, per thread LineBuffers, encoding and sorting into a subclass.
+
+
+================================================================================
+SVN Rev 419-461 Januar 31 2012:
+================================================================================
+fixed tickets: 90
+
+- new: Constants.java now supports loading constant values from 'Constants.properties' file if such a file exists right next to the pdgf.jar.
+- reworked Constants.java class. Per default the Operating system dependent line separator chars are used in the output classes to format the outputed files. 
+- new: split system for meta table "TradeSource" The big table TradeSource is split into 4 distinct Tables: TradeHistory, Trade (one for each batch), HoldingHistory and CashTransaction
+- added complex error and bounds checking routines to UpdateBlack box to detect settings which would lead to degeneration over time (delete more ID큦 per update than adding new ones will exhaust available id큦 over time, so at some point it is no longer possible to delete/change anything)
+- improvement of UpdateBlackBox performance for common special cases
+- improved code documentation
+- improvement of error reporting system. More and better structured information for better tracing down errors on "non developer" machines.
+- improved and reworked many Generators to incorporate the latest core features, Also bugfixed a few. Affected: ActionTsGenerator, ProspectTradeTypeGenerator, DefaultReferenceGenerator
+- reworked worker subclasses. All FieldValueDTO values are resetet to NULL before handling them to the generators
+- cleanup legacy code, refactored and merged stuff.
+- located and fixed the "non deterministic" error during FINWIRE generation (cause: concurrency issue in UpdateScheduler, leading to wrong RowID to Update bean assignment  in WorkUnit. This non deterministic assignment caused the witnessed strange behavior, as the PermutationReferenceGenerator used the (wrong) rowID to select a valid ID from Finwire-FIN. Obviously a wrong rowID could lead to wrong selections out of bound of the backing bijective permutations used to generate the reference. 
+- fixed a bug in the Generation progress update system
+
+================================================================================
+SVN Rev 384-418 December 12 2011:
+================================================================================
+fixed tickets: 71, 87
+
+- new own licence free PRNG algorithm implementation of PDGFDefaultRandom 
+- updated 3rd party licence file.
+- Created ActionListener interface for DataGenerator. 
+- Implemented tpc.di.output.ReportingOutputExample.  
+- Switched ALL FormattedNumberGenerators to SimpleFormattedNumberGenerator!
+- A little bit of performance work to reduce object allocation overhead.
+- better version of debug print in generator exceptions
+- added "PermuationReferenceGenerator_ErrorCheckDisabled" switch to config file and PermutationReferenceGenerator. Further improved debug information output
+- fixed bug in BechmarkGenerator Action
+- fixed minor bug in UpdateRowWorker
+- fixed finwirePTSGenerator, added Reference
+- fixed hashCode routine in SpreadGeneratorCache, removed debug prints
+- fixed ticket #71 "In CustomerMgmt, actions have time stamps beyond the BatchDate".  Error was: Wrong calculation formula in ActionTSGenerator and wrong <endDate> in CustomerMgmt table definition in  tpc-di-schema.xml.    
+- fix for ticket #87 middle names in customer.txt and customermgmt.xml are empty.  Error in cfg and RandomAString generator.
+
+================================================================================
+SVN Rev 324-383 November 22. 2011:
+================================================================================
+fixed tickets: 76, 83
+
+Usability (Plugin writers and end users)
+---------------
+- made internal developer cheat switches available as JVM properties. See appendix Documents/ConstantsCheatVars.pdf. Properties can be set with java -DpropertieName=value	
+- char [] no longer supported as valid Generator output in FieldValueDTO.setValue(obj). Every Obj a plugin writer puts into the FieldValueDTO must implement toString. Primitives like int are automatically casted into their wrapper Objects like Integer which support toString().
+- references are disabled by default (as most generators cant use <reference> nodes) To enable references in an generator plugin, do the following:
+ protected void initStage0_configParsers() throws ConfigurationException {
+    setReferencesUsed(requiredCount, usedCount);
+ }
+- added self monitoring (profiling) to PDGF. To turn it on start with: 
+  java -DSELF_MONITORING_ENABLED=1 -DSELF_MONITORING_HUMANREADABLE=1 -jar pdgf.jar
+- outsourced tpc-di specifc implementations into own plugin jar file: /plugins/tpc-di.jar
+
+-new Controller commands:
+*************************
+-'r' or 'reload'  to reload all config files without restarting pdgf. (you have to confirm this action);
+- 'sf' or  'scaleFactor' allows you to change the main ScaleFactor, even if the config file is allready loaded (but triggers cfg reload)
+- Controller command history function::
+  <?   list the last 20 commands and their id큦
+  <ID  executes command with specified ID.
+  <    executes the last command again.
+  <<   executes 2nd last command.
+  <<<  executes third last command.
+  <<<< executes forth last command ... and so on.
+
+Stability
+---------------
+- fixed ticket #76, 
+- resolved a null error in DefaultScheduler.getProgress() 
+- fixed bug in memory allocator interface. 
+- fixed RandomBrokerGen and JobIDGenerator  (misplaced cast, the random double number was first casted to long and then multiplied by range. this cast will ALWAYS be 1 and thus the result will always be 1*range = range = 314))
+- bugfix for Generators LastValueCache. Values where cached by storing reference to FieldValueDTO but contents of FieldValueDTO may be changed by other generators during Reference generation. Now cache does cloneing of values (again..)
+-fix progress dived by zero error for to slow and to fast systems. RowsPerSecond or elapsed time could have had values < 1
+- removed lagacy code in DataTransferObjects (DTO큦 aka pdgf.core.dataGenerator.beans.*)
+- 'tg' or 'testGen' and 'bm' or 'benchmarkGenerator' commands now work for more table types and operate more reliable
+- changed behaviour of 'v' 'verbose' command. Default log level is DEBUG, so log/pdgf.log allways contains debug information. Default log level for console appender is info. -v command changes <min> and <max> level of additional appender "consoleDebug", to print out addtional information with its own format. Remember: starting pdgf with java -Ddebug=1 will enable additional debug code paths.
+
+Performance
+---------------
+- performance improvement of longgeneraotr (the former IntGenerator)
+- New strategies for initialization. Greatly reduced memory footprint and initialization time. 
+- Added new scheduling strategy.
+Revisited all Worker/Scheduler/Updateblackbox pairs and transfered more workload to the workers to  take the pressure off the singlethreaded producer side (Scheduler/UpdateBB).  Added some resource reuse strategys in Reference System/DefualtReferenceGenerator. 
+- SeedingStrategy and BijectivePermutation instances are now shared between threades, except their internal RNG instances which are not threadsafe.
+- Specialized implementations for BijectivePermutation. For small enought values BijectivePermuationLong is used, for bigger numbers BijectivePermutationBigInt.
+- Specialized seeding strategies: SeedingStrategy (default) SeedingStrategyTable and SeedingStrategyField to reduce array acces overhead on cached seeds.
+  
+Functionality
+---------------
+- users can now chosse between double conversion strategies: java default DecimalFormat class or FastDoubleToString by starting the JVM with java -DUSE_FAST_DOUBLE_TO_STRING=true/false
+-Restore Cluster scale parallelity of PDGF (distribute work between multiple nodes)
+ step 1:  Historical Tables and Sorting system are functional
+- NullGenerator now realy generates null instead of empty string "";
+-<Reference> node now supports a <generatorByID> node to select a specific generator from a chain of metagenerators by its <generator name="foo" id="theIdofTheGenerator">    Example:
+ <reference>
+  <sameIDAs>
+    <field>Symbol</field>
+    <generatorID>FIN_SEC_SYMBOL_REFGEN</generatorID>
+  </sameIDAs>
+  <field>field</field><table>table</table>
+ </reference>
+- introduced new Default generator "TemplateGenerator" 
+  Example:
+  <generator name="TemplateGenerator">
+  	<nextValue><!-- 
+	  fvdto.setBothValues( Integer.valueOf(10 + rng.nextInt(10))); 
+   --></nextValue>
+  </generator>
+- introduced new Default generator: "FormulaGenerator" 
+  Example:
+ <generator name="FormulaGenerator">
+  <formula>generator[1] * generator[0] + random.nextDouble()*10 </formula>
+  <generator name="OtherFieldValueGenerator">
+   <reference><field>dm_close</field></reference>
+  </generator>
+  <generator name="DoubleGenerator">
+   <minD>1.0</minD>
+   <maxD>1.5</maxD>
+  </generator>
+ </generator> 
+
+
+
+================================================================================
+SVN Rev 305-321 Oktober 27. 2011:
+================================================================================
+Usability (Plugin writers and end users)
+---------------
+-Caching system overhaul (tightly interconnected with reference system @ see ref
+ system update)
+-Reference system cleanup. The only valid way of getting references, is to do the
+ following within a Generator: 
+ 	getReference(refNumber_OR_refName).getReferencedValue(referencedIDToUse, updateIDToUse, gc, currentFieldValue);
+ 	
+ This change triggered a cascade of other changes and so on. A short overview:
+	+All Generators using references/caches hat to be migrated to the new API
+	+All config files had  to be migrated to the new reference Syntax 
+	+Unified many "custom ways" of 
+	+Command Actions (some commands relied on no longer present interfaces)
+	+Changes to the UpdateBlackBox action type implementation.
+		->+Changes to Custom UpdateBlackBox implementations
+			->+Changes to CustomerMgmt specific BlackBox, Scheduler, Worker 
+			   and Output
+			->+Discovered bug in SortingCache regarding null values.
+	
+
+Stability
+---------------
+- fixed ticket #62 Divide by Zero in generation progress statistics
+
+Performance
+---------------
+- Performance improvements on some Generators. 
+	+Compute and Double generator use:
+	 FastDoubleToString.appendFormated(buffer, decimalplaces, thedouble);
+	+Special case in double generator: if <decimalPlaces> is not specified, the
+	 plain unformated double is the result. This is much more performant for 
+	 the use in metagenerators. Especially in combination with the ComputeGenerator, 
+	 as the final formating is performed by the ComputeGen, so we dont have to do 
+	 it within the DoubleGen.
+	+PaddingGenerator:  faster way of padding by avoiding unnecessary casts and copies
+
+- algorithm of StaticHelper.roundDouble(d, decimalPlaces), speed doubled as 
+  complexity was cut in half
+- ByteBufSingleLockSkipListOrderingCacheImpl: new priority (SkipList) based worker thread 
+  pause (park thread) and wakeup (unpark thread), reducing lock congestion.
+  
+Functionality
+---------------
+-changed CustomerMgmt output formating.
+-Changes to CustomerMgmt specific BlackBox, Scheduler, Worker and Output, 
+ RowDTO and FieldValueDTO to support an updateID based output decision.
+ Adapted CompiledOutput template to make the new features available.
+ (before that the output was not aware of the updateID of an field)
+ 
+	Description of the new output behaviour:
+	------------------------------------------
+	Null behaviour:
+		Normal values: <node>value</node>
+		Null values are represented as empty XML Nodes: <node/>
+		
+	If the value exists as attribute it is omitted:
+		Normal <node value="someValue">....</node>
+		Null value <node>....</node>
+	
+	In updcust and updacc, if an value is not updated, it is ommitted:
+		Example 1: CA_B_ID and CA_NAME updated:
+		 <Account CA_ID="4" CA_TAX_ST="0">
+		  <CA_B_ID>6308</CA_B_ID>
+		  <CA_NAME>dTggqhJHSPNTqjhyLxHKiInKJBxmRVhkHVxUKLwUqQOiyU</CA_NAME>
+		  </Account>
+		
+		Example 2: only CA_B_ID updated:
+		<Account CA_ID="4" CA_TAX_ST="0">
+		 <CA_B_ID>6308</CA_B_ID>
+		</Account>
+		
+		Example 3: only CA_NAME updated and new value is NULL:
+		<Account CA_ID="4" CA_TAX_ST="0">
+		 <CA_NAME/>
+		</Account>
+
+Known problems 
+---------------
+
+
+================================================================================
+SVN Rev 258-304 September 28. 2011:
+================================================================================
+
+Usability (Plugin writers and end users)
+-----------
+- added method: Element.error(String message) for all element subclasses. 
+ This system provides plugin writers with an efficient way of generating and 
+ throwing Configuration error messages. The Framework takes care of appending 
+ additional user friendly meta information, like the exact row in the XML
+  configuration file this error relates to.
+- reduced number of schedulers. Removed FixedJunkScheduler. 
+  Substitute: 'DefaultScheduler' (<- the old 'OneLineAtATimeScheduler')
+- re-activated statistics Thread to output progress information (percentage done 
+ and time remaining) while generating large tables. UpdateIntervall 1sec.
+ (Scheduler classes have to implement getProgress(), implemented it for
+ DefaultScheduler and UpdateScheduler)  
+- ElementFactory.getNewElement(Node,...,Element parent) now takes care of 
+  parent.addChild(newElement);
+- A generator plugin now can extend the LastValueCache implementation by
+ overriding: "public LastValueCache getNewLastValueCacheInstance() {}"
+  which gives plugins the ability to easily cache stuff like their 
+  last rng.next() value or any other choice they made.
+  Other generators than can retrieve those values by calling:
+  getCachedValue(sameIDAs_GeneratorField, gc.getID(), gc.getUpdateID()); 
+  (Currently required for Prospect tables ProbabilityGenerator)
+
+Stability
+-----------
+- improved plugin loading. Fixed error regarding special chars in file path 
+  like: '+' or ' ' (java.net.URL class is broken and messed things up)
+- fixed major bug in DefaultReferenceGenerator
+- fixed bug in config file table Prospect. References where not generated 
+ correctly because of the wrong selection of the  DefaultReferenceGenerator 
+ <sameIDAs> field. It must never point to an field containing a MetaGenerator!
+- fixed bugs in several (Meta)generators due to changed framework behaviour 
+ regarding reference handling and generation (related to new adaptive lastValue 
+ cache in Generator class introduced in rev #257):
+ UpdateActionTypeGenerator, SwitchGenerator, TPCDIBirthdayGenerator,
+ TPCDIBatchDateGenerator,SequentialGenerator,ProbabilityGenerator,
+ PrePostfixGenerator,OtherFieldValueGenerator,NullGenerator,
+ CustMgmtUpdateActionTypeGenerator
+
+Performance
+-----------
+- changed SpreadGeneratorCache to weak references (if PDGF tends to run out of 
+ memory, this cache automatically empties itself). Improves scaling of PDGF
+- SplitOutputWrapper (affected tables: ALL with statistics).  Added case 
+ differentiation to handle some special cases much more efficient.
+  On of these special cases, the "just clone everything"-operation mode
+  profits most of this update. The whole Auditing and Reporting system 
+  benefits greatly from this.
+
+Functionality
+---------------
+- NEW Auditing and Reporting system based on (new) StatisticsOutput and 
+ SplitOutputWrapper plugin. 
+
+ to Enable/disable the reporting system set the property to 0 or 1 
+ in schema config file:
+	<property name="AuditingAndReportingSystemActive" type="double">1</property>
+- NEW. added StatisticsOutput class based on XML to Java compiler templates to 
+ realize Auditing and Reporting system for tables.
+- NEW. activated Auditing and Reporting system for tables: 
+ Customer, Account,CustomerMgmt, DailyMarket, WatchHistory, HR, FINWIRE, Prospect
+- Enhanced the SplitOutputWrapper class. New possibilities for 
+ fieldIDs attribute. It now accepts a list of fields as id or name or in the 
+ form of 'table_Name/ID:field_Name/ID'
+ example: fieldIDs="Customer:c_id,Customer:3,5:c_dob,9,8,7">
+ This is very helpful for splitting composite tables like CustomerMgmt and
+ FINWIRE.
+ It is even possible to mix name and id notations. Valid are: 
+	tableID:fieldID
+	tableID:fieldName
+	tableName:fieldID
+	tableName:fieldName
+	fieldName
+	fieldID
+
+ If the fieldIDs attribute is missing, all fields in the RowDataDTO are copied 
+ unchanged to underlying corresponding child output class.
+
+- Enhanced UpdateBlackBox. It is now able to generate very large updates. Limit was
+ Integer.MaxValue = 2^31-1, now there are: 2^63-1 rows possible per update.
+ implication: DailyMarket with SF > 90000 is now possible
+
+- Enhanced memory requirements prediction feature. PDGF will estimate its 
+ memory requirements for the loaded configuration file and alert the user
+ if the JVM settings offer not enough memory. The user than gets the choice 
+ to automatically restart PDGF with the correct settings or procced unchanged.
+ 
+- NEW: StaticHelper getElementByID() every element in the config file can have
+ an ID attribute to uniquely identify it. Example:
+  <generator name="IdGenerator" id="mainIDGenerator">
+ This is very useful when dealing with nested MetaGenerators and References.
+ (Currently used to generate Prospect큦 lastname, name,..  etc.)
+  See next item for an example:
+
+- Enhanced ProbabilityGenerator to accept a <sameChoiceAs> node.
+ This node telles the ProbabilityGenerator to make the same choice
+ as a other ProbabilityGenerator. 
+ Example: <sameChoiceAs>Field.name#GeneratorElementID</sameChoiceAs>
+ 
+ If the desired foreign ProbabilityGenerator is the first generator of
+ the specified field (within the same table) the "generatorElementID"
+ can be omitted <sameChoiceAs>parentField</sameChoiceAs>
+ 
+ It the desired ProbabilityGenerator is nested with other MetaGenerators 
+ an ElementID has to be specified:
+ <field name="lastname">
+	 <generator name="SequentialGenerator">
+		 <generator name="ProbabilityGenerator" id="Prospect_lastName_ProbGen">
+ 		 ...
+ 		 
+ and has to be referenced by the calling generator:
+ 	<field name="firstname">
+	 <generator name="SequentialGenerator">
+		 <generator name="ProbabilityGenerator">
+			 <sameChoiceAs>lastname#Prospect_lastName_ProbGen</sameChoiceAs>
+			 ...
+			 
+
+- fixed bug in OtherFieldValueGenerator (wrong target=updateID selection)
+- fixed bugs concerning the config file (re-)loading mechanism.
+(some resources where not fully reseted)
+
+- added possibility to specify an custom Generator.LastValueCache
+  by overriding Generator.
+  Generator.getNewLastValueCacheInstance() {
+  		//extends Generator.LastValueCache class
+		return new OwnCustomLastValueCache();
+  }
+  currently used in ProbabilityGenerator to store
+  <sameChoiceAs> information within the lastValue cache
+  
+Known problems:  
+---------------
+- some fields in the Auditing and Reporting *_statistics.csv files cannot be 
+ generated. (TODO: make a list of issues)
+ 
+-Tables with TimeStamps can not be bigger than Integer.MaxValue for each update.
+ If a table is this big, a huge amount of memory is required to store the pre-
+ calculated  timestamps. An array of type and size:  new long[Integer.MaxValue] 
+ requires at least 16 GigaByte of free (old generation) heap memory.
+
+
+================================================================================
+SVN Rev 246-257 September 10. 2011:
+================================================================================
+Updated README and LICENCE files
+Added CHANGELOG file
+
+Usability
+-----------
+- Fork function to automatically restart PDGF with the recommended JVM memory
+ settings depending on the desired amount of wokers.
+- added: FieldValueDTO.set(Object value,Object plainValue). reduces method calls 
+Stability
+-----------
+- fixed a congestion problem in ByteBuffSingleLockOrderingCache and added an 
+  adaptable cache size function. (Cache size depends on workercount and 
+  WorkUnit max size) 
+- fixed bug in SpreadGenerator
+- fixed some stuff in BijectivePermutation initialization
+- changed Element.getRng() initialization strategy.Normal: lazy approach but for 
+  Generator classes use eager initialization.
+- fixed bug in benchmarkGenerator function.
+Performance
+-----------
+- adaptive last value cache in Generator class instead if caching all.
+- UpdateBlackBox: reduced the runtime complexity required to generate the  
+  FieldUpdateID큦 of an Update
+  added functionallity to retrieve a random existing id in any update 
+- FileOutputSkeleton and TemplateOutput: switched from (Rhino)JavaScript 
+ templates to native Java code templates (done by the 'javasssist' library which 
+ compiles and loads classes at runtime)
+- changed storage datastructure for Parsers in Element to HashMap
+- changed Data-Transfer-Objects to reduce access and allocation times
+- added variable workUnit size support to all Scheduler and Worker classes 
+ (reduces synchronization between threads)
+- added variable size for DataTransfer Objects (output classes now accept 
+ multiple RowDataDTO큦 at a time)
+- added new function in PDGFDefaultRandom to reduce method calls.
+- Performance improvements in many Generator classes (intruction reduction, 
+	precalculation, caching)
+    ActionTSGenerator
+    ComputeGenerator  (moved stuff from nextValue() to init())
+    DoubleGenerator
+    DTSGenerator
+    IdGenerator
+    IntGenerator
+    OtherFieldValueGenerator
+    PrePostifxGenerator
+    RandomAString
+
+Functionality
+---------------
+- enhanced reference system to work better with updates
+- fixed bug in OtherFieldGenerator (picked wrong references)
+- fixed bug in CustomerMgmtUpdateRowWorker
+- removed unused "writeToWriter" function in EncodingCharLine cache,
+  as it only wastes resources
+  - The timestamps in FINWIRE stay in the corresponding quarter now
+- The year and quarter fields of FINWIRE-FIN now correlate with the
+timestamp
+- Some generator cleanup
+- Lots of performance and correctness tests
+
+Known problems:  
+---------------
+- FINWIRE field contents are not padded right now (the framework just
+padds everything with spaces), some field values are generated according
+to the spec, many have only static values, some are generated
+half-correct for testing purposes (to see if the merge blackbox is
+working like it should). So the field values are work in progress.
+  
+  
+================================================================================
+SVN Rev 205-246 September 02. 2011:
+================================================================================
+- CustomerMgmt/Account/Customer is now functional. Everything in customerMgmt is 
+  now generated by a merging approach out of three tables:
+  Customer
+  Account
+  CustomerMgmtHelper
+  are merged into one table.
+- CScaling is down to 0.005, AScaling down to 0.01.
+- Limitations of the final generation system:
+  AScaling*SF*AInsertPct must be >= CScaling*SF*CInsertPct
+  as every (new) Customer requires at least one account.
+  The parameters:
+    CMNewCustPct
+    CMAddAcctPct
+    CMUpdateAcctPct
+    CMUpdateCustPct
+    CMCloseAcctPct
+    CMInactCustPct
+    CMExcPct
+    CMAcctPerCustomerMax
+    CMAcctDOBErrPct
+    CMFieldUpdatePct
+    CMMultipleRecPerDayPct
+  are now obsolete. Most of them are replaced by the parameters from table 
+  Customer and Account like  CMInactCustPct by CInactPct etc.
+  
+- Per ActionType there is only one entry like:
+  <TPCDI:Action ActionType="CLOSEACCT" ActionTS="2017-06-23T20:11:02">
+    <Customer C_ID="121">
+     <Account CA_ID="582" />
+    </Customer>
+  </TPCDI:Action>
+  and not!:
+   <TPCDI:Action ActionType="CLOSEACCT" ActionTS="2017-06-23T20:11:02">
+      <Customer C_ID="121">
+        <Account CA_ID="582" />
+        <Account CA_ID="493" />
+      </Customer>
+    </TPCDI:Action>
+
+Further changes:
+---------------------------------
+- extended the "start" command. start <tableName> <tableName> .. will only gen-
+  erate the specified tables. all others will be excluded from the generation 
+  process. Example:
+  java -jar pdgf.jar -l schema.xml -l generation.xml -s FINWIRE CustomerMgmt
+-many core changes to enable the generation of Customer/Account/customerMgmt and 
+ Finwire like a <sameSeedAsTable> configuration option, introduction of table 
+ types: default, update ,composite and compositeUpdate
+- reworked worker classes to be more stateless which allows switching the table 
+ from row to row (aids Composite table generation system for FinWire)
+- further extend this approach which allows switching of tables even on a column 
+ base. A row can now be assembled out of fields of different tables.This allows 
+ CustomerMgmt generation
+- added some (pretty though) helper classes for the new generation system like a
+ CustomerMgmt specific Scheduler, Worker and UpdateBlackBox class.
+- added caching routine for (expensive) ActionTS TimeStamp generation
+- again some working on the performance to keep generation times up while table 
+ generation complexity rises (mainly within the UpdateBlackBox and SeedingStra-
+ tegy classes to reduce runtime complexity. in some cases from O(n^2) to O(n))
+ Now update (batch) generation scales more linearly with higher amount of 
+ batches like in CustomerMgmt and Finwire
+- some bigger and smaller bug fixes all over the framework. 
+- FINWIRE is written into the correct output files, the different
+ subtables are merged in proper order, the fields themselves are padded
+ to the correct size (even the CIKOrCompanyName fields with variable
+ length should be correctly padded now)
+- Implemented and tested the FINWIRE-specific MergeUpdateBlackBox to
+ merge the different subtables in a correct way
+- rewrote the definition for FINWIRE and its subtables in the
+ tpc-di-schema.xml. Now the subtables are normal tables again which are
+ excluded in the tpc-di-generation.xml
+- Michael adapted the standard scheduler, so it can be also used to
+ generate FINWIRE
+- Some tags like <exclude> are now in the generation.xml, because the
+ decision if a table is ignored or not does not belong to the schema
+- Merged the sorted tpc-di-generationS.xml and the standard
+ tpc-di-generation.xml, so every table is sorted now by rowID
+- Michael did some great speed improvements
+- Added lots of basic stuff for the merge system
+   
+Known problems:
+---------------
+- FINWIRE field contents are not padded right now (the framework just
+padds everything with spaces), some field values are generated according
+to the spec, many have only static values, some are generated
+half-correct for testing purposes (to see if the merge blackbox is
+working like it should). So the field values are work in progress.
+- I rose FWCMPScaling and FWSECScaling to 10 (was set to 1 in the
+previous drops) which leads to a longer generation time
+
+    
+================================================================================
+SVN Rev 190-205 August 13. 2011:
+================================================================================
+-added new output class: SplitOutputWrapper. This output is able to split a 
+ (big?) meta table into different flat files, which will be required for the 
+ phase IV tables.
+-added split merge system for finwire
+-added different table types  <Table name="" type="Standard | update | composite 
+ | compositeUpdate"> to identify updates tables and composite tables 
+ (finwire will be a compositeUpdate table)
+-(re-) added -sf command to set the main scalefactor via command line.
+-added warning, if pdgf is started with to less memory.
+----------------------------
+-switched config file tpc-di-generationS.xml to new bytebuffer based sorting 
+  strategy introduced in rev190.
+-improved padding mechanism of CSVRowOutput.
+-improved parsing system for Generation xml config files to follow the way 
+ suggested by the framework (the framework already supported multiple 
+ configuration files)
+-further cleanup of project and removal of now obsolete code and libraries
+----------------------------
+-fixed bug in StaticHelper.xmlNodeToDouble
+-fixed bug in CSVRowOutput  padding mechanism
+-fixed "restricted api use" issue with IBM JVM큦 -> switched to Xerces xml 
+ parser library instead of the one available via the rt.jar package.
+
+
+
+================================================================================
+SVN Rev 166-190 August 02. 2011:
+================================================================================
+Resolved tickets:
+#45  CustomerMgmt.xml has 24,992 blank lines
+#43: Performance issue with R165
+#44: generator hangs with 80 workers thread
+
+Changes:
+------------------
+- Modified SequentialGenerator to store interim results after each
+ subgenerator run. This makes it possible to generate tables with a
+ different number of fields (like FINWIRE)
+- Implemented a metagenerator for padding a generated value to a certain
+ length
+- Rewrote FINWIRE schema definition to stick together the new generators
+ and stuff
+- Adapted CSVRowOutput to properly write out an Object[] (these are the
+interim results of the modified SequentialGenerator)
+- Moved <reference> elements from fields into the generators. This makes
+ more sense in general, because a field can have a lot of generators, and
+ only some of them access a reference. This also helps to keep generators
+ generic
+- The schema definition was adapted to the reference element move
+- Improved efficiency and performance of some generators by moving as
+ much code as possible from the often called nextValue() to initialize()
+-new: implemented ByteBuffer based sorting cache instance into 
+ FileOutputSkeleton to achieve a higher CPU utilization. The wrapper based 
+ OrderingCache approach has shown, that formatting the generated data and 
+ conversion to utf8 takes a lot of time and must be parallelized too.The sorting
+ wrapper rendered the existing parallelization inoperative.
+-new: implemented historicalReferenceGenerator. Required to generate references 
+ between customer and the (historical) CustomerMgmt table.
+-new Reference system. References are now child of <Generator> and no longer 
+ child of <field> which allows a much more intuitive and flexible use.Especially
+ when working with metagenerators and the new historicalReferenceGenerator.
+-new error system for parser  and generator plugins.
+----------------------------
+-improved performance of Output orderingCache. (tried many different caching 
+ approaches to reduce wait times of threads as the first version had a lot of 
+ synchronization overhead)
+-improved error handling and cleaner&better error messages for all classes.
+-improvement of overall performance (instruction reduction).
+ Memory: lazy init approach for initialization system. Unloading of no longer 
+ needed resources greatly reduced the required memory and loading/initalization 
+ times.
+-Improved class loading architecture.
+- CPU: reworked schedulers to support lager number for worker threads 
+ (tested up to 512). Lots of testing done to find the best system and data 
+ structure with a minimum of synchronization overhead.
+ 
+-improved error reporting and handling system
+-improved reference system
+-enhanced outputsystem for Finwire
+----------------------------
+-Implemented multithreaded sorting cache.
+ If more than one worker was used, the insertion of lines was uncertain.
+ the quick fix for that was: set workercount 1.
+ you can now use more than one worker, and still get a sorted file.
+ This is related to ticket  #17 CustomerMgmt.xml should be sorted by ActionTS
+-added padding support to CSVRowOutput (needed for FinWire fixed width fields)
+-added function to generate an Schema XML-Template (e.g. example empty config 
+ file, as a start for config file writers)
+-improved (doubled) generation speed for update tables by adding a multi stage 
+ producer consumer approach
+----------------------------
+-deleted most of the distribution subsystem to get rid of third party lib: 
+ flanagan.jar
+-deleted dan kaminskys parallel java lib (it was only there for credit purpose, 
+ because i use sourcode from him)
+-deleted an bunch of no longer required classes
+----------------------------
+-fixed error in CSVRowOutput큦 handing of object arrays.
+-fixed errors and unnecessary overhead in JobIDGenerator, TPCDIBirthdayGenerator 
+ and Sequential generator
+-fixed a concurrency issue in MetageneratorPause-Thread vs. worker wait condition.
+-fixed a bug in the update system initialization
+-fixed ticket #45 CustomerMgmt.xml has blank lines
+
+
+Known Problems:
+-------------------
+-If workercount > 32, the the synchronization overhad of sorting  all generated 
+ lines becomes a problem. If the writes are done unsorted, the problem shifts to 
+ sync overhead at sun.nio.ch.FileChannelImpl.write();
+- The general structure of FINWIRE should be correct, also the fixed
+ size width of the fields, but almost everything else is not correct.
+ This is currently work in progress.
+- The timestamps for DailyMarket and WatchHistory are wrong in the
+ update tables. This is a problem in the corresponding generator which
+ has to be fixed (at the moment I don't know how tough this will be)
+- CDC_FLAG and CDC_DSN in DailyMarket and WatchHistory are also present
+ in the historical load, and the value of CDC_DSN is wrong (ticket 40). I
+ implemented a fix, but deactivated it for performance reasons
+- Set FWCMPScaling and FWSECScaling to 1 (instead of default 100) to
+ speed up DailyMarket generation
+- ca_c_id of Account depends on the generation of CustomerMgmt.
+
+
+
+================================================================================ 
+SVN Rev 144-165 Jul 20. 2011:
+================================================================================
+- Fixed tickets 37-39
+- new parser merged, so now it is possible to use dates in calculations,
+ nested parenthesis are supported, negative numbers are supported, a lot
+ of Double <=> String conversions are avoided, ...
+- Modified xml and some older generators to use the new capabilities
+- Prepared core stuff for FINWIRE generation
+- DailyMarket should be correct but DM_S_SYMB (depends on FINWIRE),
+ DM_CLOSE and DM_VOL are not polynomial distributed, and DM_DATE in the
+ updates starts at DMBeginDate
+- WatchHistory should be correct but W_S_SYMB and W_ACTION (both depend
+on FINWIRE) and W_DTS in the updates has the same issue as DM_DATE in
+DailyMarket
+- added CustomXMLParser errors. now the exact row number the error happened is shown. (implemented own xml parser for this)
+- added prototype of multithreaded SortedOutput and OrderingCache implemented
+ as Wrapper to existing output classes. Operates on RowDataDTOs.
+- added first sorted version of tpc-di-generation.xml ->tpc-di-generationS.xml
+-improved formatting of controller messages
+-cleanup of project (removed no longer required things & some package reordering)
+-many minor changes and small bug fixes. Some of them are for gui support. 
+
+Known problems:
+----------------
+- As already said, the timestamps for DailyMarket and WatchHistory are
+ wrong in the update tables. This is a problem in the corresponding
+ generator which has to be fixed (at the moment I don't know how tough
+ this will be)
+- CDC_FLAG and CDC_DSN in DailyMarket and WatchHistory are also present
+ in the historical load, and the value of CDC_DSN is wrong (ticket 40). I
+ implemented a fix, but deactivated it for performance reasons
+- I missed to fix ticket 41 for this drop. Sorry for that.
+- Set FWCMPScaling and FWSECScaling to 1 (instead of default 100) to
+ speed up DailyMarket generation
+- I have to put together a lot of things to get the structure and format
+ of FINWIRE right. The code is already implemented, but it has to be put
+ together and tested first. Then I also need the update of the spec.
+ Please ignore FINWIRE completely for now
+- ca_c_id of Account depends on the generation of CustomerMgmt.
+
+
+================================================================================ 
+SVN Rev xx-117 Jul 20. 2011:
+================================================================================
+Changes:
+- Progress on the tables as we described it in our monday call.
+- customer and account table now start at batch2 as they should.
+- first fixes for the reference system implemented. Prospect is now almost 
+ correct, but some reference issues are still left.
+
+Known problems:
+- customerMgmt only NEW values
+- prospect, some reference issues remain, but most of them solved
+- dupplicates in customer and account tables. Deleted customers can be updated 
+ and deleted again. 
