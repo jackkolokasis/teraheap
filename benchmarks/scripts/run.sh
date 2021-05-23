@@ -12,8 +12,7 @@
 #
 ###################################################
 
-BENCHMARKS=("LogisticRegression")
-EXECUTORS=1
+. ./conf.sh
 
 # Print error/usage script message
 usage() {
@@ -25,6 +24,10 @@ usage() {
     echo "      -n  Number of Runs"
     echo "      -t  Type of Storage Device (e.g SSD, NVMe, NVM)"
     echo "      -o  Output Path"
+    echo "      -c  Enable TeraCache"
+    echo "      -s  Enable serialization"
+    echo "      -p  Enable perf tool"
+    echo "      -a  Run experiments with high bench"
     echo "      -k  Kill iostat and jstat processes"
     echo "      -h  Show usage"
     echo
@@ -50,26 +53,48 @@ stop_spark() {
 
 ##
 # Description: 
-#   Kill running background processes (iostat, jstat)
+#   Stop perf monitor statistics with signal interupt (SIGINT)
+#
+##
+stop_perf() {
+	local perfPID=$(pgrep perf)
+	
+	# Kill all perf process
+    for perf_id in ${perfPID}
+    do
+        kill -2 ${perf_id}
+    done
+}
+
+
+##
+# Description: 
+#   Kill running background processes (jstat, serdes)
 #
 # Arguments:
 #   $1 - Restart Spark
 ##
 kill_back_process() {
-    local iostatPID=$(pgrep iostat)
-    local myjstatPID=$(pgrep myjstat)
+    local jstatPID=$(pgrep jstat)
+	local serdesPID=$(pgrep serdes)
+	local perfPID=$(pgrep perf)
  
-    # Kill all iostat process
-    for iostat_pid in ${iostatPID}
-    do
-        kill -KILL ${iostat_pid} 2>/dev/null
-        wait ${iostat_pid} 2>/dev/null
-    done
-
     # Kill all jstat process
-    for jstat_pid in ${myjstatPID}
+    for jstat_pid in ${jstatPID}
     do
         kill -KILL ${jstat_pid}
+    done
+    
+	# Kill all serdes process
+    for serdes_pid in ${serdesPID}
+    do
+        kill -KILL ${serdes_pid}
+    done
+	
+	# Kill all perf process
+    for perf_id in ${perfPID}
+    do
+        kill -KILL ${perf_id}
     done
     
     if [[ $1 == "restart" ]]
@@ -141,7 +166,7 @@ printEndMsg() {
 }
 
 # Check for the input arguments
-while getopts ":n:t:c:o:i:d:m:kh" opt
+while getopts ":n:t:o:cspkah" opt
 do
     case "${opt}" in
         n)
@@ -154,9 +179,21 @@ do
             OUTPUT_PATH=${OPTARG}
             ;;
         k)
-            killProcess "restart"
+            kill_back_process
             exit 1
             ;;
+		c)
+			TC=true
+			;;
+		s)
+			SERDES=true
+			;;
+		p)
+			PERF_TOOL=true
+			;;
+		a)
+			HIGH_BENCH=true
+			;;
         h)
             usage
             ;;
@@ -180,43 +217,112 @@ do
 
 	mkdir -p ${OUT}/${benchmark}
         
+	# For every iteration
 	for ((i=0; i<${ITER}; i++))
 	do
 		mkdir -p ${OUT}/${benchmark}/run${i}
-		RUN_DIR="${OUT}/${benchmark}/run${i}"
 
-		# Garbage collector statistics
-		./jstat.sh ${RUN_DIR}/jstat.txt ${EXECUTORS} &
+		# For every configuration
+		for ((j=0; j<${TOTAL_CONFS}; j++))
+		do
+			mkdir -p ${OUT}/${benchmark}/run${i}/conf${j}
+			RUN_DIR="${OUT}/${benchmark}/run${i}/conf${j}"
 
-		# Drop caches
-		sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+			if [ -z "$HIGH_BENCH" ]
+			then
+				# Set configuration
+				if [ $SERDES ]
+				then
+					./update_conf.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} -s ${S_LEVEL[$j]} -r ${RAMDISK[$j]}
+				elif [ $TC ]
+				then
+					./update_conf_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} -s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} -n ${NEW_GEN[$j]}
+				fi
+			fi
 
-		# System statistics start
-		~/system_util/start_statistics.sh -d ${RUN_DIR}
-		
-		# Run benchmark and save output to tmp_out.txt
-		../spark-bench/${benchmark}/bin/run.sh \
-			> ${RUN_DIR}/tmp_out.txt
+			# Garbage collector statistics
+			./jstat.sh ${RUN_DIR}/jstat.txt ${EXECUTORS} &
+			
+			if [ $PERF_TOOL ]
+			then
+				# Count total cache references, misses and pagefaults
+				./perf.sh ${RUN_DIR}/perf.txt ${EXECUTORS} &
+			fi
 
-		# System statistics stop
-		~/system_util/stop_statistics.sh -d ${RUN_DIR}
+			# Enable serialization/deserialization metric
+			if [ ${SERDES} ]
+			then
+				./serdes.sh ${RUN_DIR}/serdes.txt ${EXECUTORS} &
+			fi
 
-		# Parse cpu and disk statistics results
-		~/system_util/extract-data.sh -d ${RUN_DIR}
+			# Drop caches
+			sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 
-		# Kill all background processes
-		# killProcess
+			# System statistics start
+			~/system_util/start_statistics.sh -d ${RUN_DIR}
 
-		# Save the total duration of the benchmark execution
-		tail -n 1 ../spark-bench/num/bench-report.dat \
-			>> ${RUN_DIR}/total_time.txt
-            
-		TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
-		cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
+			if [ $HIGH_BENCH ]
+			then
+				cd ~/HiBench
+				./bin/workloads/ml/${benchmark}/spark/run.sh
+				cd -
+			else
+				# Run benchmark and save output to tmp_out.txt
+				../spark-bench/${benchmark}/bin/run.sh \
+					> ${RUN_DIR}/tmp_out.txt
+			fi
 
-		./parse_results.sh -d ${RUN_DIR}
+			# System statistics stop
+			~/system_util/stop_statistics.sh -d ${RUN_DIR}
+
+			# Parse cpu and disk statistics results
+			~/system_util/extract-data.sh -d ${RUN_DIR}
+
+			if [ $HIGH_BENCH ]
+			then
+				# Save the total duration of the benchmark execution
+				tail -n 1 ~/HiBench/report/hibench.report >> ${RUN_DIR}/total_time.txt
+			else
+				# Save the total duration of the benchmark execution
+				tail -n 1 ../spark-bench/num/bench-report.dat >> ${RUN_DIR}/total_time.txt
+			fi
+				
+
+			if [ $PERF_TOOL ]
+			then
+				# Stop perf monitor
+				stop_perf
+			fi
+
+			# Parse results
+			if [ $TC ]
+			then
+				if [ $HIGH_BENCH ]
+				then
+					TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
+					cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
+					./parse_results.sh -d ${RUN_DIR} -t -a
+				else
+					TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
+					cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
+					./parse_results.sh -d ${RUN_DIR} -t
+				fi
+			elif [ $SERDES ]
+			then
+				if [ $HIGH_BENCH ]
+				then
+					./parse_results.sh -d ${RUN_DIR} -s -a
+				else
+					./parse_results.sh -d ${RUN_DIR} -s
+				fi
+			else
+				./parse_results.sh -d ${RUN_DIR}
+			fi
+		done
 	done
-    
+
 	ENDTIME=$(date +%s)
-    printEndMsg ${STARTTIME} ${ENDTIME}
+	printEndMsg ${STARTTIME} ${ENDTIME}
 done
+
+exit

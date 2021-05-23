@@ -18,22 +18,28 @@ usage() {
     echo
     echo "Options:"
     echo "      -d  Directory with results"
+    echo "      -t  Enable TeraCache"
+    echo "      -s  Enable serdes"
+    echo "      -a  Enable hibench suite"
     echo "      -h  Show usage"
     echo
 
     exit 1
 }
 
-# Check the number of arguments
-if [[ $# -ne 2 ]]; then
-	usage
-    exit 1
-fi
-
 # Check for the input arguments
-while getopts "d:h" opt
+while getopts "d:tsah" opt
 do
     case "${opt}" in
+        s)
+            SER=true
+            ;;
+        t)
+            TC=true
+            ;;
+        a)
+            HIGH_BENCH=true
+            ;;
         d)
             RESULT_DIR="${OPTARG}"
             ;;
@@ -46,23 +52,53 @@ do
     esac
 done
 
-TOTAL_TIME=$(tail -n 1 ${RESULT_DIR}/total_time.txt | awk '{split($0,a,","); print a[3]}')
-MINOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt | awk '{print $8}')
-MAJOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt | awk '{print $10}')
-TC_CT_TRAVERSAL=$(grep "MINOR_GC" ${RESULT_DIR}/teraCache.txt | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
-TC_MARK=$(grep "TC_MARK" ${RESULT_DIR}/teraCache.txt | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
-TC_ADJUST=$(grep "TC_ADJUST" ${RESULT_DIR}/teraCache.txt | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+if [ $HIGH_BENCH ]
+then
+	TOTAL_TIME=$(tail -n 1 ${RESULT_DIR}/total_time.txt | awk '{print $5}')
+else
+	TOTAL_TIME=$(tail -n 1 ${RESULT_DIR}/total_time.txt | awk '{split($0,a,","); print a[3]}')
+fi
 
-echo "COMPONENT,TIME(s)" > ${RESULT_DIR}/result.csv
-echo "TOTAL_TIME,${TOTAL_TIME}" >> ${RESULT_DIR}/result.csv
+NUM_MGC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{print $7}')
+MINOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{print $8}')
+NUM_FGC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{print $9}')
+MAJOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{print $10}')
 
-echo "MINOR_GC,${MINOR_GC}" >> ${RESULT_DIR}/result.csv
+# Caclulate the overheads in TC card table traversal, marking and adjust phases
+if [ $TC ]
+then
+	TC_CT_TRAVERSAL=$(grep "TC_CT" ${RESULT_DIR}/teraCache.txt | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+	HEAP_CT_TRAVERSAL=$(grep "HEAP_CT" ${RESULT_DIR}/teraCache.txt | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+	PHASE1=$(grep "PHASE1" ${RESULT_DIR}/teraCache.txt          | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+	PHASE2=$(grep "PHASE2" ${RESULT_DIR}/teraCache.txt          | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+	PHASE3=$(grep "PHASE3" ${RESULT_DIR}/teraCache.txt          | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+	PHASE4=$(grep "PHASE4" ${RESULT_DIR}/teraCache.txt          | awk '{print $5}' | awk '{ sum += $1 } END {print sum }')
+fi
+
+# Caclulate the serialziation/deserialization overhead
+if [ $SER ]
+then
+	SERDES_PER=$(grep "com.esotericsoftware.kryo.io." ${RESULT_DIR}/serdes.txt  | grep "%" | awk '{ print $2 }' | sed 's/%//g' | awk '{ sum += $1 } END {print sum }')
+	SERDES=$(echo "${TOTAL_TIME} * ${SERDES_PER} / 100" | bc -l)
+fi
+
+echo "COMPONENT,TIME(s)"               > ${RESULT_DIR}/result.csv
+echo "TOTAL_TIME,${TOTAL_TIME}"       >> ${RESULT_DIR}/result.csv
+
+echo "MINOR_GC,${MINOR_GC}"           >> ${RESULT_DIR}/result.csv
+echo "MAJOR_GC,${MAJOR_GC}"           >> ${RESULT_DIR}/result.csv
+
 echo "TC_MINOR_GC,${TC_CT_TRAVERSAL}" >> ${RESULT_DIR}/result.csv
+echo "HEAP_MINOR_GC,${HEAP_CT_TRAVERSAL}" >> ${RESULT_DIR}/result.csv
+echo "PHASE1_FGC,${PHASE1}"           >> ${RESULT_DIR}/result.csv
+echo "PHASE2_FGC,${PHASE2}"           >> ${RESULT_DIR}/result.csv
+echo "PHASE3_FGC,${PHASE3}"           >> ${RESULT_DIR}/result.csv
+echo "PHASE4_FGC,${PHASE4}"           >> ${RESULT_DIR}/result.csv
+echo "SERSES,${SERDES}"		          >> ${RESULT_DIR}/result.csv
 
-echo "MAJOR_GC,${MAJOR_GC}" >> ${RESULT_DIR}/result.csv
-echo "TC_MARK,${TC_MARK}" >> ${RESULT_DIR}/result.csv
-echo "TC_ADJUST,${TC_ADJUST}" >> ${RESULT_DIR}/result.csv
-
-grep "TOTAL_TRANS_OBJ" ${RESULT_DIR}/teraCache.txt | awk '{print $3","$5}' > ${RESULT_DIR}/statistics.csv
-grep "TOTAL_FORWARD_PTRS" ${RESULT_DIR}/teraCache.txt | awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
-grep "TOTAL_BACK_PTRS" ${RESULT_DIR}/teraCache.txt | awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
+if [ $TC ]
+then
+	grep "TOTAL_TRANS_OBJ" ${RESULT_DIR}/teraCache.txt    | awk '{print $3","$5}' > ${RESULT_DIR}/statistics.csv
+	grep "TOTAL_FORWARD_PTRS" ${RESULT_DIR}/teraCache.txt | awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
+	grep "TOTAL_BACK_PTRS" ${RESULT_DIR}/teraCache.txt    | awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
+fi
