@@ -14,8 +14,9 @@
 #
 ###################################################
 
+
 create_ramDisk () {
-    modprobe brd rd_nr=1 rd_size=20971520 max_part=1
+    modprobe brd rd_nr=1 rd_size=225443840 max_part=1
     mkfs.xfs /dev/ram0
     mkdir -p /mnt/ramdisk/
     mount -t xfs /dev/ram0 /mnt/ramdisk/

@@ -1,9 +1,0 @@
-InstanceRefKlass.cpp::265
-template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, oop obj)
-
-	TODO check if we have objects that are in TC
-
-----------
-
-
-
