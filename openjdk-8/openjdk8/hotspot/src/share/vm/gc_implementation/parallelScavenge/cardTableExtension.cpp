@@ -149,11 +149,33 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 	 // Preventing scanning objects more than onece
 	oop* last_scanned = NULL;
 
+	// In the following loop, in the specified area (currently only TeraCache)
+	// process from bottom (start_card in the above variable declaration) to top
+	// (end_card in the above variable declaration).
+
 	// The width of the stripe ssize*stripe_total must be consistent with the
 	// number of so that the complete slice is covered.
+	//
+	// However, it does not process everything from bottom to top, but divides
+	// this into ParallelGCThreads and processes them in parallel.
+	//
+	// Your responsibility is indicated by the argument stripe_number.
+	// Specifically, it is processed as follows.
+	//  (1) Process ssize bytes from the address of start (start_card) + stripe_number * ssize
+    //  (2) Next, advance by ssize * ParallelGCThreads and process ssize bytes.
+	//      That is, ssize bytes from the address of the beginning + stripe_number * ssize + ssize * ParallelGCThreads)
+	//  (3) Further advance by ssize * ParallelGCThreads. Repeat until the
+	//  end_card is reached
+	//
+	// To be precise, start_card and end_card are not the start address or end
+	// address itself to be processed, but the address of the entry in the
+	// CardTableExtension corresponding to that address.
+	// The value 128 of ssize corresponds to 64K because the size of 1 card is
+	// 512 bytes.
 	size_t slice_width = ssize * stripe_total;
-	
+		
 	for (jbyte* slice = start_card; slice < end_card; slice += slice_width) {
+
 		jbyte* worker_start_card = slice + stripe_number * ssize;
 		if (worker_start_card >= end_card)
 			return; // We're done.
@@ -173,11 +195,8 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
 
 		// if there are not objects starting within the chunk, skip it.
-		bool check = start_array->tc_object_starts_in_range(slice_start, slice_end);
-
-		if (!check){
+		if (!start_array->tc_object_starts_in_range(slice_start, slice_end))
 			continue;
-		}
 
 		// Update our beginning addr
 		HeapWord* first_object = start_array->tc_object_start(slice_start);
@@ -203,7 +222,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			if (worker_end_card > end_card)
 				worker_end_card = end_card;
 		}
-
+		
 		assertf(slice_end <= (HeapWord*)sp_top, "Last object in slice crosses space boundary");
 		assertf(is_valid_card_address(worker_start_card), "Invalid worker start card");
 		assertf(is_valid_card_address(worker_end_card), "Invalid worker end card");
@@ -211,7 +230,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		// an object spans an entire slice.
 		assertf(worker_start_card <= end_card, "worker start card beyond end card");
 		assertf(worker_end_card <= end_card, "worker end card beyond end card");
-
+	
 		jbyte* current_card = worker_start_card;
 		while (current_card < worker_end_card) {
 			// Find an unclean card
@@ -281,16 +300,27 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				}
 
 				// we know which cards to scan, now clear them
-				if (first_unclean_card <= worker_start_card+1)
-					first_unclean_card = worker_start_card+1;
-				if (following_clean_card >= worker_end_card-1)
-					following_clean_card = worker_end_card-1;
+				//
+				//if (first_unclean_card <= worker_start_card +1)
+				//	first_unclean_card = worker_start_card + 1;
+
+				//if (following_clean_card >= worker_end_card - 1)
+				//	following_clean_card = worker_end_card - 1;
+				//
+				//
+				if (first_unclean_card <= worker_start_card)
+					first_unclean_card = worker_start_card;
+
+				if (following_clean_card >= worker_end_card)
+					following_clean_card = worker_end_card;
 
 				while (first_unclean_card < following_clean_card) {
 					*first_unclean_card++ = clean_card;
 				}
 
+
 				const int interval = PrefetchScanIntervalInBytes;
+
 				// scan all objects in the range
 				if (interval != 0) {
 					while (p < to) {
@@ -300,14 +330,18 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 						m->tc_push_contents(pm);
 						p += m->size();
 					}
+
 					pm->drain_stacks_cond_depth();
+
 				} else {
+
 					while (p < to) {
 						oop m = oop(p);
 						assertf(m->is_oop_or_null(), "check for header");
 						m->tc_push_contents(pm);
 						p += m->size();
 					}
+					
 					pm->drain_stacks_cond_depth();
 				}
 				last_scanned = p;
@@ -327,7 +361,6 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		}
 	}
 }
-
 #endif
 
 // We get passed the space_top value to prevent us from traversing into
