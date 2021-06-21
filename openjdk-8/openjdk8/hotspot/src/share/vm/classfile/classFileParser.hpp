@@ -227,10 +227,15 @@ class ClassFileParser VALUE_OBJ_CLASS_SPEC {
                               u2* generic_signature_index_addr,
                               FieldAnnotationCollector* parsed_annotations,
                               TRAPS);
+
   Array<u2>* parse_fields(Symbol* class_name,
                           bool is_interface,
                           FieldAllocationCount *fac,
-                          u2* java_fields_count_ptr, TRAPS);
+                          u2* java_fields_count_ptr, 
+#if P_SD_BITMAP
+						  int *transient_field_bitmap,
+#endif
+						  TRAPS);
 
   void print_field_layout(Symbol* name,
                           Array<u2>* fields,

@@ -27,9 +27,11 @@ uint64_t TeraCache::fwd_ptrs_per_fgc;
 uint64_t TeraCache::back_ptrs_per_fgc;
 uint64_t TeraCache::trans_per_fgc;
 
-uint64_t TeraCache::dirty_cards[16];
 uint64_t TeraCache::tc_ct_trav_time[16];
 uint64_t TeraCache::heap_ct_trav_time[16];
+		
+uint64_t TeraCache::back_ptrs_per_mgc;
+uint64_t TeraCache::intra_ptrs_per_mgc;
 
 // Constructor of TeraCache
 TeraCache::TeraCache() {
@@ -53,6 +55,9 @@ TeraCache::TeraCache() {
 		tc_ct_trav_time[i] = 0;
 		heap_ct_trav_time[i] = 0;
 	}
+
+	back_ptrs_per_mgc = 0;
+	intra_ptrs_per_mgc = 0;
 }
 		
 void TeraCache::tc_shutdown() {
@@ -163,6 +168,8 @@ void TeraCache::tc_push_object(void *p, oop o) {
 #endif
 	_tc_stack.push(o);
 	_tc_adjust_stack.push((oop *)p);
+	
+	back_ptrs_per_mgc++;
 
 	assertf(!_tc_stack.is_empty(), "Sanity Check");
 	assertf(!_tc_adjust_stack.is_empty(), "Sanity Check");
@@ -199,6 +206,11 @@ bool TeraCache::tc_empty() {
 }
 		
 void TeraCache::tc_clear_stacks() {
+	if (TeraCacheStatistics) {
+		back_ptrs_per_mgc = 0;
+		intra_ptrs_per_mgc = 0;
+	}
+		
 	_tc_adjust_stack.clear(true);
 	_tc_stack.clear(true);
 }
@@ -268,12 +280,19 @@ void TeraCache::tc_print_mgc_statistics() {
 
 	tclog_or_tty->print_cr("[STATISTICS] | TC_CT_TIME = %lu\n", max_tc_ct_trav_time);
 	tclog_or_tty->print_cr("[STATISTICS] | HEAP_CT_TIME = %lu\n", max_heap_ct_trav_time);
-
+	tclog_or_tty->print_cr("[STATISTICS] | BACK_PTRS_PER_MGC = %lu\n", back_ptrs_per_mgc);
+#if !MT_STACK
+	tclog_or_tty->print_cr("[STATISTICS] | INTRA_PTRS_PER_MGC = %lu\n", intra_ptrs_per_mgc);
+#endif
+	
 	// Initialize arrays for the next minor collection
 	for (unsigned int i = 0; i < ParallelGCThreads; i++) {
 		tc_ct_trav_time[i] = 0;
 		heap_ct_trav_time[i] = 0;
 	}
+
+	// Initialize counters
+	back_ptrs_per_mgc = 0;
 }
 
 // Give advise to kernel to expect page references in sequential order
@@ -309,4 +328,11 @@ int TeraCache::tc_areq_completed() {
 // We need to make an fsync when we use fastmap
 void TeraCache::tc_fsync() {
 	r_fsync();
+}
+
+// Count the number of references between objects that are located in
+// TC.
+// This function works only when ParallelGCThreads = 1
+void TeraCache::incr_intra_ptrs_per_mgc(void) {
+	intra_ptrs_per_mgc++;
 }

@@ -54,15 +54,17 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 	oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 	if (Universe::teraCache()->tc_check(obj)) {
+#if !MT_STACK
+		if (EnableTeraCache && TeraCacheStatistics)
+			Universe::teraCache()->incr_intra_ptrs_per_mgc();
+#endif
 		return false;
 	}
 	else if (PSScavenge::is_obj_in_young(heap_oop)) {
 		return true;
 	}
 	else {
-#if P_DISTINCT
-		obj->set_tc_to_old();
-#else
+#if !P_DISTINCT
 		obj->set_tera_cache();
 #endif
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
@@ -139,7 +141,9 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	// address directly. If there is no forward, then do a forward. 
 #if TERA_CARDS
 	if (EnableTeraCache && Universe::teraCache()->tc_check(o)){
+#if PERF_TEST
 		oopDesc::encode_store_heap_oop_not_null(p, o);
+#endif
 		return;
 	}
 	  
@@ -170,12 +174,15 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	// that are outside the heap. These pointers are either from roots
 	// or from metadata.
 	if ((!PSScavenge::is_obj_in_young((HeapWord*)p)) && (Universe::heap()->is_in_reserved(p))) {
+		assertf(!Universe::teraCache()->tc_check(new_obj), "Sanity");
+		assertf(!Universe::teraCache()->tc_is_in((void*) p), "Sanity");
 		if (PSScavenge::is_obj_in_young(new_obj))
 			card_table()->inline_write_ref_field_gc(p, new_obj);
 	}
 
 #if TERA_CARDS
 	if (Universe::teraCache()->tc_is_in((void *)p)) {
+		assertf(!Universe::teraCache()->tc_check(new_obj), "Sanity");
 		Universe::teraCache()->tc_push_object((void *)p, new_obj);
 		card_table()->inline_write_ref_field_gc(p, new_obj);
 	}
@@ -228,9 +235,10 @@ class PSScavengeFromKlassClosure: public OopClosure {
 
 	  // XXX TODO Check again this  case
 #if !DISABLE_TERACACHE
-	  if (EnableTeraCache && Universe::teraCache()->tc_check(o))
-	  {
+	  if (EnableTeraCache && Universe::teraCache()->tc_check(o)) {
+#if PERF_TEST
 		  oopDesc::encode_store_heap_oop_not_null(p, o);
+#endif
 		  return;
 	  }
 #endif

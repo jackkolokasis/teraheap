@@ -22,6 +22,7 @@
  *
  */
 
+#include "oops/instanceKlass.hpp"
 #include "precompiled.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "utilities/macros.hpp"
@@ -602,8 +603,12 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObject(JNIEnv *env, jobject unsafe, jobject obj)
   UnsafeWrapper("Unsafe_TcMarkObject");
   
   oop o = JNIHandles::resolve_non_null(obj);
-  o->set_mark_tc();
+  int i;
 
+  if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
+	return;
+
+  o->set_tera_cache();
 UNSAFE_END
 
 

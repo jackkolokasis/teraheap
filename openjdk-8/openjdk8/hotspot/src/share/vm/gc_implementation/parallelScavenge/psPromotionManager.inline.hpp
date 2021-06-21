@@ -43,17 +43,21 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
 
 #if !DISABLE_TERACACHE
 	 // XXX TODO Check this case again
-	if (EnableTeraCache && Universe::teraCache()->tc_check(o))
-	{
+	if (EnableTeraCache && Universe::teraCache()->tc_check(o)) {
+#if PERF_TEST
 		oopDesc::encode_store_heap_oop_not_null(p, o);
+#endif
 		return;
 	}
 #endif
 
     if (o->is_forwarded()) {
       o = o->forwardee();
+
       // Card mark
       if (PSScavenge::is_obj_in_young(o)) {
+		  assertf(Universe::teraCache()->tc_check(o) == false, "Error Object in TC");
+
 #if TERA_CARDS
 		if (Universe::teraCache()->tc_is_in((void *)p)) {
 			Universe::teraCache()->tc_push_object((void *)p, o);
@@ -64,6 +68,7 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
 
 #if TERA_CARDS
 	  if (Universe::teraCache()->tc_is_in((void *)p) && !PSScavenge::is_obj_in_young(o)) {
+		  assertf(Universe::teraCache()->tc_check(o) == false, "Error Object in TC");
 		  Universe::teraCache()->tc_push_object((void *)p, o);
 		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
 	  }
@@ -80,7 +85,7 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
 	  //	[p]------->[o]-------------------
 
 	  // Save the forward pointer to the location pointed by p
-	  assertf(o->get_obj_state() != IN_TERA_CACHE, "Object is in TeraCache");
+	  // assertf(o->get_obj_state() != IN_TERA_CACHE, "Object is in TeraCache");
 
       oopDesc::encode_store_heap_oop_not_null(p, o);
     } else {

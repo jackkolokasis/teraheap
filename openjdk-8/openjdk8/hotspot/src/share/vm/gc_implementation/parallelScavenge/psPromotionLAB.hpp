@@ -132,8 +132,8 @@ class PSOldPromotionLAB : public PSPromotionLAB {
   // Not MT safe
   HeapWord* allocate(size_t size) {
     // Cannot test for this now that we're doing promotion failures
-    assertf(_state != flushed, "Sanity");
-    assertf(_start_array != NULL, "Sanity");
+    assert(_state != flushed, "Sanity");
+    assert(_start_array != NULL, "Sanity");
 	
     HeapWord* obj = top();
     HeapWord* new_top = obj + size;

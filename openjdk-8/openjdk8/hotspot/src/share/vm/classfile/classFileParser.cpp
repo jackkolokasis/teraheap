@@ -1084,7 +1084,11 @@ class FieldAllocationCount: public ResourceObj {
 Array<u2>* ClassFileParser::parse_fields(Symbol* class_name,
                                          bool is_interface,
                                          FieldAllocationCount *fac,
-                                         u2* java_fields_count_ptr, TRAPS) {
+                                         u2* java_fields_count_ptr, 
+#if P_SD_BITMAP
+										 int *transient_field_bitmap,
+#endif
+										 TRAPS) {
   ClassFileStream* cfs = stream();
   cfs->guarantee_more(2, CHECK_NULL);  // length
   u2 length = cfs->get_u2_fast();
@@ -1121,6 +1125,7 @@ Array<u2>* ClassFileParser::parse_fields(Symbol* class_name,
   // The generic signature slots start after all other fields' data.
   int generic_signature_slot = total_fields * FieldInfo::field_slots;
   int num_generic_signature = 0;
+  int transient_field_counter = 0;
   for (int n = 0; n < length; n++) {
     cfs->guarantee_more(8, CHECK_NULL);  // access_flags, name_index, descriptor_index, attributes_count
 
@@ -1150,6 +1155,13 @@ Array<u2>* ClassFileParser::parse_fields(Symbol* class_name,
     u2 generic_signature_index = 0;
     bool is_static = access_flags.is_static();
     FieldAnnotationCollector parsed_annotations(_loader_data);
+
+#if P_SD_BITMAP
+	if (!is_static && access_flags.is_transient()) {
+		SetBit(transient_field_bitmap, transient_field_counter);
+		transient_field_counter++;
+	}
+#endif
 
     u2 attributes_count = cfs->get_u2_fast();
     if (attributes_count > 0) {
@@ -3931,10 +3943,20 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
     u2 java_fields_count = 0;
     // Fields (offsets are filled in later)
     FieldAllocationCount fac;
+
+#if P_SD_BITMAP
+	int transient_field_bitmap[4] = {0};
+    Array<u2>* fields = parse_fields(class_name,
+                                     access_flags.is_interface(),
+                                     &fac, &java_fields_count,
+									 transient_field_bitmap,
+                                     CHECK_(nullHandle));
+#else 
     Array<u2>* fields = parse_fields(class_name,
                                      access_flags.is_interface(),
                                      &fac, &java_fields_count,
                                      CHECK_(nullHandle));
+#endif
     // Methods
     bool has_final_method = false;
     AccessFlags promoted_flags;
@@ -4121,6 +4143,11 @@ instanceKlassHandle ClassFileParser::parseClassFile(Symbol* name,
 
     // Initialize itable offset tables
     klassItable::setup_itable_offset_table(this_klass);
+
+#if P_SD_BITMAP
+	// Initialize transient field bitmap
+	this_klass->set_transient_field_bitmap(transient_field_bitmap);
+#endif
 
     // Compute transitive closure of interfaces this class implements
     // Do final class setup

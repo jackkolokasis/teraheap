@@ -28,7 +28,7 @@ class TeraCache {
 		// TeraCache and point to objects in the heap. We adjust these pointers
 		// during adjust phase of the Full GC.
 		static Stack<oop *, mtGC> _tc_adjust_stack;
-
+		
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
 		 *---------------------------------------------*/
@@ -46,6 +46,9 @@ class TeraCache {
 		static uint64_t tc_ct_trav_time[16];	   // Time to traverse TeraCards card table
 		static uint64_t heap_ct_trav_time[16];	   // Time to traverse heap card tables
 
+		static uint64_t back_ptrs_per_mgc;		   // Total number of back ptrs per MGC
+		static uint64_t intra_ptrs_per_mgc;		   // Total number of intra ptrs between objects in TC per MGC
+
 	public:
 		// Constructor
 		TeraCache(); 
@@ -55,7 +58,7 @@ class TeraCache {
 
 		// Check if this object is located in TeraCache
 		bool tc_check(oop ptr);
-
+		
 		// Check if object p belongs to TeraCache
 		bool tc_is_in(void* p);
 
@@ -147,6 +150,11 @@ class TeraCache {
 		// Fsync writes in TeraCache
 		// We need to make an fsync when we use fastmap
 		void tc_fsync();
+
+		// Count the number of references between objects that are located in
+		// TC.
+		// This function works only when ParallelGCThreads = 1
+		void incr_intra_ptrs_per_mgc(void);
 };
 
 #endif

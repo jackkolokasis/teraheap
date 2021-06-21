@@ -53,7 +53,6 @@ inline void MarkSweep::mark_object(oop obj) {
 
 inline void MarkSweep::follow_klass(Klass* klass, bool is_tera) {
 	oop op = klass->klass_holder();
-
 	MarkSweep::mark_and_push(&op);
 }
 
@@ -65,7 +64,7 @@ inline void MarkSweep::follow_klass_tera_cache(Klass* klass) {
 
 template <class T> inline void MarkSweep::follow_root(T* p) {
 	assertf(!Universe::heap()->is_in_reserved(p),
-			"roots shouldn't be things within the heap");
+		"roots shouldn't be things within the heap");
 	T heap_oop = oopDesc::load_heap_oop(p);
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
@@ -174,6 +173,7 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 			if (obj->is_tc_to_old()) {
 				if (!obj->mark()->is_marked()) {
 					mark_object(obj); 
+
 					_marking_stack.push(obj);
 				}
 
@@ -181,10 +181,10 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 			}
 
 			if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
-				if (!obj->mark()->is_marked()) 
+				if (!obj->mark()->is_marked())
 					mark_object(obj);
 
-				if (!obj->is_tera_cache()) 
+				if (!obj->is_tera_cache())
 					obj->set_tera_cache();
 #endif
 

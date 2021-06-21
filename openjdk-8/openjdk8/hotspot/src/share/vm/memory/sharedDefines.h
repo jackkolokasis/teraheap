@@ -26,6 +26,13 @@
 #define assertf(A, M, ...) ;
 //#endif
 
+/***********************************
+ * Transient field bitmap array
+ **********************************/
+#define SetBit(A,k)     ( A[(k/32)] |= (1 << (k%32)) )
+#define ClearBit(A,k)   ( A[(k/32)] &= ~(1 << (k%32)) )
+#define TestBit(A,k)    ( A[(k/32)] & (1 << (k%32)) )
+
 #define DEBUG_SLOWPATH_INTR		 0	//< Use only interpreter for object allocation
 
 #define DEBUG_ANNO_INTR     	 0	//< Debug @Cache annotation, TODO Disable in Spark experiments
@@ -60,6 +67,10 @@
 
 #define TEST_CLONE				 0
 
+#define PERF_TEST				 0  //< Performance tests in minor collection.
+									// Keep this here until testing a lot and
+									// then remove it.
+
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
@@ -78,7 +89,7 @@
 									// memory of fast map is different from
 									// buffer cache. 
 
-#define TERA_CARD_SIZE			14  // This is the size of each card in
+#define TERA_CARD_SIZE			 14  // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
@@ -106,15 +117,28 @@
 									//  combination with P_Balance or
 									//  P_Aggressive
 
+#define P_SIZE                  0	//< Move Objects to TeraCache based on their
+									//  size. This policy should be used in
+									//  combination with P_Balance or
+									//  P_Aggressive
+
+#define P_SD					1	//< Move Objects to TeraCache based on
+									//  serialization policy.  This policy
+									//  should be used in combination with
+									//  P_DISTINCT 
+
+#define P_SD_BITMAP				1	//< Bitmap to optimize the search in tree
+									//  
+
+#define P_NO_TRANSFER           0	//< This policy is ONLY for debugging.
+									//  Calculate the closure but do not move
+									//  anything to TeraCache. This policy
+									//  should be used in combination with
+									//  P_POLICY and P_DISTINCT
+
 /**********************************
  * States of TeraFlag  
  **********************************/
-#define MARK_TO_TERA			527	//< Mark HashMap in Spark. By marking
-									// Hashmap we mark the root object for all
-									// the cached RDD partitions in TC. We do
-									// not move HashMap but only partitions in
-									// TeraCache.
-
 #define MOVE_TO_TERA			255	//< Move this object to tera cache
 
 #define TERA_TO_OLD		        328	//< Pointer from TeraCache to Old Gen. Move
@@ -131,7 +155,6 @@
 #define STATISTICS			      0  //< Enable statistics for TeraCache
 
 #define VERBOSE_TC				  0  //< Print objects in T
-
 
 
 #endif  // _SHARE_DEFINES_H_

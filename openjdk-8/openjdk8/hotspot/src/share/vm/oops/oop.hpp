@@ -123,14 +123,6 @@ class oopDesc {
 	  return _tera_flag  == TERA_TO_OLD;
   }
 
-  void set_mark_tc() {
-	  _tera_flag = MARK_TO_TERA;
-  }
-  
-  bool is_mark_tc() {
-	  return _tera_flag == MARK_TO_TERA;
-  }
-
   /* Mark an object to be moved in TeraCache */
   void set_tera_cache() 
   { 
@@ -140,7 +132,7 @@ class oopDesc {
   /* Check if an object is marked to be moved in TeraCache */
   bool is_tera_cache() 
   { 
-	  return _tera_flag == MOVE_TO_TERA || _tera_flag == MARK_TO_TERA; 
+	  return _tera_flag == MOVE_TO_TERA;
   }
 
   /*

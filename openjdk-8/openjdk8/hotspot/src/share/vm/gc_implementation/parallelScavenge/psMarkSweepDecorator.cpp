@@ -88,11 +88,17 @@ bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
 	return oop(q)->is_tera_cache() && !oop(q)->is_mark_tc() && !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold;
 
-#elif P_DISTINCT
+#elif P_DISTINCT && !P_SD
 	return (oop(q)->is_tera_cache() 
-		&& !oop(q)->is_mark_tc() 
 		&& !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold) || (oop(q)->is_tc_to_old());
+	
+#elif P_SD
+	return (oop(q)->is_tera_cache() || oop(q)->is_tc_to_old());
+
+#elif P_NO_TRANSFER
+	return false
+
 #else
 	return false;
 #endif
@@ -279,8 +285,8 @@ void PSMarkSweepDecorator::precompact() {
 
 			/* Increase compation pointer */
 			compact_top += size;
-			assertf(compact_top == prev_compact_top + size,
-					"Compact top change | Obj = %p | Size = %d", oop(q), oop(q)->size());
+			//assertf(compact_top == prev_compact_top + size,
+			//		"Compact top change | Obj = %p | Size = %d", oop(q), oop(q)->size());
 
 			assertf(compact_top <= dest->space()->end(), "Exceeding space in destination");
 
@@ -649,8 +655,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					Copy::aligned_conjoint_words(q, compaction_top, size);
 					/* Initialize mark word of the destination */
 					oop(compaction_top)->init_mark();
-					if (!oop(compaction_top)->is_mark_tc())
-						oop(compaction_top)->set_obj_state();
+					oop(compaction_top)->set_obj_state();
 				}
 			    
 #if DEBUG_TERACACHE
@@ -673,8 +678,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 				        	  << "=> NEW_ADDR = "  << q  << std::endl;
 #endif
 				oop(q)->init_mark();
-				if (!oop(q)->is_mark_tc())
-					oop(q)->set_obj_state();
+				oop(q)->set_obj_state();
 
 				/* 
 				 * Set the object state to show that this place holds a valid object
@@ -799,15 +803,12 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			  Copy::aligned_conjoint_words(q, compaction_top, size);
 			  // Change the value of teraflag in the new location of the object
 			  oop(compaction_top)->init_mark();
-			  if (!oop(compaction_top)->is_mark_tc())
-				  oop(compaction_top)->set_obj_state();
+			  oop(compaction_top)->set_obj_state();
 		  }
 #else
 		  Copy::aligned_conjoint_words(q, compaction_top, size);
 		  oop(compaction_top)->init_mark();
-
-		  if (!oop(compaction_top)->is_mark_tc())
-			  oop(compaction_top)->set_obj_state();
+		  oop(compaction_top)->set_obj_state();
 #endif
 
 

@@ -316,6 +316,15 @@ class InstanceKlass: public Klass {
   //   or an anonymous class loaded through normal classloading does not
   //   have this embedded field.
   //
+  
+#if P_SD_BITMAP
+
+  // Bitmap to identify transient fields during FullGC for P_SD policy. We add
+  // this extra field in this klass to reduce the search time for transient
+  // fields during scanning phase of major GC.
+  int _transient_field_bitmap[4];
+  
+#endif
 
   friend class SystemDictionary;
 
@@ -513,6 +522,11 @@ class InstanceKlass: public Klass {
   bool find_local_field_from_offset(int offset, bool is_static, fieldDescriptor* fd) const;
   bool find_field_from_offset(int offset, bool is_static, fieldDescriptor* fd) const;
 
+#if !DISABLE_TERACACHE
+  bool find_transient_local_field_from_offset(int offset, fieldDescriptor* fd) const;
+  bool find_transient_field_from_offset(int offset, fieldDescriptor* fd) const;
+#endif
+
   // find a local method (returns NULL if not found)
   Method* find_method(Symbol* name, Symbol* signature) const;
   static Method* find_method(Array<Method*>* methods, Symbol* name, Symbol* signature);
@@ -611,6 +625,10 @@ class InstanceKlass: public Klass {
   void set_minor_version(u2 minor_version) { _minor_version = minor_version; }
   u2 major_version() const                 { return _major_version; }
   void set_major_version(u2 major_version) { _major_version = major_version; }
+  
+#if P_SD_BITMAP
+  void set_transient_field_bitmap(int *bitmap) { memcpy(_transient_field_bitmap, bitmap, 4*sizeof(int)); }
+#endif
 
   // source debug extension
   char* source_debug_extension() const     { return _source_debug_extension; }
