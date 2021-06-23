@@ -127,7 +127,7 @@
 									//  should be used in combination with
 									//  P_DISTINCT 
 
-#define P_SD_BITMAP				1	//< Bitmap to optimize the search in tree
+#define P_SD_BITMAP				0	//< Bitmap to optimize the search in tree
 									//  
 
 #define P_NO_TRANSFER           0	//< This policy is ONLY for debugging.

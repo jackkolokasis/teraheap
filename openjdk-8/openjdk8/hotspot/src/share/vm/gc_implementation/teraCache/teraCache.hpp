@@ -42,7 +42,6 @@ class TeraCache {
 		static uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
 		static uint64_t trans_per_fgc;	           // Total number of objects transfered to 
 												   // TeraCache per FGC
-		static uint64_t dirty_cards[16];		   // Number of dirty cards
 		static uint64_t tc_ct_trav_time[16];	   // Time to traverse TeraCards card table
 		static uint64_t heap_ct_trav_time[16];	   // Time to traverse heap card tables
 

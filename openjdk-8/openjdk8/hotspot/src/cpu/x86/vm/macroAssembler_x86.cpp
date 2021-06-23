@@ -3470,29 +3470,8 @@ void MacroAssembler::store_check(Register obj) {
 		store_check_part_2(obj);
 	}
 #else
-
-	if (EnableTeraCache) {
-		AddressLiteral tc_start_addr((address)Universe::teraCache()->tc_get_addr_region(), relocInfo::none);
-		// Push the teraCache address in r11
-		lea(r11, tc_start_addr);
-
-		cmpptr(obj, r11); 
-		jcc(Assembler::lessEqual, ok);
-
-		// Debug
-		stop("Execution stopped, print registers?");
-
-		bind(ok);
-		store_check_part_1(obj);
-		store_check_part_2(obj);
-		jmp(Done);
-
-		bind(Done);
-	}
-	else {
-		store_check_part_1(obj);
-		store_check_part_2(obj);
-	}
+	store_check_part_1(obj);
+	store_check_part_2(obj);
 #endif
 }
 

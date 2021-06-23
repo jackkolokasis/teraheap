@@ -81,23 +81,23 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
 // takes as argument the position `q` of the object and its `size` in the Java
 // heap and return `true` if the policy is satisfied, and `false` otherwise.
 bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
-#if P_SIMPLE
+#if P_SIMPLE && !P_NO_TRANSFER
 	return oop(q)->is_tera_cache() && !oop(q)->is_mark_tc() && !PSScavenge::is_obj_in_young(oop(q));
 
-#elif P_SIZE
+#elif P_SIZE && !P_NO_TRANSFER
 	return oop(q)->is_tera_cache() && !oop(q)->is_mark_tc() && !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold;
 
-#elif P_DISTINCT && !P_SD
+#elif P_DISTINCT && !P_SD && !P_NO_TRANSFER
 	return (oop(q)->is_tera_cache() 
 		&& !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold) || (oop(q)->is_tc_to_old());
 	
-#elif P_SD
+#elif P_SD && !P_NO_TRANSFER
 	return (oop(q)->is_tera_cache() || oop(q)->is_tc_to_old());
 
 #elif P_NO_TRANSFER
-	return false
+	return false;
 
 #else
 	return false;

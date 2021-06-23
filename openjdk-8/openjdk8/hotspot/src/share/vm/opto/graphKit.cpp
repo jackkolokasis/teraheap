@@ -3777,23 +3777,22 @@ void GraphKit::write_barrier_post(Node* oop_store,
 	  assertf(adr->bottom_type()->isa_ptr() != NULL, "Error");
 	  assertf(tc_adr->bottom_type()->isa_ptr() != NULL, "Error");
 
-	  // Combine teracache card table base and card offset
-	  Node* tc_card_adr =  __ AddP(__ top(), tc_byte_map_base_node(), tc_card_offset );
-
-	  // Combine heap card table base and card offset
-	  Node* card_adr =  __ AddP(__ top(), byte_map_base_node(), card_offset );
-	  
+	  Node* card_adr;
 	  __ if_then(adr, BoolTest::ge, tc_adr); {
-	      __ store(__ ctrl(), tc_card_adr, zero, bt, adr_type);
+		  // Combine teracache card table base and card offset
+		  card_adr =  __ AddP(__ top(), tc_byte_map_base_node(), tc_card_offset );
 	  
-	      // Final sync IdealKit and GraphKit.
-	      final_sync(ideal);
 	  } __ else_(); {
-	      __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+
+		  // Combine heap card table base and card offset
+		  card_adr =  __ AddP(__ top(), byte_map_base_node(), card_offset );
 	  
-	      // Final sync IdealKit and GraphKit.
-	      final_sync(ideal);
 	  } __ end_if();
+	      
+	  __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+
+	  // Final sync IdealKit and GraphKit.
+	  final_sync(ideal);
   }
   else {
 
