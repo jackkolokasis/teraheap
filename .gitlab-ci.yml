@@ -1,0 +1,9 @@
+image: carvicsforth/centos_carv
+stages:
+    - build
+
+build_jvm:
+  stage: build
+  script:
+    - echo "Hello JVM"
+
