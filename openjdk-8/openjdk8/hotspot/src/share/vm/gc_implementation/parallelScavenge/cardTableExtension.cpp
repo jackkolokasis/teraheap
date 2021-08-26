@@ -131,13 +131,17 @@ class CheckForPreciseMarks : public OopClosure {
 // do no work.  If this method needs to be called
 // when the space is empty, fix the calculation of
 // end_card to allow sp_top == sp->bottom().
+//
+// 'is_scavenge_done' field shows if we use this function during minor gc or we
+// use this function only to trace dirty objects of TeraCache
 void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_array,
 													  HeapWord* space_top,
 													  PSPromotionManager* pm,
 													  uint stripe_number,
-													  uint stripe_total) {
+													  uint stripe_total,
+													  bool is_scavenge_done) {
   
-	int ssize = 128; // Naked constant!  Work unit = 64k.
+	int ssize = 512; // Naked constant!  Work unit = 64k.
 	int dirty_card_count = 0;
   
 	oop* sp_top = (oop*)space_top;
@@ -233,14 +237,14 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 	
 		jbyte* current_card = worker_start_card;
 		while (current_card < worker_end_card) {
-			// Find an unclean card
+			// Find a dirty card
 			while (current_card < worker_end_card && card_is_clean(*current_card)) {
 				current_card++;
 			}
 
 			jbyte* first_unclean_card = current_card;
 
-			// Find the end of a run of contiguous unclean cards
+			// Find the end of a run of contiguous dirty cards
 			while (current_card < worker_end_card && !card_is_clean(*current_card)) {
 				while (current_card < worker_end_card && !card_is_clean(*current_card)) {
 					current_card++;
@@ -283,6 +287,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				assertf((p >= last_scanned) ||
 						(last_scanned == first_object_within_slice),
 						"Should no longer be possible");
+				// TODO check
 				if (p < last_scanned) {
 					// Avoid scanning more than once; this can happen because
 					// newgen cards set by GC may a different set than the
@@ -300,24 +305,15 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				}
 
 				// we know which cards to scan, now clear them
-				//
-				//if (first_unclean_card <= worker_start_card +1)
-				//	first_unclean_card = worker_start_card + 1;
+				if (first_unclean_card <= worker_start_card +1)
+					first_unclean_card = worker_start_card + 1;
 
-				//if (following_clean_card >= worker_end_card - 1)
-				//	following_clean_card = worker_end_card - 1;
-				//
-				//
-				if (first_unclean_card <= worker_start_card)
-					first_unclean_card = worker_start_card;
-
-				if (following_clean_card >= worker_end_card)
-					following_clean_card = worker_end_card;
+				if (following_clean_card >= worker_end_card - 1)
+					following_clean_card = worker_end_card - 1;
 
 				while (first_unclean_card < following_clean_card) {
 					*first_unclean_card++ = clean_card;
 				}
-
 
 				const int interval = PrefetchScanIntervalInBytes;
 
@@ -327,7 +323,10 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 						Prefetch::write(p, interval);
 						oop m = oop(p);
 						assertf(m->is_oop_or_null(), "check for header");
-						m->tc_push_contents(pm);
+						if (is_scavenge_done)
+							m->tc_push_contents(pm);
+						else
+							m->tc_trace_contents(pm);
 						p += m->size();
 					}
 
@@ -338,7 +337,10 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 					while (p < to) {
 						oop m = oop(p);
 						assertf(m->is_oop_or_null(), "check for header");
-						m->tc_push_contents(pm);
+						if (is_scavenge_done)
+							m->tc_push_contents(pm);
+						else
+							m->tc_trace_contents(pm);
 						p += m->size();
 					}
 					
@@ -516,10 +518,10 @@ void CardTableExtension::scavenge_contents_parallel(ObjectStartArray* start_arra
         }
 
         // we know which cards to scan, now clear them
-        if (first_unclean_card <= worker_start_card+1)
-          first_unclean_card = worker_start_card+1;
-        if (following_clean_card >= worker_end_card-1)
-          following_clean_card = worker_end_card-1;
+		if (first_unclean_card <= worker_start_card+1)
+			first_unclean_card = worker_start_card+1;
+		if (following_clean_card >= worker_end_card-1)
+			following_clean_card = worker_end_card-1;
 
         while (first_unclean_card < following_clean_card) {
           *first_unclean_card++ = clean_card;

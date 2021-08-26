@@ -383,8 +383,13 @@ class oopDesc {
   // Parallel Scavenge
   void push_contents(PSPromotionManager* pm);
   
+#if TERA_CARDS
   // Parallel Scavenge TeraCache
   void tc_push_contents(PSPromotionManager* pm);
+  
+  // Parallel Trace TeraCache contents
+  void tc_trace_contents(PSPromotionManager* pm);
+#endif
 
   // Parallel Old
   void update_contents(ParCompactionManager* cm);

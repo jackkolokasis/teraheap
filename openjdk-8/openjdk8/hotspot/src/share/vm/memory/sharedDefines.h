@@ -164,7 +164,4 @@
 // TODO: This define must be removed
 #define NEW_FEAT				  0  //< Enable when you add new feature
 
-
-
-
 #endif  // _SHARE_DEFINES_H_

@@ -74,13 +74,16 @@ class CardTableExtension : public CardTableModRefBS {
                                   uint stripe_number,
                                   uint stripe_total);
   
-  // Scavenge support for TeraCache
 #if TERA_CARDS
+  // Scavenge support for TeraCache
+  // 'is_scavenge_done' field shows if we use this function during minor gc or
+  // we use this function only to trace dirty objects of TeraCache
   void tc_scavenge_contents_parallel(ObjectStartArray* start_array,
                                   HeapWord* space_top,
                                   PSPromotionManager* pm,
                                   uint stripe_number,
-                                  uint stripe_total);
+                                  uint stripe_total, 
+								  bool is_scavenge_done);
 #endif
   
   // Verification

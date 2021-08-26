@@ -271,6 +271,52 @@ bool PSScavenge::invoke() {
   return full_gc_done;
 }
 
+#if TERA_CARDS
+// Scavenge only the dirty objects in TeraCache. We use this function in case
+// where we perform directly major gc without performing minor gc. So using
+// this function we identify backward pointers (from TC to the heap) to use
+// them during major gc.
+void PSScavenge::tc_scavenge() {
+    // Release all previously held resources
+    gc_task_manager()->release_all_resources();
+
+    // Set the number of GC threads to be used in this collection
+    gc_task_manager()->set_active_gang();
+    gc_task_manager()->task_idle_workers();
+
+    uint active_workers = gc_task_manager()->active_workers();
+
+	// Create the task queu for the scavengers
+	GCTaskQueue* q = GCTaskQueue::create();
+
+    PSPromotionManager* promotion_manager = PSPromotionManager::vm_thread_promotion_manager();
+
+	// Give advise to kernel to prefetch pages for TeraCache random
+	Universe::teraCache()->tc_enable_rand();
+
+	uint stripe_total = active_workers;
+	for (uint i = 0; i < stripe_total; i++) {
+		q->enqueue(new TCToHeapRootsTask(Universe::teraCache(), 
+					(HeapWord*)Universe::teraCache()->tc_region_cur_ptr(), 
+					i, stripe_total));
+	}
+
+	// End the scavengers
+	ParallelTaskTerminator terminator( active_workers,
+			(TaskQueueSetSuper*) promotion_manager->stack_array_depth());
+
+	if (active_workers > 1) {
+		for (uint j = 0; j < active_workers; j++) {
+			q->enqueue(new StealTask(&terminator));
+		}
+	}
+
+	gc_task_manager()->execute_and_wait(q);
+
+	gc_task_manager()->release_idle_workers();
+}
+#endif
+
 // This method contains no policy. You should probably
 // be calling invoke() instead.
 bool PSScavenge::invoke_no_policy() {
@@ -308,6 +354,30 @@ bool PSScavenge::invoke_no_policy() {
   PSYoungGen* young_gen = heap->young_gen();
   PSOldGen* old_gen = heap->old_gen();
   PSAdaptiveSizePolicy* size_policy = heap->size_policy();
+
+#if NEW_FEAT
+  static bool tc_first_time = true;
+
+  if (EnableTeraCache) {
+	  BarrierSet *bs = Universe::heap()->barrier_set();
+	  ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+
+	  assertf(modBS->tc_num_dirty_cards(
+				  (HeapWord*)Universe::teraCache()->tc_get_addr_region(),
+				  (HeapWord *) Universe::teraCache()->tc_region_cur_ptr(), 1),
+			  "Check the number of dirty cards in TC before MinorGC");
+
+	  // In the first minor collection make all the cells in the teracache card
+	  // table to be clean.
+	  // We understand that the default value of the card table during
+	  // initialization is dirty. Thus increase the overhead of traversing the
+	  // card tables in teraCache.
+	  if (tc_first_time) {
+		  modBS->tc_clean_cards((HeapWord*)Universe::teraCache()->tc_get_addr_region(), (HeapWord *) Universe::teraCache()->tc_stop_addr_region() - 1);
+		  tc_first_time = false;
+	  }
+  }
+#endif
 
   heap->increment_total_collections();
 
@@ -514,6 +584,10 @@ bool PSScavenge::invoke_no_policy() {
     // Finally, flush the promotion_manager's labs, and deallocate its stacks.
     promotion_failure_occurred = PSPromotionManager::post_scavenge(_gc_tracer);
     if (promotion_failure_occurred) {
+#if TERA_CARDS
+		if (EnableTeraCache)
+			assertf(false, "TODO: Implement this usecase");
+#endif
       clean_up_failed_promotion();
       if (PrintGC) {
         gclog_or_tty->print("--");
@@ -744,6 +818,16 @@ bool PSScavenge::invoke_no_policy() {
 		  Universe::teraCache()->tc_print_mgc_statistics();
   }
 
+#if NEW_FEAT
+  if (EnableTeraCache) {
+	  BarrierSet *bs = Universe::heap()->barrier_set();
+	  ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+	  assertf(modBS->tc_num_dirty_cards(
+				  (HeapWord*)Universe::teraCache()->tc_get_addr_region(),
+				  (HeapWord *) Universe::teraCache()->tc_region_cur_ptr(), 0),
+			  "Check the number of dirty cards in TC after MinorGC");
+  }
+#endif
 
   return !promotion_failure_occurred;
 }
@@ -830,6 +914,20 @@ bool PSScavenge::should_attempt_scavenge() {
   size_t avg_promoted = (size_t) policy->padded_average_promoted_in_bytes();
   size_t promotion_estimate = MIN2(avg_promoted, young_gen->used_in_bytes());
   bool result = promotion_estimate < old_gen->free_in_bytes();
+
+#if TERA_CARDS
+  // If the 'result' is false, then we scavenge only the dirty objects in
+  // TeraCache. We addresss the case where we perform directly major gc without
+  // performing minor gc. So, we identify the backward pointers (from TC to the
+  // heap) to use them during major gc.
+  if (EnableTeraCache && !Universe::teraCache()->tc_empty() && !result) {
+
+#if DEBUG_TERACACHE
+	  std::cerr << "Result = FALSE" << std::endl;
+#endif
+	  tc_scavenge();
+  }
+#endif
 
   if (PrintGCDetails && Verbose) {
     gclog_or_tty->print(result ? "  do scavenge: " : "  skip scavenge: ");

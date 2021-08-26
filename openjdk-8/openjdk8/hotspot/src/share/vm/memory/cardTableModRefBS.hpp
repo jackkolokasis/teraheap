@@ -461,6 +461,12 @@ public:
 #if TERA_CARDS
   virtual void tc_invalidate(HeapWord *start, HeapWord *end);
 #endif
+
+#if NEW_FEAT
+  virtual void tc_write_ref_field(HeapWord *obj);
+  virtual bool tc_num_dirty_cards(HeapWord *start, HeapWord* end, bool before);
+  virtual void tc_clean_cards(HeapWord *start, HeapWord* end);
+#endif
   void clear(MemRegion mr);
   void dirty(MemRegion mr);
 

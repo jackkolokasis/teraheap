@@ -90,7 +90,7 @@ bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
 
 #elif P_DISTINCT && !P_SD && !P_NO_TRANSFER
 	return (oop(q)->is_tera_cache() 
-		&& !PSScavenge::is_obj_in_young(oop(q))  
+		//&& !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold) || (oop(q)->is_tc_to_old());
 	
 #elif P_SD && !P_NO_TRANSFER
@@ -225,7 +225,14 @@ void PSMarkSweepDecorator::precompact() {
 				// Encoding the pointer should preserve the mark
 				assertf(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
 
+#if NEW_FEAT
 				// Mark TeraCache Card Table
+				if (Universe::teraCache()->tc_should_mk_dirty(q)) {
+					BarrierSet *bs = Universe::heap()->barrier_set();
+					ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+					modBS->tc_write_ref_field(region_top);
+				}
+#endif
 
 				// Move to the next object
 				q += size;
@@ -428,7 +435,7 @@ void PSMarkSweepDecorator::precompact() {
 
 	_first_dead = first_dead;
 
-#if !DISABLE_TERACACHE
+#if !DISABLE_TERACACHE && !NEW_FEAT
 	// Invalidate tera cards for the new objects that will be allocated in the
 	// EnableTeraCache. Objects that are moved in TeraCache might have backward
 	// pointers to the heap. So we invalidate these cards that map the new
@@ -553,8 +560,10 @@ void PSMarkSweepDecorator::verify_compacted_objects()
 			assertf(obj->get_obj_state() == IN_TERA_CACHE,  "Error in compaction");
 		}
 		else {
-			assertf(obj->get_obj_state() == MOVE_TO_TERA 
-					|| obj->get_obj_state() == INIT_TF,  "Error in compaction");
+			assertf(obj->get_obj_state() == MOVE_TO_TERA
+					|| obj->get_obj_state() == INIT_TF  
+					|| obj->get_obj_state() == IN_TERA_CACHE,  
+					"Error in compaction");
 		}
 	}
 }

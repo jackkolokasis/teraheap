@@ -258,6 +258,11 @@ void TypeArrayKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
   ShouldNotReachHere();
   assert(obj->is_typeArray(),"must be a type array");
 }
+
+void TypeArrayKlass::tc_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  ShouldNotReachHere();
+  assert(obj->is_typeArray(),"must be a type array");
+}
 #endif
 
 

@@ -2105,24 +2105,62 @@ template <class T> void assert_nothing(T *p) {}
 
 #else
 
+#if NEW_FEAT
+
 // The following macros call specialized macros, passing either oop or
 // narrowOop as the specialization type.  These test the UseCompressedOops
 // flag.
 // This is special iterator for TeraCache objects
-#define InstanceKlass_TC_OOP_MAP_ITERATE(obj, do_oop, assert_fn)                  \
-{                                                                                 \
-  /* Compute oopmap block range. The common case                                  \
-     is nonstatic_oop_map_size == 1. */                                           \
-  OopMapBlock* map           = start_of_nonstatic_oop_maps();                     \
-  OopMapBlock* const end_map = map + nonstatic_oop_map_count();                   \
-  if (UseCompressedOops) {                                                        \
-    while (map < end_map) {                                                       \
-      InstanceKlass_SPECIALIZED_OOP_ITERATE(narrowOop,                            \
-        obj->obj_field_addr<narrowOop>(map->offset()), map->count(),              \
-        do_oop, assert_fn)                                                        \
-      ++map;                                                                      \
-    }                                                                             \
-  } else {                                                                        \
+#define InstanceKlass_TC_OOP_MAP_ITERATE(obj, do_oop, assert_fn)              \
+{                                                                             \
+  /* Compute oopmap block range. The common case                              \
+     is nonstatic_oop_map_size == 1. */                                       \
+  OopMapBlock* map           = start_of_nonstatic_oop_maps();                 \
+  OopMapBlock* const end_map = map + nonstatic_oop_map_count();               \
+  if (UseCompressedOops) {                                                    \
+    while (map < end_map) {                                                   \
+      InstanceKlass_SPECIALIZED_OOP_ITERATE(narrowOop,                        \
+        obj->obj_field_addr<narrowOop>(map->offset()), map->count(),          \
+        do_oop, assert_fn)                                                    \
+      ++map;                                                                  \
+    }                                                                         \
+  } else {                                                                    \
+	  fieldDescriptor fd;                                                     \
+	  while (map < end_map) {                                                 \
+		  if (find_transient_field_from_offset(map->offset(), &fd)) {         \
+			  InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                      \
+					  obj->obj_field_addr<oop>(map->offset()), map->count(),  \
+					  MarkSweep::mark_and_push(p), assert_fn)                 \
+			  Universe::teraCache()->tc_mk_dirty(obj);                        \
+		  }																      \
+		  else {														      \
+			  InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                      \
+					  obj->obj_field_addr<oop>(map->offset()), map->count(),  \
+					  MarkSweep::tera_mark_and_push(p), assert_fn)            \
+		  }																      \
+		  ++map;                                                              \
+	  }                                                                       \
+  }                                                                           \
+}
+#else
+// The following macros call specialized macros, passing either oop or
+// narrowOop as the specialization type.  These test the UseCompressedOops
+// flag.
+// This is special iterator for TeraCache objects
+#define InstanceKlass_TC_OOP_MAP_ITERATE(obj, do_oop, assert_fn)              \
+{                                                                             \
+  /* Compute oopmap block range. The common case                              \
+     is nonstatic_oop_map_size == 1. */                                       \
+  OopMapBlock* map           = start_of_nonstatic_oop_maps();                 \
+  OopMapBlock* const end_map = map + nonstatic_oop_map_count();               \
+  if (UseCompressedOops) {                                                    \
+    while (map < end_map) {                                                   \
+      InstanceKlass_SPECIALIZED_OOP_ITERATE(narrowOop,                        \
+        obj->obj_field_addr<narrowOop>(map->offset()), map->count(),          \
+        do_oop, assert_fn)                                                    \
+      ++map;                                                                  \
+    }                                                                         \
+  } else {                                                                    \
 	  fieldDescriptor fd;                                                     \
 	  while (map < end_map) {                                                 \
 		  if (find_transient_field_from_offset(map->offset(), &fd)) {         \
@@ -2139,6 +2177,8 @@ template <class T> void assert_nothing(T *p) {}
 	  }                                                                       \
   }                                                                           \
 }
+
+#endif
 
 #endif
 
@@ -2392,6 +2432,16 @@ void InstanceKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
 	InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
 			obj, \
 			if (PSScavenge::tc_should_scavenge(p)) { \
+			pm->tc_claim_or_forward_depth(p); \
+			}, \
+			assert_nothing )
+}
+
+void InstanceKlass::tc_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+
+	InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
+			obj, \
+			if (PSScavenge::tc_should_trace(p)) { \
 			pm->tc_claim_or_forward_depth(p); \
 			}, \
 			assert_nothing )

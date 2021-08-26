@@ -48,6 +48,11 @@ class TeraCache {
 		static uint64_t back_ptrs_per_mgc;		   // Total number of back ptrs per MGC
 		static uint64_t intra_ptrs_per_mgc;		   // Total number of intra ptrs between objects in TC per MGC
 
+#if NEW_FEAT
+		static std::vector<HeapWord *> _mk_dirty;    //< These objects should
+													 // make dirty their cards
+#endif
+
 	public:
 		// Constructor
 		TeraCache(); 
@@ -154,6 +159,19 @@ class TeraCache {
 		// TC.
 		// This function works only when ParallelGCThreads = 1
 		void incr_intra_ptrs_per_mgc(void);
+
+#if NEW_FEAT
+		// New feature
+		void tc_mk_dirty(oop obj);
+		
+		// New feature
+		bool tc_should_mk_dirty(HeapWord* obj);
+#endif
+		
+		// 
+		// // Validate if all the dirty cards that we found are dirty now are
+		// // clean. If one of the dirty card is still dirty then fail
+		// bool validate_dirty_card(unsigned int tid);
 };
 
 #endif

@@ -11,6 +11,7 @@
 #include "runtime/mutexLocker.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include <map>
 
 char*        TeraCache::_start_addr = NULL;
 char*        TeraCache::_stop_addr = NULL;
@@ -32,6 +33,10 @@ uint64_t TeraCache::heap_ct_trav_time[16];
 		
 uint64_t TeraCache::back_ptrs_per_mgc;
 uint64_t TeraCache::intra_ptrs_per_mgc;
+
+#if NEW_FEAT
+std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
+#endif
 
 // Constructor of TeraCache
 TeraCache::TeraCache() {
@@ -143,6 +148,8 @@ void TeraCache::scavenge()
 	struct timeval end_time;
 
 	gettimeofday(&start_time, NULL);
+
+	static int i = 0;
 
 	while (!_tc_stack.is_empty()) {
 		oop obj = _tc_stack.pop();
@@ -336,3 +343,23 @@ void TeraCache::tc_fsync() {
 void TeraCache::incr_intra_ptrs_per_mgc(void) {
 	intra_ptrs_per_mgc++;
 }
+
+#if NEW_FEAT
+// New feature
+void TeraCache::tc_mk_dirty(oop obj) {
+	_mk_dirty.push_back((HeapWord *)obj);
+
+}
+
+// New feature
+bool TeraCache::tc_should_mk_dirty(HeapWord* obj) {
+	for (unsigned long int i = 0; i < _mk_dirty.size(); i++) {
+		if (_mk_dirty[i] == obj) {
+			_mk_dirty.erase(_mk_dirty.begin() + i);
+			std::cout << "BKPTR | SIZE = " << _mk_dirty.size() << std::endl;
+			return true;
+		}
+	}
+	return false;
+}
+#endif

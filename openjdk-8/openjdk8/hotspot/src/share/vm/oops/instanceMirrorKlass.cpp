@@ -424,6 +424,20 @@ void InstanceMirrorKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) 
     },                                                                        \
     assert_nothing )
 }
+
+void InstanceMirrorKlass::tc_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  // Note that we don't have to follow the mirror -> klass pointer, since all
+  // klasses that are dirty will be scavenged when we iterate over the
+  // ClassLoaderData objects.
+
+  InstanceKlass::tc_oop_trace_contents(pm, obj);
+  InstanceMirrorKlass_OOP_ITERATE(                                            \
+    start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),\
+    if (PSScavenge::tc_should_trace(p)) {                                     \
+      pm->tc_claim_or_forward_depth(p);                                          \
+    },                                                                        \
+    assert_nothing )
+}
 #endif
 
 int InstanceMirrorKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {

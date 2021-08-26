@@ -237,7 +237,53 @@ void TeraToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
 		// Traverse TeraCache to Heap pointers
 #if TERA_CARDS
 		card_table->tc_scavenge_contents_parallel(_tc->start_array(), _tc_top,
-												  pm, _stripe_number, _stripe_total);
+												  pm, _stripe_number,
+												  _stripe_total, true);
+#endif
+		
+		if (TeraCacheStatistics) {
+			gettimeofday(&end_time, NULL);
+
+			ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
+				((end_time.tv_usec - start_time.tv_usec) / 1000);
+
+			Universe::teraCache()->tc_ct_traversal_time(which, ellapsed_time);
+		}
+
+		// Do the real work
+		pm->drain_stacks(false);
+	}
+}
+
+//
+// TCCacheToHeapRootsTask
+//
+void TCToHeapRootsTask::do_it(GCTaskManager* manager, uint which){
+	// There are not tera-to-heap pointers if the tera cache is empty.
+	assertf(!_tc->tc_empty(),
+			"Should not be called is there is no work");
+	assertf(_tc != NULL, "Sanity");
+	assertf(_stripe_number < ParallelGCThreads, "Sanity");
+
+	{
+		struct timeval start_time;
+		struct timeval end_time;
+		uint64_t ellapsed_time;
+
+		if (TeraCacheStatistics)
+			gettimeofday(&start_time, NULL);
+
+		PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(which);
+
+		assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+		CardTableExtension* card_table = (CardTableExtension *)Universe::heap()->barrier_set();
+
+		
+		// Traverse TeraCache to Heap pointers
+#if TERA_CARDS
+		card_table->tc_scavenge_contents_parallel(_tc->start_array(), _tc_top,
+												  pm, _stripe_number,
+												  _stripe_total, false);
 #endif
 		
 		if (TeraCacheStatistics) {
