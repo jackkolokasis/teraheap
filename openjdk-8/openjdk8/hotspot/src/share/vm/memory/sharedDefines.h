@@ -51,10 +51,15 @@
 
 #define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
 
+#define C2_ONLY_LEAF_CALL		 1  //< C2 Compiler version - Comparisons and
+									// card marking are all implemented in the
+									// make_leaf_call()
+
 #define TERA_INT			     1  //< Enable Interpreter to support TeraCache, TODO Set to 1
 
 #define MT_STACK				 1  //< Enable multi threaded stack in Minor GC 
 								    //  for TeraCache, TODO Set to 1
+
 #define CLOSURE					 1  //< Closure Calculation TEST  !!!!!
 
 #define DEBUG_INTR               0  //< Debug Interpreter
@@ -89,7 +94,7 @@
 									// memory of fast map is different from
 									// buffer cache. 
 
-#define TERA_CARD_SIZE			 14  // This is the size of each card in
+#define TERA_CARD_SIZE			14 // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
@@ -122,7 +127,7 @@
 									//  combination with P_Balance or
 									//  P_Aggressive
 
-#define P_SD					1	//< Move Objects to TeraCache based on
+#define P_SD					0	//< Move Objects to TeraCache based on
 									//  serialization policy.  This policy
 									//  should be used in combination with
 									//  P_DISTINCT 
@@ -155,6 +160,11 @@
 #define STATISTICS			      0  //< Enable statistics for TeraCache
 
 #define VERBOSE_TC				  0  //< Print objects in T
+
+// TODO: This define must be removed
+#define NEW_FEAT				  0  //< Enable when you add new feature
+
+
 
 
 #endif  // _SHARE_DEFINES_H_

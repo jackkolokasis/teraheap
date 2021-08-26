@@ -24,6 +24,7 @@
 
 #include "opto/cfgnode.hpp"
 #include "opto/connode.hpp"
+#include "opto/node.hpp"
 #include "opto/subnode.hpp"
 #include "opto/type.hpp"
 #include "precompiled.hpp"
@@ -3749,6 +3750,8 @@ void GraphKit::write_barrier_post(Node* oop_store,
 
   IdealKit ideal(this, true);
 
+  Node* no_base =  __ top();
+
   // Convert the pointer to an int prior to doing math on it
   Node* cast = __ CastPX(__ ctrl(), adr);
 
@@ -3762,7 +3765,7 @@ void GraphKit::write_barrier_post(Node* oop_store,
 		  "Only one we handle so far.");
 
   card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::card_shift) );
-  tc_card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::tc_card_shift) );
+  //tc_card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::tc_card_shift) );
 		  
   // Get the alias_index for raw card-mark memory
   int adr_type = Compile::AliasIdxRaw;
@@ -3771,25 +3774,32 @@ void GraphKit::write_barrier_post(Node* oop_store,
 
   if (EnableTeraCache) {
 
-	  Node* tc_adr = __ makecon(TypeRawPtr::make(
-				  (address)Universe::teraCache()->tc_get_addr_region()));
+#if C2_ONLY_LEAF_CALL
+	  const TypeFunc *tf = OptoRuntime::tc_wb_post_Type();
+	  __ make_leaf_call(tf,  CAST_FROM_FN_PTR(address, SharedRuntime::tc_wb_post), "tc_wb_post", adr);
+#else
+	  Node* tc_adr = __ makecon(
+	    	  TypeRawPtr::make((address)Universe::teraCache()->tc_get_addr_region()));
+	  Node* tc_cast = __ CastPX(__ ctrl(), tc_adr);
 
 	  assertf(adr->bottom_type()->isa_ptr() != NULL, "Error");
 	  assertf(tc_adr->bottom_type()->isa_ptr() != NULL, "Error");
 
-	  Node* card_adr;
-	  __ if_then(adr, BoolTest::ge, tc_adr); {
-		  // Combine teracache card table base and card offset
-		  card_adr =  __ AddP(__ top(), tc_byte_map_base_node(), tc_card_offset );
+	  Node* t = _gvn.transform(new (C) SubXNode(cast, tc_cast));
+
+	  __ if_then(t, BoolTest::lt, __ ConX(0)); {
+	      // Combine Heap card table base and card offset and mark card as dirty
+	      card_adr =  __ AddP(no_base, byte_map_base_node(), card_offset);
+	      __ store(__ ctrl(), card_adr, zero, bt, adr_type);
 	  
 	  } __ else_(); {
 
-		  // Combine heap card table base and card offset
-		  card_adr =  __ AddP(__ top(), byte_map_base_node(), card_offset );
+	      // Mark tera card as dirty
+	      const TypeFunc *tf = OptoRuntime::tc_wb_post_Type();
+	      __ make_leaf_call(tf,  CAST_FROM_FN_PTR(address, SharedRuntime::tc_wb_post), "tc_wb_post", adr);
 	  
 	  } __ end_if();
-	      
-	  __ store(__ ctrl(), card_adr, zero, bt, adr_type);
+#endif
 
 	  // Final sync IdealKit and GraphKit.
 	  final_sync(ideal);

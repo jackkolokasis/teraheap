@@ -262,6 +262,11 @@ private:
   static const TypeFunc* multianewarrayN_Type(); // multianewarray
   static const TypeFunc* g1_wb_pre_Type();
   static const TypeFunc* g1_wb_post_Type();
+
+#if TERA_C2
+  static const TypeFunc* tc_wb_post_Type();
+#endif
+
   static const TypeFunc* complete_monitor_enter_Type();
   static const TypeFunc* complete_monitor_exit_Type();
   static const TypeFunc* uncommon_trap_Type();
