@@ -33,9 +33,6 @@ public class Array_List
 
 	public static void main (String[] args) 
 	{		 
-		// declares an Array of integers. 
-		// allocating memory for 5 integers. 
-		//
 		int num_elements = 60000;
 
 		mem_info("Memory Before");

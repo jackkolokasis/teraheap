@@ -28,21 +28,17 @@ public class Clone
     @SuppressWarnings("unchecked")
     public static void main(String[] args) 
     {
-		int num_elements = 1000000;
+		int num_elements = 4000000;
 
 		System.out.println(Runtime.getRuntime().maxMemory());
 
         ArrayList<String> arrayListObject = new @Cache ArrayList<>(); 
-
-		gc();
 
 		for (int i = 0; i < num_elements/2; i++)
 		{
 			arrayListObject.add("Jack Kolokasis " + i);
 		}
 
-		gc();
-		
 		for (int i = 0; i < num_elements/2; i++)
 		{
 			arrayListObject.add("Jack Kolokasis " + i);
@@ -50,17 +46,18 @@ public class Clone
          
         System.out.println(arrayListObject);   
 		
-		for (int i = 0; i < num_elements/2; i++)
+		for (int i = 0; i < num_elements/4; i++)
 		{
-			arrayListObject.add("Jack Kolokasis " + i);
+			arrayListObject.add("Nicos Kolokasis " + i);
 		}
 
-		gc();
-         
         ArrayList<String> arrayListClone =  (ArrayList<String>) arrayListObject.clone();
 
-		gc();
-         
         System.out.println(arrayListClone);   
+		
+		for (int i = 0; i < num_elements/4; i++)
+		{
+			arrayListObject.add("Jack Kolokasis " + i + "00");
+		}
     }
 }
