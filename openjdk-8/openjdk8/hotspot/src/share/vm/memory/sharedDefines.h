@@ -51,7 +51,7 @@
 
 #define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
 
-#define C2_ONLY_LEAF_CALL		 1  //< C2 Compiler version - Comparisons and
+#define C2_ONLY_LEAF_CALL		 0  //< C2 Compiler version - Comparisons and
 									// card marking are all implemented in the
 									// make_leaf_call()
 
@@ -81,6 +81,11 @@
 
 #define ASYNC				     1  //< Asynchronous I/O path for the writes in
 									// TeraCache
+
+#define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to
+									// reduce the number of system calls 
+
+#define PR_BUFFER_SIZE (2 * 1024 * 1024) //< Size of the promotion buffer in TeraCache
 
 #define FMAP				     0  //< When we use fastmap we need to ensure
 									// that all the writes in buffered cached
@@ -127,7 +132,7 @@
 									//  combination with P_Balance or
 									//  P_Aggressive
 
-#define P_SD					0	//< Move Objects to TeraCache based on
+#define P_SD					1	//< Move Objects to TeraCache based on
 									//  serialization policy.  This policy
 									//  should be used in combination with
 									//  P_DISTINCT 
@@ -162,6 +167,6 @@
 #define VERBOSE_TC				  0  //< Print objects in T
 
 // TODO: This define must be removed
-#define NEW_FEAT				  0  //< Enable when you add new feature
+#define NEW_FEAT				  1  //< Enable when you add new feature
 
 #endif  // _SHARE_DEFINES_H_

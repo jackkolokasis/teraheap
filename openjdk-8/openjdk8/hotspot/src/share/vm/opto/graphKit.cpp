@@ -3757,7 +3757,6 @@ void GraphKit::write_barrier_post(Node* oop_store,
 
   Node* card_adr = NULL;
   Node* card_offset = NULL;
-  Node* tc_card_offset = NULL;
 
 #if TERA_C2
   // Divide by card size
@@ -3765,7 +3764,6 @@ void GraphKit::write_barrier_post(Node* oop_store,
 		  "Only one we handle so far.");
 
   card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::card_shift) );
-  //tc_card_offset = __ URShiftX( cast, __ ConI(CardTableModRefBS::tc_card_shift) );
 		  
   // Get the alias_index for raw card-mark memory
   int adr_type = Compile::AliasIdxRaw;

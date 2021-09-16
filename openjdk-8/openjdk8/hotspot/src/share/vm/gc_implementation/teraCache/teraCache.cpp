@@ -63,6 +63,12 @@ TeraCache::TeraCache() {
 
 	back_ptrs_per_mgc = 0;
 	intra_ptrs_per_mgc = 0;
+
+#if PR_BUFFER
+	_pr_buffer.size = 0;
+	_pr_buffer.start_obj_addr_in_tc = NULL;
+	_pr_buffer.buf_alloc_ptr = _pr_buffer.buffer;
+#endif
 }
 		
 void TeraCache::tc_shutdown() {
@@ -362,4 +368,79 @@ bool TeraCache::tc_should_mk_dirty(HeapWord* obj) {
 	}
 	return false;
 }
+#endif
+
+#if PR_BUFFER
+// Add an object 'q' with size 'size' to the promotion buffer. We use
+// promotion buffer to reduce the number of system calls for small sized
+// objects.
+void  TeraCache::tc_prbuf_insert(char* q, char* new_adr, size_t size) {
+	char* start_adr = _pr_buffer.start_obj_addr_in_tc;
+	size_t cur_size = _pr_buffer.size;
+	size_t free_space = PR_BUFFER_SIZE - cur_size;
+
+	// Case1: Buffer is empty
+	if (cur_size == 0) {
+		assertf(start_adr == NULL, "Sanity check");
+		
+		if ((size * HeapWordSize) > PR_BUFFER_SIZE)
+			r_awrite(q, new_adr, size);
+		else {
+			memcpy(_pr_buffer.buf_alloc_ptr, q, size * HeapWordSize);
+
+			_pr_buffer.start_obj_addr_in_tc = new_adr;
+			_pr_buffer.buf_alloc_ptr += (size * HeapWordSize);
+			_pr_buffer.size = (size * HeapWordSize);
+		}
+
+		return;
+	}
+	
+	// Case2: Object size is grater than the available free space in buffer
+	// Case3: Object's new address is not contignious with the other objects -
+	// object belongs to other region in TeraCache
+	// In both cases we flush the buffer and allocate the object in a new
+	// buffer.
+	if (((size * HeapWordSize) > free_space) || ((start_adr + cur_size) != new_adr)) {
+		tc_flush_buffer();
+
+		// If the size of the object is still grater than the total promotion
+		// buffer size then bypass the buffer and write the object to TeraCache
+		// directly
+		if ((size * HeapWordSize) > PR_BUFFER_SIZE)
+			r_awrite(q, new_adr, size);
+		else {
+			memcpy(_pr_buffer.buf_alloc_ptr, q, size * HeapWordSize);
+
+			_pr_buffer.start_obj_addr_in_tc = new_adr;
+			_pr_buffer.buf_alloc_ptr += (size * HeapWordSize);
+			_pr_buffer.size = (size * HeapWordSize);
+		}
+
+		return;
+	}
+		
+	memcpy(_pr_buffer.buf_alloc_ptr, q, size * HeapWordSize);
+
+	_pr_buffer.buf_alloc_ptr += (size * HeapWordSize);
+	_pr_buffer.size += (size * HeapWordSize);
+}
+
+// Flush the promotion buffer to TeraCache and re-initialize the state of the
+// promotion buffer.
+void TeraCache::tc_flush_buffer() {
+	if (_pr_buffer.size != 0) {
+		assertf(_pr_buffer.size <= PR_BUFFER_SIZE, "Sanity check");
+		
+		// Write the buffer to TeraCache
+		r_awrite(_pr_buffer.buffer, _pr_buffer.start_obj_addr_in_tc, _pr_buffer.size / HeapWordSize);
+
+		memset(_pr_buffer.buffer, 0, sizeof(_pr_buffer.buffer));
+
+		_pr_buffer.buf_alloc_ptr = _pr_buffer.buffer;
+		_pr_buffer.start_obj_addr_in_tc = NULL;
+		_pr_buffer.size = 0;
+	}
+}
+
 #endif

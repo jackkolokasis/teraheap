@@ -647,7 +647,11 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					oop(q)->set_obj_in_tc();
 					/* Initialize mark word of the destination */
 					oop(q)->init_mark();
+#if PR_BUFFER
+					Universe::teraCache()->tc_prbuf_insert((char *)q, (char *)compaction_top, size);
+#else
 					Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#endif
 #if FMAP_ASYNC
 					trans_to_tc = true;
 #endif
@@ -798,7 +802,11 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 #elif ASYNC
 			  oop(q)->set_obj_in_tc();
 			  oop(q)->init_mark();
+#if PR_BUFFER
+			  Universe::teraCache()->tc_prbuf_insert((char *)q, (char *)compaction_top, size);
+#else
 			  Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#endif
 #if FMAP_ASYNC
 			  trans_to_tc = true;
 #endif
@@ -838,7 +846,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  }
 #endif
 
-		  //assertf(oop(compaction_top)->klass() != NULL, "should have a class");
+		  assert(oop(compaction_top)->klass() != NULL, "should have a class");
 
 		  debug_only(prev_q = q);
 		  q += size;
@@ -860,7 +868,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 
   if (EnableTeraCache) {
 #if ASYNC
-  while(!Universe::teraCache()->tc_areq_completed());
+#if PR_BUFFER
+	  Universe::teraCache()->tc_flush_buffer();
+#endif
+	  while(!Universe::teraCache()->tc_areq_completed());
 #if FMAP_ASYNC
   if (trans_to_tc)
 	  Universe::teraCache()->tc_fsync();
