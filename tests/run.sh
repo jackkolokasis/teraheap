@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-#OLD=1024
-#MAX=2048
-
 XMS=5
 MAX=6
 TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
@@ -92,6 +89,23 @@ function run_tests() {
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 
+# Run tests using gdb
+function run_tests_debug() {
+	gdb --args ${JAVA} \
+		-server \
+		-XX:+UseParallelGC \
+		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
+		-XX:-UseParallelOldGC \
+		-XX:+EnableTeraCache \
+		-XX:TeraCacheSize=${TERACACHE_SIZE} \
+		-Xmx${MAX}g \
+		-Xms${XMS}m \
+		-XX:TeraCacheThreshold=0 \
+		-XX:-UseCompressedOops \
+		-XX:+TeraCacheStatistics \
+		-Xlogtc:llarge_teraCache.txt $1
+}
+
 cd java
 make clean;
 
@@ -113,6 +127,9 @@ do
 			;;
 		3)
 			c2_mode $exec_file
+			;;
+		4)
+			run_tests_debug $exec_file
 			;;
 		*)
 			run_tests $exec_file
