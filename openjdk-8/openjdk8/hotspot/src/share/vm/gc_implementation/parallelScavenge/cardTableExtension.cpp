@@ -141,7 +141,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 													  uint stripe_total,
 													  bool is_scavenge_done) {
   
-	int ssize = 512; // Naked constant!  Work unit = 64k.
+	int ssize = TeraStripeSize; // Naked constant!  Default work unit = 8M
 	int dirty_card_count = 0;
   
 	oop* sp_top = (oop*)space_top;
