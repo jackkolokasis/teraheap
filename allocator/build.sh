@@ -2,7 +2,7 @@
 
 SUDO=sudo
 
-if [ $1 == "docker" ]
+if [ "$1" == "docker" ]
 then
 	SUDO=""
 fi
@@ -10,9 +10,9 @@ fi
 make clean
 make distclean
 
-if [ $1 != "docker" ]
+if [ "$1" != "docker" ]
 then
-	$SUDO make uninstall
+	${SUDO} make uninstall
 fi
 
 make
