@@ -57,6 +57,10 @@ done
 # Enter to spark configuration
 cd /opt/spark/spark-2.3.0-kolokasis/conf
 
+# Change the worker memory
+# Change SPARK_WORKER_MEMORY=30g
+sed -i '/SPARK_WORKER_MEMORY/c\SPARK_WORKER_MEMORY='"${MIN_HEAP}"'g' spark-env.sh
+
 # Change the minimum heap size
 # Change only the first -Xms 
 # sed -i -e '0,/-Xms[0-9]*g/ s/-Xms[0-9]*g/-Xms'"${MIN_HEAP}"'g/' spark-defaults.conf
@@ -87,8 +91,6 @@ then
 	# Create the new ramdisk
 	MEM=$(( ${RAMDISK} * 1024 * 1024 ))
 	sudo ./ramdisk_create_and_mount.sh -m ${MEM} -c
-
-	cd -
 
 	cd /mnt/ramdisk
 

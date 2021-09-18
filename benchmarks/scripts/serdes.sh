@@ -38,7 +38,7 @@ i=0
 
 for execId in ${processId}
 do
-	${ASYNC_PROF}/profiler.sh -d 40000 -i 1000ms ${execId} > ${OUTPUT} &
+	${ASYNC_PROF}/profiler.sh -d 40000 -i 10ms -o collapsed ${execId}> ${OUTPUT} &
 
     i=$((i + 1))
 done

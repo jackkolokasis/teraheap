@@ -13,45 +13,52 @@
 #
 ###################################################
 
-############## SVM #######################
-# D = 196, E = 4, S = 64
-
-# Heap size for executors
-#HEAP=( 4 24 44 83 122 161 200 )
-
-# DRAM shrink
-#RAMDISK=( 226 206 186 147 108 69 30 )
-
-# Spark memory fraction
-#MEM_FRACTON=( 0.2 0.83 0.9 0.95 0.97 0.98 0.98 )
-############################################
-
-############## KMEANS #######################
-# Heap size for executors
-# D = 30, E = 4, S = 64
-#HEAP=( 4 7 10 16 22 28 32 )
-
-# DRAM shrink
-#RAMDISK=( 226 223 220 214 208 202 198 )
-
-# Spark memory fraction
-#MEM_FRACTON=( 0.2 0.4 0.6 0.75 0.82 0.86 0.88 )
-############################################
-
-############### LgR #######################
-## Heap size for executors
-## D = 160, E = 4, S = 64
-##HEAP=( 4 20 36 68 100 132 164 )
-#HEAP=( 12 )
+############## TERACACHE #######################
+## Heap size for executors '-Xms'
+#HEAP=( 64 )
 #
-### DRAM shrink
-##RAMDISK=( 226 210 194 162 130 98 66 )
-#RAMDISK=( 0 )
-#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
 #NEW_GEN=( 0 )
 #
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "TriangleCount" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+##############################################
+## PageRank
+## GC vs SD overhead
+##############################################
+## Heap size for executors
+#HEAP=( 32 )
+#
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+### DRAM shrink
+#RAMDISK=( 171 )
+#
 ### Spark memory fraction
-##MEM_FRACTON=( 0.2 0.8 0.89 0.94 0.96 0.97 0.98 )
 #MEM_FRACTON=( 0.5 )
 #
 #S_LEVEL=( "MEMORY_AND_DISK" )
@@ -64,49 +71,31 @@
 #
 ### Total Configurations
 #TOTAL_CONFS=${#HEAP[@]}
-#############################################
+###########################################
 
-############## LR #######################
-# Heap size for executors
-# D = 160, E = 4, S = 64
-# HEAP=( 4 20 36 68 100 132 164 )
-
-# DRAM shrink
-# RAMDISK=( 226 210 194 162 130 98 66 )
-
-# Spark memory fraction
-# MEM_FRACTON=( 0.2 0.8 0.89 0.9 0.96 0.97 0.98 )
-############################################
-
-############## KMeans #######################
-# Heap size for executors
-# D = 60, E = 8, S = 128
-# HEAP=( 8 14 20 32 44 56 68)
-
-# DRAM shrink
-# RAMDISK=( 222 216 210 198 186 174 162 )
-
-# Spark memory fraction
-# MEM_FRACTON=( 0.2 0.43 0.6 0.75 0.82 0.86 0.9 )
-############################################
-
-############### SVM #######################
-### D = 196, E = 4, S = 64 f = E/H
+##############################################
+## Connected Component
+## GC vs SD overhead
+##############################################
+## Heap size for executors
+#HEAP=( 34 136 )
 #
-### Heap size for executors
-#HEAP=( 4 24 44 83 122 161 )
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
 #
 ### DRAM shrink
-#RAMDISK=( 230 212 190 147 112 73 )
+### THere
+#RAMDISK=( 204 102 )
 #
 ### Spark memory fraction
-#MEM_FRACTON=( 0 0 0 0 0 0 )
+#MEM_FRACTON=( 0.5 0.5 )
 #
-#S_LEVEL=( "DISK_ONLY" "MEMORY_AND_DISK" "MEMORY_AND_DISK" "MEMORY_AND_DISK" \
-#	"MEMORY_AND_DISK" "MEMORY_AND_DISK" )
+#S_LEVEL=( "MEMORY_AND_DISK" "MEMORY_AND_DISK" )
 #
 ### Running benchmarks
-#BENCHMARKS=( "SVM" )
+#BENCHMARKS=( "ConnectedComponent" )
 #
 ### Number of executors
 #EXECUTORS=1
@@ -115,52 +104,149 @@
 #TOTAL_CONFS=${#HEAP[@]}
 ###########################################
 
-
-
-############## TERACACHE #######################
-## Heap size for executors '-Xms'
-#HEAP=( 8 )
+##############################################
+## Single Source Shortest Path
+## GC vs SD overhead
+###############################################
+## Heap size for executors
+#HEAP=( 102 )
 #
-## New generation size '-Xmn'
-## if the value is 0: let the JVM to decide
-## if the value > 0 : set the size of the New Generation based on the value
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
 #NEW_GEN=( 0 )
 #
-## DRAM shrink 200GB
-#RAMDISK=( 235 )
+### DRAM shrink
+### THere
+#RAMDISK=( 136 )
 #
-## Spark memory fraction: 'spark.memory.fraction'
+### Spark memory fraction
 #MEM_FRACTON=( 0.5 )
 #
-## Storage Level
-#S_LEVEL=( "MEMORY_ONLY" )
+#S_LEVEL=( "MEMORY_AND_DISK" )
 #
-## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
-#TERACACHE=( 220 )
+### Running benchmarks
+#BENCHMARKS=( "ShortestPaths" )
 #
-## Running benchmarks
-#BENCHMARKS=( "KMeans" )
-#
-## Number of executors
+### Number of executors
 #EXECUTORS=1
 #
 ## Total Configurations
 #TOTAL_CONFS=${#HEAP[@]}
+##########################################
 
-
-############### LgR #######################
+################################################
+#### SVD++
+#### GC vs SD overhead
+################################################
 ## Heap size for executors
-## D = 160, E = 4, S = 64
-#HEAP=( 4 20 36 68 100 132 )
+#HEAP=( 132 )
 #
-## DRAM shrink
-#RAMDISK=( 226 210 194 162 130 98 )
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
 #
-## Spark memory fraction
-#MEM_FRACTON=( 0.5 0.5 0.5 0.5 0.5 0.5 )
+### DRAM shrink
+### THere
+#RAMDISK=( 106 )
 #
-#S_LEVEL=( "DISK_ONLY" "MEMORY_AND_DISK" "MEMORY_AND_DISK" "MEMORY_AND_DISK" \
-#	"MEMORY_AND_DISK" "MEMORY_AND_DISK" )
+### Spark memory fraction
+#MEM_FRACTON=( 0.5 )
+#
+#S_LEVEL=( "MEMORY_AND_DISK" )
+#
+### Running benchmarks
+#BENCHMARKS=( "SVDPlusPlus" )
+#
+### Number of executors
+#EXECUTORS=1
+#
+### Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+###########################################
+
+################################################
+#### TriangleCount
+#### GC vs SD overhead
+################################################
+## Heap size for executors
+#HEAP=( 220 )
+#
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+### DRAM shrink
+### THere
+#RAMDISK=( 0 )
+#
+### Spark memory fraction
+#MEM_FRACTON=( 0.5 )
+#
+#S_LEVEL=( "MEMORY_AND_DISK" )
+#
+### Running benchmarks
+#BENCHMARKS=( "TriangleCount" )
+#
+### Number of executors
+#EXECUTORS=1
+#
+### Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+###########################################
+
+###############################################
+### Linear Regression
+###############################################
+## Heap size for executors
+#HEAP=( 64 )
+#
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+### DRAM shrink
+### THere
+#RAMDISK=( 0 )
+##RAMDISK=( 167 ) 
+#
+### Spark memory fraction
+#MEM_FRACTON=( 0.5 )
+#
+#S_LEVEL=( "MEMORY_AND_DISK" )
+#
+### Running benchmarks
+#BENCHMARKS=( "LinearRegression" )
+#
+### Number of executors
+#EXECUTORS=1
+#
+### Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+###########################################
+
+##############################################
+## Logistic Regression
+##############################################
+# Heap size for executors
+#HEAP=( 32 )
+#
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+### DRAM shrink
+### THere
+#RAMDISK=( 204 )
+#
+### Spark memory fraction
+#MEM_FRACTON=( 0.5 )
+#
+#S_LEVEL=( "MEMORY_AND_DISK" )
 #
 ### Running benchmarks
 #BENCHMARKS=( "LogisticRegression" )
@@ -172,35 +258,11 @@
 #TOTAL_CONFS=${#HEAP[@]}
 ###########################################
 
-
-############### LgR #######################
+###############################################
+### SVM
+###############################################
 ## Heap size for executors
-## D = 160, E = 4, S = 64
-#HEAP=( 20 )
-#
-## DRAM shrink
-#RAMDISK=( 0 )
-#
-## Spark memory fraction
-#MEM_FRACTON=( 0.5 )
-#
-#S_LEVEL=( "MEMORY_AND_DISK" )
-#
-### Running benchmarks
-#BENCHMARKS=( "LinearRegression" )
-#
-### Number of executors
-#EXECUTORS=1
-#
-### Total Configurations
-#TOTAL_CONFS=${#HEAP[@]}
-###########################################
-
-
-############### LR #######################
-#
-### Heap size for executors
-#HEAP=( 16 )
+#HEAP=( 35 )
 #
 ### New generation size '-Xmn'
 ### if the value is 0: let the JVM to decide
@@ -208,15 +270,16 @@
 #NEW_GEN=( 0 )
 #
 ### DRAM shrink
-#RAMDISK=( 227 )
+### THere
+#RAMDISK=( 201 )
 #
 ### Spark memory fraction
-#MEM_FRACTON=( 0.5)
+#MEM_FRACTON=( 0.5 )
 #
 #S_LEVEL=( "MEMORY_AND_DISK" )
 #
 ### Running benchmarks
-#BENCHMARKS=( "LinearRegression" )
+#BENCHMARKS=( "SVM" )
 #
 ### Number of executors
 #EXECUTORS=1
@@ -225,9 +288,269 @@
 #TOTAL_CONFS=${#HEAP[@]}
 ###########################################
 
-############# TERACACHE #######################
+###############################################
+### TeraCache - SVM
+###############################################
 # Heap size for executors '-Xms'
-HEAP=( 16 )
+#HEAP=( 35 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "SVM" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+################################################
+#### TeraCache - Linear Regression
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 32 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 204 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "LinearRegression" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+################################################
+#### TeraCache - Linear Regression
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 32 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "LogisticRegression" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+
+################################################
+#### TeraCache - PageRank
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 64 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 171 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "PageRank" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+################################################
+### TeraCache - ConnectedComponent
+###############################################
+## Heap size for executors '-Xms'
+#HEAP=( 68 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "ConnectedComponent" )
+#
+## Number of executors
+#EXECUTORS=1
+
+# Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+################################################
+#### SSSP - PageRank
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 42 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "ShortestPaths" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+################################################
+#### TC - SVD++
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 24 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 211 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "SVDPlusPlus" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+# Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+################################################
+#### TC - TR
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 64 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 171 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 900 )
+#
+## Running benchmarks
+#BENCHMARKS=( "TriangleCount" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+
+###############################################
+### TC - TR
+###############################################
+# Heap size for executors '-Xms'
+HEAP=( 36 )
 
 # New generation size '-Xmn'
 # if the value is 0: let the JVM to decide
@@ -235,7 +558,7 @@ HEAP=( 16 )
 NEW_GEN=( 0 )
 
 # DRAM shrink 200GB
-RAMDISK=( 222 )
+RAMDISK=( 0 )
 
 # Spark memory fraction: 'spark.memory.storagefraction'
 MEM_FRACTON=( 0.8 )
@@ -244,7 +567,7 @@ MEM_FRACTON=( 0.8 )
 S_LEVEL=( "MEMORY_ONLY" )
 
 # TeraCache configuration size in Spark: 'spark.teracache.heap.size'
-TERACACHE=( 900 )
+TERACACHE=( 2000 )
 
 # Running benchmarks
 BENCHMARKS=( "LinearRegression" )
@@ -254,4 +577,3 @@ EXECUTORS=1
 
 # Total Configurations
 TOTAL_CONFS=${#HEAP[@]}
-

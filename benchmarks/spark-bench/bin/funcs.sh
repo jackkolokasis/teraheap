@@ -145,7 +145,7 @@ function set_gendata_opt() {
 
   # Add this rule from Jack Kolokasis to configure spark executor instances
   if [ ! -z "$SPARK_EXECUTOR_INSTANCES" ]; then
-      SPARK_OPT="${SPARK_OPT} --conf spark.executor.instacnes=${SPARK_EXECUTOR_INSTANCES}"
+      SPARK_OPT="${SPARK_OPT} --conf spark.executor.instances=${SPARK_EXECUTOR_INSTANCES}"
   fi
 
   # Add this rule from Jack Kolokasis to configure spark executor cores

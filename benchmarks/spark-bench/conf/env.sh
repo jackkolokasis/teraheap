@@ -25,9 +25,19 @@ MC_LIST="sith4-fast"
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench64"
 
 # 128GB Datasets
-# DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
 
-DATA_HDFS="file:///mnt/data/SparkBench"
+# 256GB Datasets
+DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench256"
+
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench12"
+
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench6"
+
+#DATA_HDFS="file:///mnt/data/SparkBench"
+
+## This directory contains small generated datasets for testing
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBenchTest"
 
 # Local dataset optional
 DATASET_DIR="${DATA_HDFS}/dataset"
@@ -35,6 +45,7 @@ DATASET_DIR="${DATA_HDFS}/dataset"
 # Use this when run on Spark 2.3.0-kolokasis
 SPARK_VERSION=2.3.0
 [ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/opt/spark/spark-2.3.0-kolokasis
+#[ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/opt/spark/spark-panthera
 
 # Use this when run on Spark 3.0.0-kolokasis
 #SPARK_VERSION=2.3.0
@@ -50,9 +61,9 @@ SPARK_RDD_COMPRESS=false
 #SPARK_IO_COMPRESSION_CODEC=lzf
 
 # Spark options in system.property or arguments of spark-submit 
-SPARK_EXECUTOR_MEMORY=900g
+SPARK_EXECUTOR_MEMORY=2000g
 SPARK_EXECUTOR_INSTANCES=1
-SPARK_EXECUTOR_CORES=8
+SPARK_EXECUTOR_CORES=16
 
 # Storage levels, see :
 STORAGE_LEVEL=MEMORY_ONLY

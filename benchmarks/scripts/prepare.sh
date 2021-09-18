@@ -12,6 +12,21 @@
 #
 ###################################################
 
+# Define some variables for pretty printing
+ESC='\033[' 
+
+# Attributes
+NORMAL=0
+BOLD=1
+
+# Foreground colors
+RED_FG=31
+GREEN_FG=32
+
+# Presets
+BRED=${ESC}${BOLD}';'${RED_FG}'m'
+BGREEN=${ESC}${BOLD}';'${GREEN_FG}'m'
+RESET=${ESC}${NORMAL}'m'
 
 # Print error/usage script message
 usage() {
@@ -22,6 +37,7 @@ usage() {
     echo "Options:"
     echo "      -s  Run experiments with serialization"
     echo "      -t  Run experiments with TeraCache"
+    echo "      -v  Active status"
     echo "      -h  Show usage"
     echo
 
@@ -29,7 +45,7 @@ usage() {
 }
 
 # Check for the input arguments
-while getopts "tsh" opt
+while getopts "tsvh" opt
 do
     case "${opt}" in
 		s)
@@ -37,6 +53,9 @@ do
 			;;
 		t)
 			TERACACHE=true
+			;;
+		v)
+			STATUS=true
 			;;
         h)
             usage
@@ -46,6 +65,23 @@ do
             ;;
     esac
 done
+
+if [ $STATUS ]
+then
+	cd /usr/lib/jvm
+	
+	check=$(ls | grep -w "java-8-kolokasis_stable")
+	if [ $check ]
+	then
+		echo -e "[${BGREEN}ENABLED${RESET} ] TC"
+		echo -e "[${BRED}DISABLED${RESET}] SD"
+	else
+		echo -e "SD [${BGREEN}ENABLED${RESET} ]"
+		echo -e "TC [${BRED}DISABLED${RESET}]"
+	fi
+
+	exit
+fi
 
 if [ $SERDES ]
 then

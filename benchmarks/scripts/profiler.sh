@@ -5,22 +5,18 @@
 # file: myjstat.sh
 #
 # @Author:  Iacovos G. Kolokasis
-# @Version: 04-05-2018
+# @Version: 19-01-2021
 # @email:   kolokasis@ics.forth.gr
 #
-# @brief    This script use jstat to monitor the
-# Garbage Collection utilization from the JVM
-# executor running in spark. Find out the proccess
-# id of the executor from the jps and the execute
-# the jstat.  All the informations are saved in an
-# output file.
-#
+# @brief    This script calculate the
+# serialziation/deserialization overhead
 ###################################################
 
 # Output file name
 OUTPUT=$1        
 NUM_OF_EXECUTORS=$2
-JIT=$3
+
+ASYNC_PROF=/home1/public/kolokasis/sparkPersistentMemory/benchmarks/profiler/async-profiler
 
 # Get the proccess id from the running
 processId=""
@@ -42,13 +38,7 @@ i=0
 
 for execId in ${processId}
 do
-    jstat -gcutil ${execId} 1000 > ${OUTPUT}/jstat.txt &
+	${ASYNC_PROF}/profiler.sh -d 40000 -f ${OUTPUT} ${execId} &
 
-	if [ $JIT -eq 1 ]
-	then
-		jstat -printcompilation ${execId} 1000 > ${OUTPUT}/jit_method.txt &
-		jstat -compiler ${execId} 1000 > ${OUTPUT}/jit.txt &
-	fi
     i=$((i + 1))
-
 done

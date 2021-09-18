@@ -18,7 +18,7 @@
 usage() {
     echo
     echo "Usage:"
-    echo -n "      $0 [option ...] [-k][-h]"
+    echo -n "      $0 [option ...] [-h]"
     echo
     echo "Options:"
     echo "      -n  Number of Runs"
@@ -27,8 +27,9 @@ usage() {
     echo "      -c  Enable TeraCache"
     echo "      -s  Enable serialization"
     echo "      -p  Enable perf tool"
+    echo "      -f  Enable profiler tool"
     echo "      -a  Run experiments with high bench"
-    echo "      -k  Kill iostat and jstat processes"
+    echo "      -j  Enable metrics for JIT compiler"
     echo "      -h  Show usage"
     echo
 
@@ -166,7 +167,7 @@ printEndMsg() {
 }
 
 # Check for the input arguments
-while getopts ":n:t:o:cspkah" opt
+while getopts ":n:t:o:cspkajfh" opt
 do
     case "${opt}" in
         n)
@@ -193,6 +194,12 @@ do
 			;;
 		a)
 			HIGH_BENCH=true
+			;;
+		j)
+			JIT=true
+			;;
+		f)
+			PROFILER=true
 			;;
         h)
             usage
@@ -233,15 +240,23 @@ do
 				# Set configuration
 				if [ $SERDES ]
 				then
+					stop_spark
 					./update_conf.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} -s ${S_LEVEL[$j]} -r ${RAMDISK[$j]}
+					start_spark
 				elif [ $TC ]
 				then
 					./update_conf_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} -s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} -n ${NEW_GEN[$j]}
 				fi
 			fi
 
-			# Garbage collector statistics
-			./jstat.sh ${RUN_DIR}/jstat.txt ${EXECUTORS} &
+			if [ -z "$JIT" ]
+			then
+				# Collect statics only for the garbage collector
+				./jstat.sh ${RUN_DIR} ${EXECUTORS} 0 &
+			else
+				# Collect statics for garbage collector and JIT
+				./jstat.sh ${RUN_DIR} ${EXECUTORS} 1 &
+			fi
 			
 			if [ $PERF_TOOL ]
 			then
@@ -250,9 +265,15 @@ do
 			fi
 
 			# Enable serialization/deserialization metric
-			if [ ${SERDES} ]
+			#if [ ${SERDES} ]
+			#then
+			./serdes.sh ${RUN_DIR}/serdes.txt ${EXECUTORS} &
+			#fi
+			
+			# Enable profiler
+			if [ ${PROFILER} ]
 			then
-				./serdes.sh ${RUN_DIR}/serdes.txt ${EXECUTORS} &
+				./profiler.sh ${RUN_DIR}/profile.svg ${EXECUTORS} &
 			fi
 
 			# Drop caches
