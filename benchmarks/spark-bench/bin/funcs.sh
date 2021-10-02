@@ -74,8 +74,8 @@ function purge_data() {
 	cmd="echo 3 >/proc/sys/vm/drop_caches"; 
 	#echo ${mc_list}
 	for nn in ${mc_list}; do 
-	#echo $nn
-	ssh  -t $nn "sudo sh -c \"$cmd\""; 
+	echo $nn
+	#ssh  -t $nn "sudo sh -c \"$cmd\""; 
 	done;
 	echo "data purged on ${mc_list}"
 }

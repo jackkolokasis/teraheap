@@ -11,11 +11,11 @@
 # NUM_OF_PARTITIONS=72
 ###########################################
 
-############## 64GB #######################
+############## 128GB #######################
 NUM_OF_EXAMPLES=20000
-NUM_OF_FEATURES=177777
+NUM_OF_FEATURES=622219
 #NUM_OF_PARTITIONS=128
-NUM_OF_PARTITIONS=512
+NUM_OF_PARTITIONS=256
 ###########################################
 
 ProbOne=0.2

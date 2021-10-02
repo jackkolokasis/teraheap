@@ -13,7 +13,6 @@
 ###################################################
 
 . ./conf.sh
-
 # Print error/usage script message
 usage() {
     echo
@@ -40,7 +39,7 @@ usage() {
 #   Start Spark
 ##
 start_spark() {
-    /opt/spark/spark-2.3.0-kolokasis/sbin/start-all.sh
+    /home/nx05/nx05/kolokasis/TeraCache-2.3.0/spark-2.3.0-kolokasis/sbin/start-all.sh
 }
 
 ##
@@ -48,7 +47,7 @@ start_spark() {
 #   Stop Spark
 ##
 stop_spark() {
-    /opt/spark/spark-2.3.0-kolokasis/sbin/stop-all.sh
+    /home/nx05/nx05/kolokasis/TeraCache-2.3.0/spark-2.3.0-kolokasis/sbin/stop-all.sh
 }
 
 ##
@@ -110,7 +109,7 @@ kill_back_process() {
 ##
 cleanWorkDirs() {
 
-    cd /opt/spark/spark-2.3.0-kolokasis/work/
+    cd /home/nx05/nx05/kolokasis/TeraCache-2.3.0/spark-2.3.0-kolokasis/work/
 
     for f in $(ls)
     do
@@ -250,15 +249,18 @@ do
 			fi
 
 			# Enable serialization/deserialization metric
-			if [ ${SERDES} ]
-			then
+			#if [ ${SERDES} ]
+			#then
 				./serdes.sh ${RUN_DIR}/serdes.txt ${EXECUTORS} &
-			fi
+			#fi
 
 			# Drop caches
-			sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+			#sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 
-			# System statistics start
+		    # Pmem stats before
+            sudo ipmctl show -performance >> ${RUN_DIR}/pmem_before.txt
+
+            # System statistics start
 			~/system_util/start_statistics.sh -d ${RUN_DIR}
 
 			if [ $HIGH_BENCH ]
@@ -271,8 +273,11 @@ do
 				../spark-bench/${benchmark}/bin/run.sh \
 					> ${RUN_DIR}/tmp_out.txt
 			fi
-
-			# System statistics stop
+            
+            # Pmem stats after
+            sudo ipmctl show -performance >> ${RUN_DIR}/pmem_after.txt
+			
+            # System statistics stop
 			~/system_util/stop_statistics.sh -d ${RUN_DIR}
 
 			# Parse cpu and disk statistics results
@@ -299,11 +304,11 @@ do
 			then
 				if [ $HIGH_BENCH ]
 				then
-					TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
+					TC_METRICS=$(ls -td /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/work/* | head -n 1)
 					cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
 					./parse_results.sh -d ${RUN_DIR} -t -a
 				else
-					TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
+					TC_METRICS=$(ls -td /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/work/* | head -n 1)
 					cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
 					./parse_results.sh -d ${RUN_DIR} -t
 				fi

@@ -225,9 +225,9 @@
 #TOTAL_CONFS=${#HEAP[@]}
 ###########################################
 
-############# TERACACHE #######################
+############## TERACACHE #######################
 # Heap size for executors '-Xms'
-HEAP=( 16 )
+HEAP=( 32 )
 
 # New generation size '-Xmn'
 # if the value is 0: let the JVM to decide
@@ -235,7 +235,7 @@ HEAP=( 16 )
 NEW_GEN=( 0 )
 
 # DRAM shrink 200GB
-RAMDISK=( 222 )
+RAMDISK=( 0 )
 
 # Spark memory fraction: 'spark.memory.storagefraction'
 MEM_FRACTON=( 0.8 )
@@ -254,4 +254,31 @@ EXECUTORS=1
 
 # Total Configurations
 TOTAL_CONFS=${#HEAP[@]}
+
+#############VANILLA######################
+#Heap size for executors '-Xms'
+#HEAP=( 35 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.5 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_AND_DISK" )
+#
+## Running benchmarks
+#BENCHMARKS=( "SVM" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
 

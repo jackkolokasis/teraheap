@@ -27,6 +27,7 @@ usage() {
     exit 1
 }
 
+
 # Check for the input arguments
 while getopts "d:tsah" opt
 do

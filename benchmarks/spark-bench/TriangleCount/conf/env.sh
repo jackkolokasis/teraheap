@@ -1,6 +1,6 @@
 # for preparation 
 #numV=1000000 #100000
-numV=14722560
+numV=942240
 NUM_OF_PARTITIONS=256
 mu=4.0
 sigma=1.3

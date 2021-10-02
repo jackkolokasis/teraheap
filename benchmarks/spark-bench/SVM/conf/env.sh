@@ -11,15 +11,15 @@
 # NUM_OF_PARTITIONS=72
 
 ############## 64GB #######################
-NUM_OF_EXAMPLES=10000
-NUM_OF_FEATURES=400000
-NUM_OF_PARTITIONS=128
+#NUM_OF_EXAMPLES=10000
+#NUM_OF_FEATURES=400000
+#NUM_OF_PARTITIONS=128
 ###########################################
 
 ############## 128GB #######################
-# NUM_OF_EXAMPLES=10000
-# NUM_OF_FEATURES=700000
-# NUM_OF_PARTITIONS=256
+NUM_OF_EXAMPLES=10000
+NUM_OF_FEATURES=1100000
+NUM_OF_PARTITIONS=256
 ###########################################
 
 # for running
