@@ -137,9 +137,8 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 													  uint stripe_number,
 													  uint stripe_total) {
   
-	int ssize = 128; // Naked constant!  Work unit = 64k.
+	int ssize = 512; // Naked constant!  Work unit = 64k.
 	int dirty_card_count = 0;
-  
 	oop* sp_top = (oop*)space_top;
 	jbyte* start_card = byte_for(Universe::teraCache()->tc_get_addr_region());
 	jbyte* end_card = byte_for(sp_top - 1) + 1;
@@ -170,8 +169,8 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 	// To be precise, start_card and end_card are not the start address or end
 	// address itself to be processed, but the address of the entry in the
 	// CardTableExtension corresponding to that address.
-	// The value 128 of ssize corresponds to 64K because the size of 1 card is
-	// 512 bytes.
+	// The value 512 of ssize corresponds to 8M because the size of 1 card is
+	// 16K.
 	size_t slice_width = ssize * stripe_total;
 		
 	for (jbyte* slice = start_card; slice < end_card; slice += slice_width) {
@@ -199,22 +198,34 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			continue;
 
 		// Update our beginning addr
-		HeapWord* first_object = start_array->tc_object_start(slice_start);
-
+         
+        if (!Universe::teraCache()->check_if_valid_object(slice_start)){
+            continue;
+        }
+        HeapWord* first_object;
+        if (Universe::teraCache()->is_start_of_region(slice_start)){
+            first_object = slice_start;
+        } else {
+            first_object = start_array->tc_object_start(slice_start);
+        }
 		oop* first_object_within_slice = (oop*) first_object;
 		if (first_object < slice_start) {
 			last_scanned = (oop*)(first_object + oop(first_object)->size());
 			first_object_within_slice = last_scanned;
 			worker_start_card = byte_for(last_scanned);
 		}
-
 		// Update the ending card
-		//if (slice_end < (HeapWord*)sp_top && slice_end != slice_start) {
+		//if (slice_end < (HeapWord*)sp_top && slice_end != slice_start) 
 		if (slice_end < (HeapWord*)sp_top) {
 			// The substaction is important! An object may start precisely at
 			// slice end
-			HeapWord* last_object = start_array->tc_object_start(slice_end - 1);
-			slice_end = last_object + oop(last_object)->size();
+            if (!Universe::teraCache()->check_if_valid_object(slice_end - 1)){
+                slice_end = Universe::teraCache()->get_last_object_end(slice_end - 1);
+            } else {
+                HeapWord* last_object = start_array->tc_object_start(slice_end - 1);
+                assertf(oop(last_object)->is_oop_or_null(), "last_object invalid");
+                slice_end = last_object + oop(last_object)->size();
+            }
 			// worker_end_card is exclusive, so bumb it one past the end of
 			// last_object's covered span.
 			worker_end_card = byte_for(slice_end) + 1;
@@ -241,11 +252,10 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			jbyte* first_unclean_card = current_card;
 
 			// Find the end of a run of contiguous unclean cards
-			while (current_card < worker_end_card && !card_is_clean(*current_card)) {
-				while (current_card < worker_end_card && !card_is_clean(*current_card)) {
+			while (current_card < worker_end_card && !card_is_clean(*current_card) ) {
+				while (current_card < worker_end_card && !card_is_clean(*current_card) ) {
 					current_card++;
 				}
-
 				if (current_card < worker_end_card) {
 					// Some objects may be large enough to span several cards. If such
 					// an object has more than one dirty card, separated by a clean card,
@@ -268,9 +278,13 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			}
 
 			jbyte* following_clean_card = current_card;
-
-			if (first_unclean_card < worker_end_card) {
-				oop* p = (oop*) start_array->tc_object_start(addr_for(first_unclean_card));
+			if (first_unclean_card < worker_end_card && Universe::teraCache()->check_if_valid_object(addr_for(first_unclean_card))) {
+                oop* p = NULL;
+                if (Universe::teraCache()->is_start_of_region(addr_for(first_unclean_card))){
+                    p = (oop*) addr_for(first_unclean_card);
+                } else {
+                    p = (oop*) start_array->tc_object_start(addr_for(first_unclean_card));
+                }
 				assertf((HeapWord*)p <= addr_for(first_unclean_card), "checking");
 
 				// "p" should always be >= "last_scanned" because newly GC
@@ -301,26 +315,26 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 
 				// we know which cards to scan, now clear them
 				//
-				//if (first_unclean_card <= worker_start_card +1)
-				//	first_unclean_card = worker_start_card + 1;
+				if (first_unclean_card <= worker_start_card +1)
+					first_unclean_card = worker_start_card + 1;
 
-				//if (following_clean_card >= worker_end_card - 1)
-				//	following_clean_card = worker_end_card - 1;
-				//
-				//
-				if (first_unclean_card <= worker_start_card)
-					first_unclean_card = worker_start_card;
-
-				if (following_clean_card >= worker_end_card)
-					following_clean_card = worker_end_card;
-
+				if (following_clean_card >= worker_end_card - 1)
+					following_clean_card = worker_end_card - 1;
+				
+				
+//				if (first_unclean_card <= worker_start_card)
+//					first_unclean_card = worker_start_card;
+//
+//				if (following_clean_card >= worker_end_card)
+//					following_clean_card = worker_end_card;
+//
 				while (first_unclean_card < following_clean_card) {
 					*first_unclean_card++ = clean_card;
 				}
 
 
 				const int interval = PrefetchScanIntervalInBytes;
-
+                
 				// scan all objects in the range
 				if (interval != 0) {
 					while (p < to) {
@@ -328,6 +342,10 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 						oop m = oop(p);
 						assertf(m->is_oop_or_null(), "check for header");
 						m->tc_push_contents(pm);
+                         
+                        if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size() ))
+                            break;
+                        
 						p += m->size();
 					}
 
@@ -337,11 +355,15 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 
 					while (p < to) {
 						oop m = oop(p);
-						assertf(m->is_oop_or_null(), "check for header");
+                        assertf(m->is_oop_or_null(), "check for header");
 						m->tc_push_contents(pm);
+                        
+                        if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size() ))
+                            break;
+
 						p += m->size();
+                        
 					}
-					
 					pm->drain_stacks_cond_depth();
 				}
 				last_scanned = p;
@@ -350,7 +372,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 			// the current_card is >= the worker_end_card so the
 			// loop will not execute again.
 			assertf((current_card == following_clean_card) ||
-					(current_card >= worker_end_card),
+					(current_card >= worker_end_card) || Universe::teraCache()->check_if_valid_object(addr_for(current_card)), 
 					"current_card should only be incremented if it still equals "
 					"following_clean_card");
 			// Increment current_card so that it is not processed again.
