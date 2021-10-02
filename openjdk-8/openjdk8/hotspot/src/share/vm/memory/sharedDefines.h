@@ -102,6 +102,10 @@
 									// will be flushed to the device because the
 									// memory of fast map is different from
 									// buffer cache. 
+									
+#define FMAP_HYBRID				 1  //< When we use fastmap hybrid version we
+									// employ huge pages for mutator threads and
+									// regular pages for GC 
 
 #define TERA_CARD_SIZE			25 // This is the size of each card in
 									// TeraCache card table. The size is in bit

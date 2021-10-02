@@ -363,12 +363,20 @@ void TeraCache::tc_print_mgc_statistics() {
 
 // Give advise to kernel to expect page references in sequential order
 void TeraCache::tc_enable_seq() {
+#if FMAP_HYBRID
+	r_enable_huge_flts();
+#else
 	r_enable_seq();
+#endif
 }
 
 // Give advise to kernel to expect page references in random order
 void TeraCache::tc_enable_rand() {
+#if FMAP_HYBRID
+	r_enable_regular_flts();
+#else
 	r_enable_rand();
+#endif
 }
 		
 // Explicit (using systemcall) write 'data' with 'size' to the specific

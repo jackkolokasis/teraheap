@@ -609,9 +609,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 	{
 		HeapWord* const end = _first_dead;
 
-		// Give advise to kernel to prefetch pages for TeraCache random
-		// Universe::teraCache()->tc_enable_rand();
-
 		while (q < end) {
 			/* Get the size of the object */
 			size_t size = oop(q)->size();

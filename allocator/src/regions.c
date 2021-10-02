@@ -205,4 +205,17 @@ char* r_region_top_addr(void) {
 
 	return tc_mem_pool.cur_alloc_ptr;
 }
+
+// This function if for the FastMap hybrid version. Give advise to kernel to
+// serve all the pagefault using regular pages.
+void r_enable_regular_flts(void) {
+	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_NOHUGEPAGE);
+}
+
+// This function if for the FastMap hybrid version. Give advise to kernel to
+// serve all the pagefault using huge pages.
+void r_enable_huge_flts(void) {
+	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_HUGEPAGE);
+}
+
 #endif

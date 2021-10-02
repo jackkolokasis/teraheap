@@ -96,7 +96,13 @@ extern "C" {
 	char*	   r_region_top_addr(void);
 #endif
 	
-
+	// This function if for the FastMap hybrid version. Give advise to kernel to
+	// serve all the pagefault using regular pages.
+	void	   r_enable_regular_flts(void);
+	
+	// This function if for the FastMap hybrid version. Give advise to kernel to
+	// serve all the pagefault using huge pages.
+	void	   r_enable_huge_flts(void);
 	
 #ifdef __cplusplus
 }
