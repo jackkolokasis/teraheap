@@ -10,7 +10,7 @@ import java.lang.management.MemoryPoolMXBean;
 import java.util.LinkedList;
 import java.util.ArrayList;
 
-public class Array_List 
+public class Groupping 
 { 
 	public static void mem_info(String str)
 	{
@@ -36,37 +36,45 @@ public class Array_List
 		// declares an Array of integers. 
 		// allocating memory for 5 integers. 
 		//
-		int num_elements =10000;
-        System.out.println("MAX:"+num_elements);
+		int num_elements = 20000;
+		int num_elements_2 = 10000000;
 
 		mem_info("Memory Before");
 
 		// Create the array list
-		ArrayList<String> arl = new @Cache ArrayList<String>();
-        String str2 = new @Cache String("Testttttttttttttttttttttttttttttttttttttttttttttttt");
+		LinkedList<Integer> arl = new LinkedList<Integer>();
 		// Add data to the list
-		for (int i = 0; i < num_elements; i++)
-		{
-			String str = new @Cache String("Hello World for the first time");
-			arl.add(str);
-			String str1 = new @Cache String("Hello World its me giannos");
-			arl.add(str1);
-            //gc();
-		}
-		gc();
-
+		
         /*
+		gc();
+        
+		gc();
+        */
 		long x = 0;
 		// Traverse all the data of the list
 		for (int i = 0; i < num_elements; i++)
 		{
-			x += arl.get(i).hashCode();
+            Integer int1 = new @Cache Integer(5);
+            arl.add(int1);
 		}
-		System.out.println("Hashcode Element = " + x);
-       */ 
-        //gc();
-
-        /*
+        gc();
+        gc();
+        for (int i = 0; i < num_elements; i++)
+		{
+            arl.remove();
+		}
+        gc();
+        gc();
+		LinkedList<String> arl2 = new LinkedList<String>();
+        
+        for (int i = 0; i < num_elements_2; i++)
+		{
+            String int1 = new @Cache String("ttt");
+            arl2.add(int1);
+		}
+        gc();
+        gc();
+       /* 
 		x = 0;
 		for (int i = 0; i < num_elements; i++)
 		{

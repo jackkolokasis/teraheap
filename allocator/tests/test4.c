@@ -1,71 +1,125 @@
-/**************************************************
+/***************************************************
 *
 * file: test2.c
 *
 * @Author:   Iacovos G. Kolokasis
-* @Version:  09-03-2021 
+* @Version:  09-03-2021
 * @email:    kolokasis@ics.forth.gr
 *
 * Test to verify:
-*	- explicit write using system call with fastmap
-*	- object allocation in the correct positions
-*	- read object using mmap
+*       - allocator initialization
+*       - object allocation in the correct positions
 ***************************************************/
 
 #include <stdint.h>
 #include <stdio.h>
 #include "../include/sharedDefines.h"
 #include "../include/regions.h"
+#include "../include/segments.h"
 
 #define CARD_SIZE ((uint64_t) (1 << 9))
 #define PAGE_SIZE ((uint64_t) (1 << 12))
 
+//this test needs 2MB segment size
 int main() {
-	char *obj1, *obj2, *obj3, *obj4;
-	char tmp[80]; 
-	char tmp2[160]; 
-	char tmp3[1048576]; 
-	char tmp4[4194304]; 
-	
-	// Init allocator
-	init(CARD_SIZE * PAGE_SIZE);
+    char *obj1;
+    char *obj2;
+    char *obj3;
+    char *obj4;
+    char *obj5;
+    char *obj6;
+    char *obj7;
+    char *obj8;
+    char *obj9;
+    // Init allocator
+    init(CARD_SIZE * PAGE_SIZE);
 
-	// Check start and stop adddresses
-	printf("Start Address: %p\n", start_addr_mem_pool());
-	printf("Stop Address: %p\n", stop_addr_mem_pool());
-	printf("Mem Pool Size: %lu\n", mem_pool_size());
-	
-	memset(tmp, '1', 80);
-	tmp[79] = '\0';
+    // Check start and stop adddresses
+    printf("\n");
+    printf("Start Address: %p\n", start_addr_mem_pool());
+    printf("Stop Address: %p\n", stop_addr_mem_pool());
 
-	memset(tmp2, '2', 160);
-	tmp2[159] = '\0';
+    //obj1 should be in segment 0
+    obj1 = allocate(1,0);
+    printf("Allocate: %p\n", obj1);
+    //assertf((obj1 - start_addr_mem_pool()) == 0, "Object start position");
 
-	memset(tmp3, '3', 1048576);
-	tmp3[1048575] = '\0';
+    //obj2 should be in segment 1 
+    obj2 = allocate(200,1);
+    printf("Allocate: %p\n", obj2);
+    //assertf((obj2 - obj1)/8 == 262144, "Object start position");
 
-	memset(tmp4, '4', 4194304);
-	tmp4[4194303] = '\0';
-	
-	obj1 = allocate(10);
-	r_write(tmp, obj1, 10);
-	
-	obj2 = allocate(20);
-	r_write(tmp2, obj2, 20);
-	
-	obj3 = allocate(131072);
-	r_write(tmp3, obj3, 131072);
+    //obj3 should be in segment 0
+    obj3 = allocate(12020, 0);
+    printf("Allocate: %p\n", obj3);
+    //assertf((obj3 - obj2)/8 == 200, "Object start position");
 
-	obj4 = allocate(524288);
-	r_write(tmp4, obj4, 524288);
+    //obj4 should be in segment 1
+    obj4 = allocate(262140,2);
+    printf("Allocate: %p\n", obj4);
+    //assertf((obj4 - obj1)/8 == 262144, "Object start position");
 
-	// In fast map we need to do an fsync
-	r_fsync();
+    //obj5 should be in segment 1
+    obj5 = allocate(4, 1);
+    printf("Allocate: %p\n", obj5);
+    //assertf((obj5 - obj4)/8 == 262140, "Object start position");
 
-	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
-	assertf(strlen(obj2) == 159, "Error in size");
-	assertf(strlen(obj3) == 1048575, "Error in size %lu", strlen(obj3));
-	assertf(strlen(obj4) == 4194303, "Error in size");
-	
-	return 0;
+    //obj6 should be in segment 2
+    obj6 = allocate(200, 0);
+    printf("Allocate: %p\n", obj6);
+
+    //obj7 should be in segment 3
+    obj7 = allocate(262140,1);
+    printf("Allocate: %p\n", obj7);
+
+    //obj8 should be in segment 4
+    obj8 = allocate(500,3);
+    printf("Allocate: %p\n", obj8);
+
+    //obj9 should be in segment 4
+    obj9 = allocate(500,2);
+    printf("Allocate: %p\n", obj9);
+
+    //nothing should be done, obj1 and obj2 are in the same segment
+    references(obj1,obj2);
+    //new group created with segments 0 and 1
+    references(obj3,obj4);
+    print_groups();
+    //nothing should be done, obj4 and obj5 are in the same segment
+    references(obj4,obj5);
+    print_groups();
+    //new group created with segments 2 and 3
+    references(obj7,obj6);
+    print_groups();
+    printf("\n");
+
+    reset_used();
+    mark_used(obj1);
+    mark_used(obj6);
+    mark_used(obj8);
+    //nothing should be freed because there is one region in each
+    //group that is used
+    free_regions();
+    print_regions();
+    print_groups();
+    printf("\n");
+
+    reset_used();
+    mark_used(obj1);
+    mark_used(obj6);
+    //region 4 should be freed
+    free_regions();
+    print_regions();
+    print_groups();
+    printf("\n");
+
+    reset_used();
+    mark_used(obj1);
+    //regions 2 and 3 should be freed
+    free_regions();
+    print_regions();
+    print_groups();
+    printf("\n");
+
+    return 0;
 }

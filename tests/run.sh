@@ -7,15 +7,15 @@ OLD=1
 MAX=2
 
 TOTAL=$(echo $NEW + $OLD | bc)
-JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
-JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-EXEC=("Array_List" "Simple_Array" "List_Small" "List_Large" "MultiList" \
-	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_String" "HashMap" \
- 	"Clone" "Rehashing")
+JAVA="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
+JDB="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
+#EXEC=("Array_List" "Simple_Array" "List_Small" "List_Large" "MultiList" \
+#	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_String" "HashMap" \
+# 	"Clone" "Rehashing")
 
-#EXEC=( "HashMap" )
+EXEC=( "Groupping" )
 
-V_JAVA="/usr/lib/jvm/java-8-kolokasis/build/linux-x86_64-normal-server-release/jdk/bin/java"
+V_JAVA="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.292.b10-1.el7_9.x86_64/bin/java"
 
 cd java
 make clean;
@@ -98,7 +98,7 @@ do
 		-XX:TeraCacheSize=1073741824 \
 		-Xmx${MAX}g \
 		-Xms${OLD}g \
-		-XX:TeraCacheThreshold=123030 \
+		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
 		-Xlogtc:llarge_teraCache.txt \
