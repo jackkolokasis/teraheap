@@ -228,35 +228,35 @@
 #TOTAL_CONFS=${#HEAP[@]}
 ###########################################
 
-##############################################
-## Logistic Regression
-##############################################
+#############################################
+# Logistic Regression
+#############################################
 # Heap size for executors
-#HEAP=( 32 )
-#
-### New generation size '-Xmn'
-### if the value is 0: let the JVM to decide
-### if the value > 0 : set the size of the New Generation based on the value
-#NEW_GEN=( 0 )
-#
-### DRAM shrink
-### THere
-#RAMDISK=( 204 )
-#
-### Spark memory fraction
-#MEM_FRACTON=( 0.5 )
-#
-#S_LEVEL=( "MEMORY_AND_DISK" )
-#
-### Running benchmarks
-#BENCHMARKS=( "LogisticRegression" )
-#
-### Number of executors
-#EXECUTORS=1
-#
-### Total Configurations
-#TOTAL_CONFS=${#HEAP[@]}
-###########################################
+HEAP=( 32 )
+
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+NEW_GEN=( 0 )
+
+## DRAM shrink
+## THere
+RAMDISK=( 172 )
+
+## Spark memory fraction
+MEM_FRACTON=( 0.5 )
+
+S_LEVEL=( "MEMORY_AND_DISK" )
+
+## Running benchmarks
+BENCHMARKS=( "SVM" )
+
+## Number of executors
+EXECUTORS=1
+
+## Total Configurations
+TOTAL_CONFS=${#HEAP[@]}
+##########################################
 
 ###############################################
 ### SVM
@@ -288,11 +288,11 @@
 #TOTAL_CONFS=${#HEAP[@]}
 ###########################################
 
-###############################################
-### TeraCache - SVM
-###############################################
-# Heap size for executors '-Xms'
-#HEAP=( 35 )
+################################################
+#### TeraCache - SVM
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 32 )
 #
 ## New generation size '-Xmn'
 ## if the value is 0: let the JVM to decide
@@ -309,7 +309,7 @@
 #S_LEVEL=( "MEMORY_ONLY" )
 #
 ## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
-#TERACACHE=( 900 )
+#TERACACHE=( 2000 )
 #
 ## Running benchmarks
 #BENCHMARKS=( "SVM" )
@@ -356,7 +356,7 @@
 #### TeraCache - Linear Regression
 ################################################
 ## Heap size for executors '-Xms'
-#HEAP=( 32 )
+#HEAP=( 55 )
 #
 ## New generation size '-Xmn'
 ## if the value is 0: let the JVM to decide
@@ -373,17 +373,16 @@
 #S_LEVEL=( "MEMORY_ONLY" )
 #
 ## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
-#TERACACHE=( 900 )
+#TERACACHE=( 2000 )
 #
 ## Running benchmarks
-#BENCHMARKS=( "LogisticRegression" )
+#BENCHMARKS=( "SVM" )
 #
 ## Number of executors
 #EXECUTORS=1
 #
 ## Total Configurations
 #TOTAL_CONFS=${#HEAP[@]}
-
 
 ################################################
 #### TeraCache - PageRank
@@ -546,11 +545,55 @@
 #TOTAL_CONFS=${#HEAP[@]}
 
 
-###############################################
-### TC - TR
-###############################################
+################################################
+#### TC - TR
+################################################
+## Heap size for executors '-Xms'
+#HEAP=( 32 )
+#
+## New generation size '-Xmn'
+## if the value is 0: let the JVM to decide
+## if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+## DRAM shrink 200GB
+#RAMDISK=( 0 )
+#
+## Spark memory fraction: 'spark.memory.storagefraction'
+#MEM_FRACTON=( 0.8 )
+#
+## Storage Level
+#S_LEVEL=( "MEMORY_ONLY" )
+#
+## TeraCache configuration size in Spark: 'spark.teracache.heap.size'
+#TERACACHE=( 2000 )
+#
+## Running benchmarks
+#BENCHMARKS=( "LogisticRegression" )
+#
+## Number of executors
+#EXECUTORS=1
+#
+## Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
+
+######################
+# New arguments 
+######################
+# Device for shuffle
+DEV_SHFL=nvme0n1
+
+# Device Fastmap
+DEV_FMAP=nvme2n1p1
+
+# TeraCache file size in GB e.g 800 -> 800GB
+TC_FILE_SZ=900
+
+# Executor cores
+EXEC_CORES=8
+2
 # Heap size for executors '-Xms'
-HEAP=( 36 )
+HEAP=( 64 )
 
 # New generation size '-Xmn'
 # if the value is 0: let the JVM to decide
@@ -567,10 +610,10 @@ MEM_FRACTON=( 0.8 )
 S_LEVEL=( "MEMORY_ONLY" )
 
 # TeraCache configuration size in Spark: 'spark.teracache.heap.size'
-TERACACHE=( 2000 )
+TERACACHE=( 900 )
 
 # Running benchmarks
-BENCHMARKS=( "LinearRegression" )
+BENCHMARKS=( "PageRank" )
 
 # Number of executors
 EXECUTORS=1

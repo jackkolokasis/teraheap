@@ -5,19 +5,12 @@
 # file: dev_setup.sh
 #
 # @Author:   Iacovos G. Kolokasis
-# @Version:  28-03-2021 
+# @Version:  19-09-2021
 # @email:    kolokasis@ics.forth.gr
 #
 # Prepare the devices for the experiments
 #
 ###################################################
-
-# Device for shuffle
-DEVICE_SHFL="nvme1n1"
-# Device for TeraCache
-DEVICE_TC="nvme2n1p"
-# File size for TeraCache
-TC_FILE_SZ="800"
 
 # Check if the last command executed succesfully
 #
@@ -40,21 +33,24 @@ usage() {
     echo -n "      $0 [option ...] [-k][-h]"
     echo
     echo "Options:"
+    echo "      -t  Run experiments with teraCache"
     echo "      -f  Run experiments with fastmap"
-    echo "      -d  Unmount devices"
+    echo "      -s  File size for TeraCache"
+    echo "      -d  List for devices. First device for TeraCache and second for Suffle"
+    echo "      -u  Unmount all devices"
     echo "      -h  Show usage"
     echo
 
     exit 1
 }
 
-destroy() {
+destroy_tc() {
 	if [ $1 ]
 	then
 		sudo umount /mnt/spark
 		# Check if the command executed succesfully
 		retValue=$?
-		message="Unmount $DEVICE_SHFL" 
+		message="Unmount ${DEVICES[1]}" 
 		check ${retValue} "${message}"
 
 		rm -rf /mnt/fmap/file.txt
@@ -62,18 +58,47 @@ destroy() {
 		retValue=$?
 		message="Remove TeraCache file" 
 		check ${retValue} "${message}"
+	else
+		rm -rf /mnt/spark/file.txt
+		# Check if the command executed succesfully
+		retValue=$?
+		message="Remove TeraCache file" 
+		check ${retValue} "${message}"
+		
+		sudo umount /mnt/spark
+		# Check if the command executed succesfully
+		retValue=$?
+		message="Unmount ${DEVICES[0]}" 
+		check ${retValue} "${message}"
 	fi
 
 }
 
+destroy_ser() {
+	sudo umount /mnt/spark
+	# Check if the command executed succesfully
+	retValue=$?
+	message="Unmount $DEVICE_SHFL" 
+	check ${retValue} "${message}"
+}
+    
 # Check for the input arguments
-while getopts "fdh" opt
+while getopts ":s:d:tfuh" opt
 do
     case "${opt}" in
+		t)
+			TC=true
+			;;
 		f)
 			FASTMAP=true
 			;;
+		s)
+			TC_FILE_SZ=${OPTARG}
+			;;
 		d)
+			DEVICE_SHFL=${OPTARG}
+			;;
+		u)
 			DESTROY=true
 			;;
         h)
@@ -88,68 +113,109 @@ done
 # Unmount TeraCache device
 if [ $DESTROY ]
 then
-	destroy $FASTMAP
+	if [ $TC ]
+	then
+		destroy_tc $FASTMAP
+	else
+		destroy_ser
+	fi
 	exit
 fi
 
 # Setup TeraCache device
-if [ $FASTMAP ]
+if [ $TC ]
 then
-	# Setup disk for shuffle
-	sudo mount /dev/$DEVICE_SHFL /mnt/spark
-	# Check if the command executed succesfully
-	retValue=$?
-	message="Mount $DEVICE_SHFL for shuffle" 
-	check ${retValue} "${message}"
-
-	sudo chown kolokasis /mnt/spark
-	# Check if the command executed succesfully
-	retValue=$?
-	message="Change ownerships /mnt/spark" 
-	check ${retValue} "${message}"
-
-	sudo chown kolokasis /mnt/fmap
-	# Check if the command executed succesfully
-	retValue=$?
-	message="Change ownerships /mnt/fmap" 
-	check ${retValue} "${message}"
-
-	cd /mnt/fmap
-
-	# if the file does not exist then create it
-	if [ ! -f file.txt ]
+	if [ $FASTMAP ]
 	then
-		fallocate -l ${TC_FILE_SZ}G file.txt
-		retValue=$?
-		message="Create ${TC_FILE_SZ}G file for TeraCache" 
-		check ${retValue} "${message}"
-	fi
-	cd -
-else
-	sudo mount /dev/$DEVICE_TC /mnt/spark
-	# Check if the command executed succesfully
-	retValue=$?
-	message="Mount $DEVICE_TC for shuffle and TeraCache" 
-	check ${retValue} "${message}"
+		if ! mountpoint -q /mnt/spark
+		then
+			# Setup disk for shuffle
+			sudo mount /dev/${DEVICE_SHFL} /mnt/spark
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Mount ${DEVICE_SHFL} for shuffle" 
+			check ${retValue} "${message}"
 
-	sudo chown kolokasis /mnt/spark
-	# Check if the command executed succesfully
-	retValue=$?
-	message="Change ownerships /mnt/spark" 
-	check ${retValue} "${message}"
+			sudo chown kolokasis /mnt/spark
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Change ownerships /mnt/spark" 
+			check ${retValue} "${message}"
+		fi
 
-	cd /mnt/spark
-
-	# if the file does not exist then create it
-	if [ ! -f file.txt ]
-	then
-		fallocate -l ${TC_FILE_SZ}G file.txt
+		sudo chown kolokasis /mnt/fmap
 		# Check if the command executed succesfully
 		retValue=$?
-		message="Create ${TC_FILE_SZ}G file for TeraCache" 
+		message="Change ownerships /mnt/fmap" 
 		check ${retValue} "${message}"
-	fi
-	cd -
-fi
 
+		cd /mnt/fmap
+
+		# if the file does not exist then create it
+		if [ ! -f file.txt ]
+		then
+			fallocate -l ${TC_FILE_SZ}G file.txt
+			retValue=$?
+			message="Create ${TC_FILE_SZ}G file for TeraCache" 
+			check ${retValue} "${message}"
+		fi
+		cd -
+	else
+		if ! mountpoint -q /mnt/spark
+		then
+			sudo mount /dev/${DEVICE_SHFL} /mnt/spark
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Mount ${DEVICE_SHFL} for shuffle and TeraCache" 
+			check ${retValue} "${message}"
+
+			sudo chown kolokasis /mnt/spark
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Change ownerships /mnt/spark" 
+			check ${retValue} "${message}"
+		fi
+
+		cd /mnt/spark
+
+		# if the file does not exist then create it
+		if [ ! -f file.txt ]
+		then
+			fallocate -l ${TC_FILE_SZ}G file.txt
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Create ${TC_FILE_SZ}G file for TeraCache" 
+			check ${retValue} "${message}"
+		else
+			rm file.txt
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Remove ${TC_FILE_SZ}G file" 
+			check ${retValue} "${message}"
+			
+			fallocate -l ${TC_FILE_SZ}G file.txt
+			# Check if the command executed succesfully
+			retValue=$?
+			message="Create ${TC_FILE_SZ}G file for TeraCache" 
+			check ${retValue} "${message}"
+		fi
+		cd -
+	fi
+else
+	if mountpoint -q /mnt/spark
+	then
+		exit
+	fi
+	sudo mount /dev/${DEVICE_SHFL} /mnt/spark
+	# Check if the command executed succesfully
+	retValue=$?
+	message="Mount ${DEVICE_SHFL} /mnt/spark" 
+	check ${retValue} "${message}"
+		
+	sudo chown kolokasis /mnt/spark
+	# Check if the command executed succesfully
+	retValue=$?
+	message="Change ownerships /mnt/spark" 
+	check ${retValue} "${message}"
+fi
 exit

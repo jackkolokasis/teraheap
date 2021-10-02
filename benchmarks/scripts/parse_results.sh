@@ -85,7 +85,11 @@ DESER_SAMPLES=$(grep "org/apache/spark/serializer/KryoDeserializationStream.read
 	| awk '{print $2}' \
 	| sed 's/,//g' |sed 's/(//g' \
 	| awk '{sum+=$1} END {print sum}')
-APP_THREAD_SAMPLES=$(grep -w "java/lang/Thread.run" ${RESULT_DIR}/profile.svg | awk '{print $2}' | sed 's/,//g' | sed 's/(//g')
+APP_THREAD_SAMPLES=$(grep -w "java/lang/Thread.run" ${RESULT_DIR}/profile.svg \
+	| awk '{print $2}' \
+	| sed 's/,//g' \
+	| sed 's/(//g' \
+	| head -n 1)
 
 NET_TIME=$(echo "${TOTAL_TIME} - ${MINOR_GC} - ${MAJOR_GC}" | bc -l)
 SD_SAMPLES=$(echo "${SER_SAMPLES} + ${DESER_SAMPLES}" | bc -l)
@@ -115,7 +119,33 @@ echo "APP_THREAD_SAMPLES,${APP_THREAD_SAMPLES}"  >> ${RESULT_DIR}/serdes.csv
 
 if [ $TC ]
 then
-	grep "TOTAL_TRANS_OBJ" ${RESULT_DIR}/teraCache.txt    | awk '{print $3","$5}' > ${RESULT_DIR}/statistics.csv
-	grep "TOTAL_FORWARD_PTRS" ${RESULT_DIR}/teraCache.txt | awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
-	grep "TOTAL_BACK_PTRS" ${RESULT_DIR}/teraCache.txt    | awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
+	grep "TOTAL_TRANS_OBJ" ${RESULT_DIR}/teraCache.txt    \
+		| awk '{print $3","$5}' > ${RESULT_DIR}/statistics.csv
+	grep "TOTAL_FORWARD_PTRS" ${RESULT_DIR}/teraCache.txt \
+		| awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
+	grep "TOTAL_BACK_PTRS" ${RESULT_DIR}/teraCache.txt \
+		| awk '{print $3","$5}' >> ${RESULT_DIR}/statistics.csv
+	grep "DUMMY" ${RESULT_DIR}/teraCache.txt \
+		| awk '{sum+=$6} END {print "DUMMY_OBJ_SIZE(GB),"sum*8/1024/1024}' \
+		>> ${RESULT_DIR}/statistics.csv
+	grep "DISTRIBUTION" ${RESULT_DIR}/teraCache.txt |tail -n 1 \
+		|awk '{print $5 " " $6 " " $7 " " $8 " " $9 " " $10 " " $11 " " $12" " $13 " " $14 " " $15}' \
+		>> ${RESULT_DIR}/statistics.csv
 fi
+
+# Read the Utilization from system.csv file
+USR_UTIL_PER=$(grep "USR_UTIL" ${RESULT_DIR}/system.csv |awk -F ',' '{print $2}')
+SYS_UTIL_PER=$(grep "SYS_UTIL" ${RESULT_DIR}/system.csv |awk -F ',' '{print $2}')
+IO_UTIL_PER=$(grep "IOW_UTIL" ${RESULT_DIR}/system.csv |awk -F ',' '{print $2}')
+
+# Convert CPU utilization to time 
+USR_TIME=$( echo "${TOTAL_TIME} * ${USR_UTIL_PER} / 100" | bc -l )
+SYS_TIME=$( echo "${TOTAL_TIME} * ${SYS_UTIL_PER} / 100" | bc -l )
+IOW_TIME=$( echo "${TOTAL_TIME} * ${IO_UTIL_PER} / 100" | bc -l )
+
+echo								 >> ${RESULT_DIR}/result.csv
+echo								 >> ${RESULT_DIR}/result.csv
+echo "CPU_COMPONENT,TIME(s)"		 >> ${RESULT_DIR}/result.csv
+echo "USR_TIME,${USR_TIME}"		     >> ${RESULT_DIR}/result.csv
+echo "SYS_TIME,${SYS_TIME}"		     >> ${RESULT_DIR}/result.csv
+echo "IOW_TIME,${IOW_TIME}"		     >> ${RESULT_DIR}/result.csv

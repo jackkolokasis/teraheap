@@ -5,7 +5,7 @@
 # file: update_conf.sh
 #
 # @Author:   Iacovos G. Kolokasis
-# @Version:  27-02-2021 
+# @Version:  28-03-2021 
 # @email:    kolokasis@ics.forth.gr
 #
 # Scrpt to setup the configuration for experiments
@@ -66,26 +66,27 @@ sed -i '/SPARK_WORKER_CORES/c\SPARK_WORKER_CORES='"${CORES}" spark-env.sh
 # Change the worker memory
 sed -i '/SPARK_WORKER_MEMORY/c\SPARK_WORKER_MEMORY='"${MIN_HEAP}"'g' spark-env.sh
 
-# Change the minimum heap size
-# Change only the first -Xms 
-# sed -i -e '0,/-Xms[0-9]*g/ s/-Xms[0-9]*g/-Xms'"${MIN_HEAP}"'g/' spark-defaults.conf
-
-# Change the spark.memory.storageFraction
-sed -i '/storageFraction/c\spark.memory.storageFraction '"${FRACTION}" spark-defaults.conf
-
 cd -
 
-# Enter the spark-bechmarks
-cd ../spark-bench/conf/
+cd /home1/public/kolokasis/HiBench/conf/
 
-# Change spark benchmarks configuration execur memory
-sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${MIN_HEAP}"'g' env.sh
+sed -i '/spark.executor.memory/c\spark.executor.memory '"${MIN_HEAP}"'g' spark.conf
 
-# Change spark benchmarks configuration executor core
-sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
+sed -i '/spark.executor.cores/c\spark.executor.cores '"${CORES}" spark.conf
 
-# Change storage level
-sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
+DRIVER_CONF="-server -XX:+UseParallelGC -XX:-UseParallelOldGC -XX:-ResizeTLAB -XX:-UseCompressedOops -XX:-UseCompressedClassPointers"
+sed -i '/spark.driver.extraJavaOptions/c\spark.driver.extraJavaOptions '"${DRIVER_CONF}" spark.conf
+
+# Change the spark.executor.extraJavaOptions
+EXEC_CONF="-server -XX:-ClassUnloading -XX:+UseParallelGC -XX:-UseParallelOldGC -XX:ParallelGCThreads=16 -XX:-ResizeTLAB -XX:-UseCompressedOops -XX:-UseCompressedClassPointers"
+sed -i '/spark.executor.extraJavaOptions/c\spark.executor.extraJavaOptions '"${EXEC_CONF}}" spark.conf
+
+# Change the spark.memory.storageFraction
+sed -i '/storageFraction/c\spark.memory.storageFraction '"${FRACTION}" spark.conf
+
+# Delete TeraCache enties if exist
+sed -i '/spark.teracache.enabled/c\' spark.conf
+sed -i '/spark.teracache.heap.size/c\' spark.conf
 
 cd -
 

@@ -74,45 +74,40 @@ sed -i '/SPARK_WORKER_CORES/c\SPARK_WORKER_CORES='"${CORES}" spark-env.sh
 # Change the worker memory
 sed -i '/SPARK_WORKER_MEMORY/c\SPARK_WORKER_MEMORY='"${TERACACHE}"'g' spark-env.sh
 
-# Change the minimum heap size
-# Change only the first -Xms 
-sed -i -e '0,/-Xms[0-9]*g/ s/-Xms[0-9]*g/-Xms'"${MIN_HEAP}"'g/' spark-defaults.conf
-
-# Change the value of the size of New Generation '-Xmn'. If the value is:
-# NEW_GEN == 0: Do not set the size of the young gen. Let the default
-# NEW_GEN > 0 : Set the size of the young gen to the 'NEW_GEN' value
-if [ ${NEW_GEN} -eq 0 ]
-then
-	sed -i -e '0,/-Xmn[0-9]*g/ s/-Xmn[0-9]*g //' spark-defaults.conf
-else
-	sed -i -e '0,/-Xmn[0-9]*g/ s/-Xmn[0-9]*g //' spark-defaults.conf
-	sed -i -e '0,/-Xms[0-9]*g/ s/-Xms[0-9]*g/& -Xmn'"${NEW_GEN}"'g/' spark-defaults.conf
-fi
-
-# Change teracache size for Spark
-sed -i '/teracache.heap.size/c\spark.teracache.heap.size '"${TERACACHE}"'g' spark-defaults.conf
-
-TC_BYTES=$(echo "(${TERACACHE} - ${MIN_HEAP}) * 1024 * 1024 * 1024" | bc)
-
-# Change teracache size for JVM
-sed -i "s/TeraCacheSize=[0-9]*/TeraCacheSize=${TC_BYTES}/g" spark-defaults.conf
-
-# Change the spark.memory.fraction
-sed -i '/storageFraction/c\spark.memory.storageFraction '"${FRACTION}" spark-defaults.conf
-
 cd -
 
-# Enter the spark-bechmarks
-cd ../spark-bench/conf/
+#################
+cd /home1/public/kolokasis/HiBench/conf
 
-# Change spark benchmarks configuration
-sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${TERACACHE}"'g' env.sh
+sed -i '/spark.executor.memory/c\spark.executor.memory '"${TERACACHE}"'g' spark.conf
 
-# Change spark benchmarks configuration executor core
-sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
+sed -i '/spark.executor.cores/c\spark.executor.cores '"${CORES}" spark.conf
 
-# Change storage level
-sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
+DRIVER_CONF="-server -XX:+UseParallelGC -XX:-UseParallelOldGC -XX:-ResizeTLAB -XX:-UseCompressedOops -XX:-UseCompressedClassPointers"
+sed -i '/spark.driver.extraJavaOptions/c\spark.driver.extraJavaOptions '"${DRIVER_CONF}" spark.conf
+
+TC_BYTES=$(echo "(${TERACACHE} - ${MIN_HEAP}) * 1024 * 1024 * 1024" | bc)
+EXEC_CONF="-server -XX:-ClassUnloading -XX:+UseParallelGC -XX:-UseParallelOldGC -XX:ParallelGCThreads=16 -XX:+EnableTeraCache -XX:TeraCacheSize=${TC_BYTES} -Xms${MIN_HEAP}g -XX:TeraCacheThreshold=0 -XX:-UseCompressedOops -XX:-UseCompressedClassPointers -XX:+TeraCacheStatistics -Xlogtc:teraCache.txt -XX:TeraStripeSize=16"
+sed -i '/spark.executor.extraJavaOptions/c\spark.executor.extraJavaOptions '"${EXEC_CONF}" spark.conf
+
+# Change teracache size for Spark
+if ! grep -q "teracache.heap.size" spark.conf
+then
+	sed -i '/spark.executor.extraJavaOptions/a\spark.teracache.heap.size '"${TERACACHE}"'g' spark.conf
+else
+	sed -i '/spark.teracache.heap.size/c\spark.teracache.heap.size '"${TERACACHE}"'g' spark.conf
+fi
+
+# Enable TeraCache for Spark
+if ! grep -q "spark.teracache.enabled" spark.conf
+then
+	sed -i '/spark.teracache.heap.size/a\spark.teracache.enabled true' spark.conf
+else
+	sed -i '/spark.teracache.enabled/c\spark.teracache.enabled true' spark.conf
+fi
+
+# Change the spark.memory.fraction 
+sed -i '/storageFraction/c\spark.memory.storageFraction '"${FRACTION}" spark.conf
 
 cd -
 

@@ -25,14 +25,17 @@ MC_LIST="sith4-fast"
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench64"
 
 # 128GB Datasets
-#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
+DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
 
 # 256GB Datasets
-DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench256"
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench256"
 
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench12"
 
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench6"
+
+# Testing
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBenchTests"
 
 #DATA_HDFS="file:///mnt/data/SparkBench"
 
@@ -61,9 +64,9 @@ SPARK_RDD_COMPRESS=false
 #SPARK_IO_COMPRESSION_CODEC=lzf
 
 # Spark options in system.property or arguments of spark-submit 
-SPARK_EXECUTOR_MEMORY=2000g
+SPARK_EXECUTOR_MEMORY=900g
 SPARK_EXECUTOR_INSTANCES=1
-SPARK_EXECUTOR_CORES=16
+SPARK_EXECUTOR_CORES=8
 
 # Storage levels, see :
 STORAGE_LEVEL=MEMORY_ONLY

@@ -1,8 +1,9 @@
 # for preparation 
 #numV=61344
-#numV=14722560			#32GB
+#numV=942240		#> 2GB
+numV=14722560			#32GB
 #numV=29445120			#64GB
-numV=44167680			#102GB
+#numV=44167680			#102GB
 NUM_OF_PARTITIONS=256
 mu=4.0
 sigma=1.3
