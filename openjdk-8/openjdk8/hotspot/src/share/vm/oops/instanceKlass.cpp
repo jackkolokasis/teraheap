@@ -2160,12 +2160,18 @@ template <class T> void assert_nothing(T *p) {}
       ++map;                                                             \
     }                                                                    \
   } else {                                                               \
+          if (EnableTeraCache && obj->is_tera_cache()) {                                         \
+              Universe::teraCache()->enable_groups((HeapWord*) obj->mark()->decode_pointer());      \
+          }                                                              \
 	  while (map < end_map) {                                            \
 		  InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                     \
 				  obj->obj_field_addr<oop>(map->offset()), map->count(), \
 				  do_oop, assert_fn)                                     \
 		  ++map;                                                         \
 	  }                                                                  \
+          if (EnableTeraCache && obj->is_tera_cache()){                  \
+              Universe::teraCache()->disable_groups();                   \
+          }                                                              \
   }                                                                      \
 }
 
