@@ -118,6 +118,8 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   }
 #endif
 
+
+
   // Mapping that includes the derived offset.
   // If the block is clean, returns the last address in the covered region.
   // If the block is < index 0, returns the start of the covered region.
@@ -287,6 +289,17 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   // If an object starts at an address corresponding to
   // "start", the method will return true.
   bool tc_object_starts_in_range(HeapWord* start_addr, HeapWord* end_addr) const;
+#endif
+
+#if TERA_CARDS
+  // Resetting the entries for a TC region
+  void tc_region_reset(HeapWord* start, HeapWord* end) {
+    assertf(_covered_region.contains(start) && _covered_region.contains(end),
+               "out of bounds access to object start array");
+    short *begin = tc_block_for_addr(start);
+    short *finish = tc_block_for_addr(end);
+    memset(begin, clean_block, (finish+1-begin) * sizeof(short));
+  }
 #endif
 };
 
