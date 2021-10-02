@@ -31,6 +31,8 @@
 #include "memory/sharedDefines.h"
 #include "runtime/os.hpp"
 #include "oops/oop.hpp"
+#include <climits>
+#include <limits.h>
 
 //
 // This class can be used to locate the beginning of an object in the
@@ -47,8 +49,8 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   jbyte*          _raw_base;		// Heap object start array base
   jbyte*          _offset_base;		// Heap offset base
 #if TERA_CARDS
-  short*		  _tc_raw_base;		// TeraCache object start array base
-  short*		  _tc_offset_base;	// TeraCache offset base
+  int*		  _tc_raw_base;		// TeraCache object start array base
+  int*		  _tc_offset_base;	// TeraCache offset base
 #endif
 
  public:
@@ -83,10 +85,10 @@ class ObjectStartArray : public CHeapObj<mtGC> {
  
 #if TERA_CARDS
   // Mapping from address to object start array entry for TeraCache
-  short* tc_block_for_addr(void* p) const {
+  int* tc_block_for_addr(void* p) const {
     assertf(_covered_region.contains(p),
            "out of bounds access to object start array");
-	short* result = &_tc_offset_base[uintptr_t(p) >> tc_block_shift];
+	int* result = &_tc_offset_base[uintptr_t(p) >> tc_block_shift];
 
     assertf(_blocks_region.contains(result),
            "out of bounds result in byte_for");
@@ -107,10 +109,10 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   
 #if TERA_CARDS
   // Mapping from object start array entry to address of first word
-  HeapWord* tc_addr_for_block(short* p) {
+  HeapWord* tc_addr_for_block(int* p) {
     assertf(_blocks_region.contains(p),
            "out of bounds access to object start array");
-    size_t delta = pointer_delta(p, _tc_offset_base, sizeof(short));
+    size_t delta = pointer_delta(p, _tc_offset_base, sizeof(int));
     HeapWord* result = (HeapWord*) (delta << tc_block_shift);
     assertf(_covered_region.contains(result),
            "out of bounds accessor from card marking array");
@@ -148,7 +150,7 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   // Mapping that includes the derived offset for TeraCache.
   // If the block is clean, returns the last address in the covered region.
   // If the block is < index 0, returns the start of the covered region.
-  HeapWord* tc_offset_addr_for_block (short* p) const {
+  HeapWord* tc_offset_addr_for_block (int* p) const {
     // We have to do this before the assert
     if (p < _tc_raw_base) {
       return _covered_region.start();
@@ -161,7 +163,7 @@ class ObjectStartArray : public CHeapObj<mtGC> {
       return _covered_region.end();
     }
 
-    size_t delta = pointer_delta(p, _tc_offset_base, sizeof(short));
+    size_t delta = pointer_delta(p, _tc_offset_base, sizeof(int));
     HeapWord* result = (HeapWord*) (delta << tc_block_shift);
 
     result += *p;
@@ -208,14 +210,16 @@ class ObjectStartArray : public CHeapObj<mtGC> {
 #if TERA_CARDS
   void tc_allocate_block(HeapWord* p) {
     assertf(_covered_region.contains(p), "Must be in covered region");
-    short* block = tc_block_for_addr(p);
+    int* block = tc_block_for_addr(p);
     HeapWord* block_base = tc_addr_for_block(block);
     size_t offset = pointer_delta(p, block_base, sizeof(HeapWord*));
 
-    assertf(offset < 32767, "Sanity %lu", offset);
+	// Check with INT_MAX
+    //assertf(offset < 32767, "Sanity %lu", offset);
+    assertf(offset < INT_MAX, "Sanity %lu", offset);
     // When doing MT offsets, we can't assert this.
     //assert(offset > *block, "Found backwards allocation");
-    *block = (short)offset;
+    *block = (int)offset;
 
     // tty->print_cr("[%p]", p);
   }
@@ -250,7 +254,7 @@ class ObjectStartArray : public CHeapObj<mtGC> {
   // object hit should be at the beginning of the block
   HeapWord* tc_object_start(HeapWord* addr) const {
     assertf(_covered_region.contains(addr), "Must be in covered region");
-    short* block = tc_block_for_addr(addr);
+    int* block = tc_block_for_addr(addr);
     HeapWord* scroll_forward = tc_offset_addr_for_block(block--);
     while (scroll_forward > addr) {
       scroll_forward = tc_offset_addr_for_block(block--);

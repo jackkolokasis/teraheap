@@ -106,7 +106,7 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   // 0x7f6100600000 & 0xff (Heap)
   // 0x7f62258180200 & 0xff (TeraCache) assertions do not work for TeraCache
   assertf((uintptr_t(tc_low_bound)  & (tc_card_size - 1))  == 0, "TeraCache must start at card boundary %p | %p", low_bound, tc_low_bound);
-  assertf((uintptr_t(tc_high_bound) & (tc_card_size - 1))  == 0, "TeraCache must end at card boundary %p | %p", tc_high_bound, tc_card_size);
+  //assertf((uintptr_t(tc_high_bound) & (tc_card_size - 1))  == 0, "TeraCache must end at card boundary %p | %p", tc_high_bound, tc_card_size);
   assertf(tc_card_size <= (1 << TERA_CARD_SIZE), "card_size  must be less equall %d", (1 << TERA_CARD_SIZE));
 
   _covered = new MemRegion[max_covered_regions];

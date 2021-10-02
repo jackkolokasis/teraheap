@@ -75,6 +75,10 @@
 #define PERF_TEST				 0  //< Performance tests in minor collection.
 									// Keep this here until testing a lot and
 									// then remove it.
+									
+#define ALIGN					 1  //< Allocate in TeraCache using allignment
+									// to avoid unnecessary pagefaults due to
+									// the traversal of card tables
 
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
@@ -99,7 +103,7 @@
 									// memory of fast map is different from
 									// buffer cache. 
 
-#define TERA_CARD_SIZE			14 // This is the size of each card in
+#define TERA_CARD_SIZE			25 // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
@@ -164,7 +168,7 @@
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for TeraCache
 
-#define VERBOSE_TC				  0  //< Print objects in T
+#define VERBOSE_TC				  1  //< Print objects in T
 
 // TODO: This define must be removed
 #define NEW_FEAT				  1  //< Enable when you add new feature

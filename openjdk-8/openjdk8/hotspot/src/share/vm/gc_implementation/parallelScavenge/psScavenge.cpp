@@ -586,7 +586,7 @@ bool PSScavenge::invoke_no_policy() {
     if (promotion_failure_occurred) {
 #if TERA_CARDS
 		if (EnableTeraCache)
-			assertf(false, "TODO: Implement this usecase");
+		//	assertf(false, "TODO: Implement this usecase");
 #endif
       clean_up_failed_promotion();
       if (PrintGC) {

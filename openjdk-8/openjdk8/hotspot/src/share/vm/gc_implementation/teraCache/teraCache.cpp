@@ -34,6 +34,8 @@ uint64_t TeraCache::heap_ct_trav_time[16];
 uint64_t TeraCache::back_ptrs_per_mgc;
 uint64_t TeraCache::intra_ptrs_per_mgc;
 
+uint64_t TeraCache::obj_distr_size[3];	
+
 #if NEW_FEAT
 std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
 #endif
@@ -69,6 +71,10 @@ TeraCache::TeraCache() {
 	_pr_buffer.start_obj_addr_in_tc = NULL;
 	_pr_buffer.buf_alloc_ptr = _pr_buffer.buffer;
 #endif
+
+	for (unsigned int i = 0; i < 3; i++) {
+		obj_distr_size[i] = 0;
+	}
 }
 		
 void TeraCache::tc_shutdown() {
@@ -128,11 +134,56 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 			(HeapWord *)obj, cur_alloc_ptr(), size, obj->klass()->internal_name());
 #endif
 
-	pos = allocate(size);
+	if (TeraCacheStatistics) {
+		size_t obj_size = (size * HeapWordSize) / 1024;
+		int count = 0;
+
+		while (obj_size > 0) {
+			count++;
+			obj_size/=1024;
+		}
+
+		assertf(count <=2, "Array out of range");
+
+		obj_distr_size[count]++;
+	}
+
+#if ALIGN
+	if (r_is_obj_fits_in_region(size))
+		pos = allocate(size);
+	else {
+		HeapWord *cur = (HeapWord *) cur_alloc_ptr();
+		HeapWord *region_end = (HeapWord *) r_region_top_addr();
+
+		typeArrayOop filler_oop = (typeArrayOop) cur;
+		filler_oop->set_mark(markOopDesc::prototype());
+		filler_oop->set_klass(Universe::intArrayKlassObj());
+  
+		const size_t array_length =
+			pointer_delta(region_end, cur) - typeArrayOopDesc::header_size(T_INT);
+
+		assertf( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, 
+				"array too big in PSPromotionLAB");
+
+		filler_oop->set_length((int)(array_length * (HeapWordSize/sizeof(jint))));
 	
+		//_start_array.tc_allocate_block((HeapWord *)cur);
+		if (TeraCacheStatistics)
+			tclog_or_tty->print_cr("[STATISTICS] | DUMMY_OBJECT SIZE = %d\n", filler_oop->size());
+	
+		_start_array.tc_allocate_block(cur);
+		
+		pos = allocate(size);
+	}
+#else
+	pos = allocate(size);
+#endif
+
+
 #if VERBOSE_TC
 	if (TeraCacheStatistics)
-		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu | Name = %s", size, obj->klass()->internal_name());
+		tclog_or_tty->print_cr("[STATISTICS] | OBJECT: %p | SIZE = %lu | NAME = %s",
+				pos, size, obj->klass()->internal_name());
 #endif
 
 	_start_array.tc_allocate_block((HeapWord *)pos);
@@ -250,6 +301,8 @@ void TeraCache::tc_print_statistics() {
 
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
+	tclog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
+			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
 }
 		
 // Keep for each thread the time that need to traverse the TeraCache
@@ -441,6 +494,13 @@ void TeraCache::tc_flush_buffer() {
 		_pr_buffer.start_obj_addr_in_tc = NULL;
 		_pr_buffer.size = 0;
 	}
+}
+
+#endif
+
+#if ALIGN
+bool TeraCache::tc_obj_fit_in_region(size_t size) {
+	return r_is_obj_fits_in_region(size);
 }
 
 #endif

@@ -65,6 +65,8 @@ class TeraCache {
 		static uint64_t back_ptrs_per_mgc;		   // Total number of back ptrs per MGC
 		static uint64_t intra_ptrs_per_mgc;		   // Total number of intra ptrs between objects in TC per MGC
 
+		static uint64_t obj_distr_size[3];  // Object size distribution between B, KB, MB
+
 #if NEW_FEAT
 		static std::vector<HeapWord *> _mk_dirty;    //< These objects should
 													 // make dirty their cards
@@ -193,6 +195,11 @@ class TeraCache {
 		
 		// New feature
 		bool tc_should_mk_dirty(HeapWord* obj);
+#endif
+
+#if ALIGN
+		bool tc_obj_fit_in_region(size_t size);
+
 #endif
 		
 		// 

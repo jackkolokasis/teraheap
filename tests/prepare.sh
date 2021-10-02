@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 DEVICE="nvme1n1"
-FILE_SIZE="200"
+FILE_SIZE="128"
 
 # Check if the last command executed succesfully
 #

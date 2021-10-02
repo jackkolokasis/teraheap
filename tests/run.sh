@@ -10,6 +10,7 @@ JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linu
 EXEC=( "Array" "Array_List_Float" "Array_List_Int" "Array_List" "Array_List_Scalar" "Clone" \
 	"Extend_Lambda" "HashMap" "List_Large" "List_Small" "MultiList" \
 	"Rehashing" "Simple_Array" "Simple_Lambda" "Test_Reference" "Test_Reflection" )
+#EXEC=( "Clone" )
 
 V_JAVA="/usr/lib/jvm/java-8-kolokasis/build/linux-x86_64-normal-server-release/jdk/bin/java"
 
@@ -76,6 +77,7 @@ function c2_mode() {
 function run_tests() {
 	${JAVA} \
 		-server \
+		-XX:+ShowMessageBoxOnError \
 		-XX:+UseParallelGC \
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
@@ -86,6 +88,7 @@ function run_tests() {
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
+		-XX:TeraStripeSize=16 \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 
