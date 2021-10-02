@@ -154,6 +154,44 @@ class TeraCache {
 		// TC.
 		// This function works only when ParallelGCThreads = 1
 		void incr_intra_ptrs_per_mgc(void);
+
+        // Check if the object that the card is trying to reference is
+        // valid. 
+        bool check_if_valid_object(HeapWord *obj);
+        
+        // Get the ending address of the last object of the region obj
+        // belongs to.
+        HeapWord* get_last_object_end(HeapWord *obj);
+        
+        // Checks if the address of obj is the beginning of a region
+        bool is_start_of_region(HeapWord *obj);
+
+        // Resets the used field of all regions
+        void reset_used_field(void);
+
+        // Marks the region containing obj as used
+        void mark_used_region(HeapWord *obj);
+
+        // Prints all active regions
+        void print_active_regions(void);
+        
+        // Groups the region of obj with the previously enabled region
+        void group_region_enabled(HeapWord* obj);
+
+        // Frees all unused regions
+        void free_unused_regions(void);
+    
+        // Prints all the region groups
+        void print_region_groups(void);
+
+        // Enables groupping with region of obj
+        void enable_groups(HeapWord* obj);
+
+        // Disables region groupping
+        void disable_groups(void);
+        
+        // Groups the region of obj1 with the region of obj2
+        void group_regions(HeapWord *obj1, HeapWord *obj2);
 };
 
 #endif
