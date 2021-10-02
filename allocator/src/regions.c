@@ -14,6 +14,7 @@
 #include "../include/asyncIO.h"
 
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
+#define HEADER_SIZE (32)                   // Header size of the Dummy object	
 #define align_size_up_(size, alignment) (((size) + ((alignment) - 1)) & ~((alignment) - 1))
 
 struct _mem_pool tc_mem_pool;
@@ -50,6 +51,10 @@ void init(uint64_t align) {
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
 
 	req_init();
+
+#if ALIGN_ON
+	tc_mem_pool.region_free_space = REGION_SIZE - HEADER_SIZE;
+#endif
 }
 
 
@@ -76,15 +81,24 @@ size_t mem_pool_size() {
 // Args: `size` is in words, each word is 8 byte. Size should be > 0
 char* allocate(size_t size) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
-
+	size_t obj_size = size * HEAPWORD;
+	
+	assertf(obj_size > 0, "Object should be > 0");
 	assertf(alloc_ptr >= tc_mem_pool.start_address &&
 			alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
-	assertf(size > 0, "Object should be > 0");
+#if ALIGN_ON
+	assertf(obj_size <= (REGION_SIZE - HEADER_SIZE), "Oject size: %lu exceeds region size: %lu", 
+			obj_size, REGION_SIZE - HEADER_SIZE);
+#endif
 
-
-	tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);
+	tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + obj_size);
 	tc_mem_pool.size += size;
 
+#if ALIGN_ON
+	// Decrease the available free space counter for the region
+	tc_mem_pool.region_free_space -= obj_size;
+#endif
+	
 	// Alighn to 8 words the pointer
 	if ((uint64_t) tc_mem_pool.cur_alloc_ptr % HEAPWORD != 0)
 		tc_mem_pool.cur_alloc_ptr = (char *)((((uint64_t)tc_mem_pool.cur_alloc_ptr) + (HEAPWORD - 1)) & -HEAPWORD);
@@ -163,3 +177,32 @@ void r_fsync() {
 	int check = fsync(fd);
 	assertf(check == 0, "Error in fsync");
 }
+
+#if ALIGN_ON
+// Check if the current object with 'size' can fit in the available region
+// Return 1 on succesfull, and 0 otherwise
+int	r_is_obj_fits_in_region(size_t size) {
+	size_t obj_size = size * HEAPWORD;
+
+	assertf(obj_size > 0, "Object should be > 0");
+	assertf(obj_size <= REGION_SIZE - HEADER_SIZE, "Oject size: %lu exceeds region size: %lu",
+			obj_size, REGION_SIZE - HEADER_SIZE);
+
+	return (obj_size  <= tc_mem_pool.region_free_space);
+}
+
+// Get the top address of the current region and set the current_ptr to the
+// next region
+char* r_region_top_addr(void) {
+	// Set the current ptr to the next region and initialize next region's free space
+	// We reserve the last HEADE_SIZE bytes in regions for the dummy object
+	tc_mem_pool.cur_alloc_ptr += tc_mem_pool.region_free_space + HEADER_SIZE;
+
+	assertf(tc_mem_pool.cur_alloc_ptr >= tc_mem_pool.start_address &&
+			tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
+
+	tc_mem_pool.region_free_space = REGION_SIZE - HEADER_SIZE;
+
+	return tc_mem_pool.cur_alloc_ptr;
+}
+#endif

@@ -20,73 +20,61 @@
 #define CARD_SIZE ((uint64_t) (1 << 9))
 #define PAGE_SIZE ((uint64_t) (1 << 12))
 
+#define SIZE_80B   (80)
+#define SIZE_160B  (160)
+#define SIZE_1M (1*1024LU*1024)
+#define SIZE_4M (4*1024LU*1024)
+
+#define HEAPWORD (8)
+
+#define SIZE_TO_WORD(SIZE) \
+	((size_t) (SIZE / HEAPWORD))
+
 int main() {
-	int i;
 	char *obj1, *obj2, *obj3, *obj4;
-	char tmp[80]; 
-	char tmp2[160]; 
-	char tmp3[1048576]; 
-	char tmp4[4194304]; 
+	char *tmp, *tmp2, *tmp3, *tmp4;
 	
 	// Init allocator
 	init(CARD_SIZE * PAGE_SIZE);
 
-	// Check start and stop adddresses
-	printf("Start Address: %p\n", start_addr_mem_pool());
-	printf("Stop Address: %p\n", stop_addr_mem_pool());
-	printf("Mem Pool Size: %lu\n", mem_pool_size());
-	
-	memset(tmp, '1', 80);
-	tmp[79] = '\0';
+	tmp = malloc(SIZE_80B * sizeof(char));
+	memset(tmp, '1', SIZE_80B);
+	tmp[SIZE_80B - 1] = '\0';
 
-	memset(tmp2, '2', 160);
-	tmp2[159] = '\0';
+	tmp2 = malloc(SIZE_160B * sizeof(char));
+	memset(tmp2, '2', SIZE_160B);
+	tmp2[SIZE_160B - 1] = '\0';
 
-	memset(tmp3, '3', 1048576);
-	tmp3[1048575] = '\0';
+	tmp3 = malloc(SIZE_1M * sizeof(char));
+	memset(tmp3, '3', SIZE_1M);
+	tmp3[SIZE_1M - 1] = '\0';
 
-	memset(tmp4, '4', 4194304);
-	tmp4[4194303] = '\0';
+	tmp4 = malloc(SIZE_4M * sizeof(char));
+	memset(tmp4, '4', SIZE_4M);
+	tmp4[SIZE_4M - 1] = '\0';
 	
-	obj1 = allocate(10);
-	r_awrite(tmp, obj1, 10);
+	obj1 = allocate(SIZE_TO_WORD(SIZE_80B));
+	r_awrite(tmp, obj1, SIZE_TO_WORD(SIZE_80B));
 	
-	obj2 = allocate(20);
-	r_awrite(tmp2, obj2, 20);
+	obj2 = allocate(SIZE_TO_WORD(SIZE_160B));
+	r_awrite(tmp2, obj2, SIZE_TO_WORD(SIZE_160B));
 	
-	obj3 = allocate(131072);
-	r_awrite(tmp3, obj3, 131072);
+	obj3 = allocate(SIZE_TO_WORD(SIZE_1M));
+	r_awrite(tmp3, obj3, SIZE_TO_WORD(SIZE_1M));
 	
-	obj4 = allocate(524288);
-	r_awrite(tmp4, obj4, 524288);
+	obj4 = allocate(SIZE_TO_WORD(SIZE_4M));
+	r_awrite(tmp4, obj4, SIZE_TO_WORD(SIZE_4M));
 
 	while (!r_areq_completed());
 
-	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
-	assertf(strlen(obj2) == 159, "Error in size");
-	assertf(strlen(obj3) == 1048575, "Error in size");
-	assertf(strlen(obj4) == 4194303, "Error in size");
+	assertf(strlen(obj1) == SIZE_80B - 1, "Error in size %lu", strlen(obj1));
+	assertf(strlen(obj2) == SIZE_160B - 1, "Error in size %lu", strlen(obj2));
+	assertf(strlen(obj3) == SIZE_1M - 1, "Error in size %lu", strlen(obj3));
+	assertf(strlen(obj4) == SIZE_4M - 1, "Error in size %lu", strlen(obj4));
 	
-	for (i = 0; i < 4096; i++) {
-		obj1 = allocate(10);
-		r_awrite(tmp, obj1, 10);
-
-		obj2 = allocate(20);
-		r_awrite(tmp2, obj2, 20);
-
-		obj3 = allocate(131072);
-		r_awrite(tmp3, obj3, 131072);
-
-		obj4 = allocate(524288);
-		r_awrite(tmp4, obj4, 524288);
-	}
-
-	while (!r_areq_completed());
-
-	assertf(strlen(obj1) == 79, "Error in size %lu", strlen(obj1));
-	assertf(strlen(obj2) == 159, "Error in size");
-	assertf(strlen(obj3) == 1048575, "Error in size");
-	assertf(strlen(obj4) == 4194303, "Error in size");
+	printf("------------------------------\n");
+	printf("Test3:\t\t\t\033[1;32m[PASS]\033[0m\n");
+	printf("------------------------------\n");
 	
 	return 0;
 }

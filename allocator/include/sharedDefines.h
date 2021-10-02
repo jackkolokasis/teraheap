@@ -6,11 +6,8 @@
 #include <string.h>
 #include <stdio.h>
 
-/************************************************
- * Sith 6 
- ************************************************/
 #define DEV "/mnt/fmap/file.txt"	     //< Device name
-#define DEV_SIZE (380*1024LU*1024*1024)  //< Device size (in bytes)
+#define DEV_SIZE (900*1024LU*1024*1024)    //< Device size (in bytes)
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
@@ -19,12 +16,14 @@
 
 #define ANONYMOUS    0
 
-#define SEG_SIZE	 1073741824		  //< Segment size
-
 #define MAX_REQS	 64				  //< Maximum requests
 
-#define BUFFER_SIZE  (8*1024LU*1024)  //< Size of the buffer for async I/O
+#define BUFFER_SIZE  (8*1024LU*1024)  //< Buffer Size (in bytes) for async I/O
 
 #define MALLOC_ON	1				  //< Allocate buffers dynamically
+
+#define ALIGN_ON	1				  //< Enable allocation with allignment in TC
+
+#define REGION_SIZE	(512*1024LU*1024) //< Region size (in bytes) for allignment version
 
 #endif

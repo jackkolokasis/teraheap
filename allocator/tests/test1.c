@@ -11,48 +11,46 @@
 *	- object allocation in the correct positions
 ***************************************************/
 
+#include "../include/regions.h"
+#include "../include/sharedDefines.h"
+
 #include <stdint.h>
 #include <stdio.h>
-#include "../include/sharedDefines.h"
-#include "../include/regions.h"
 
 #define CARD_SIZE ((uint64_t) (1 << 9))
 #define PAGE_SIZE ((uint64_t) (1 << 12))
 
+#define SIZE_8B   (8)
+#define SIZE_8K   (8*1024LU)
+#define SIZE_100M (100*1024LU*1024)
+#define SIZE_300M (300*1024LU*1024)
+
+#define HEAPWORD (8)
+
+#define SIZE_TO_WORD(SIZE) \
+	((size_t) (SIZE / HEAPWORD))
+
 int main() {
-	char *obj1;
-	char *obj2;
-	char *obj3;
-	char *obj4;
+	char *obj1, *obj2, *obj3, *obj4;
 	
 	// Init allocator
 	init(CARD_SIZE * PAGE_SIZE);
 
-	// Check start and stop adddresses
-	printf("\n");
-	printf("Start Address: %p\n", start_addr_mem_pool());
-	printf("Stop Address: %p\n", stop_addr_mem_pool());
-	printf("Mem Pool Size: %lu\n", mem_pool_size());
-	
-	printf("\n");
-
-	obj1 = allocate(1);
-	printf("Allocate: %p\n", obj1);
+	obj1 = allocate(SIZE_TO_WORD(SIZE_8B));
 	assertf((obj1 - start_addr_mem_pool()) == 0, "Object start position");
 
-	obj2 = allocate(200);
-	printf("Allocate: %p\n", obj2);
-	assertf((obj2 - obj1)/8 == 1, "Object start position");
+	obj2 = allocate(SIZE_TO_WORD(SIZE_8K));
+	assertf((obj2 - obj1) == SIZE_8B, "Object start position");
 
-	obj3 = allocate(12020);
-	printf("Allocate: %p\n", obj3);
-	assertf((obj3 - obj2)/8 == 200, "Object start position");
+	obj3 = allocate(SIZE_TO_WORD(SIZE_100M));
+	assertf((obj3 - obj2) == SIZE_8K, "Object start position");
 	
-	obj4 = allocate(10000000);
-	printf("Allocate: %p\n", obj4);
-	assertf((obj4 - obj3)/8 == 12020, "Object start position");
+	obj4 = allocate(SIZE_TO_WORD(SIZE_300M));
+	assertf((obj4 - obj3) == SIZE_100M, "Object start position");
 
-	printf("\n");
+	printf("------------------------------\n");
+	printf("Test1:\t\t\t\033[1;32m[PASS]\033[0m\n");
+	printf("------------------------------\n");
 
 	return 0;
 }
