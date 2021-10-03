@@ -40,6 +40,8 @@ uint64_t TeraCache::obj_distr_size[3];
 std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
 #endif
 
+long int TeraCache::cur_obj_group_id;
+
 // Constructor of TeraCache
 TeraCache::TeraCache() {
 	
@@ -75,6 +77,8 @@ TeraCache::TeraCache() {
 	for (unsigned int i = 0; i < 3; i++) {
 		obj_distr_size[i] = 0;
 	}
+
+	cur_obj_group_id = 0;
 }
 		
 void TeraCache::tc_shutdown() {
@@ -182,8 +186,8 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 
 #if VERBOSE_TC
 	if (TeraCacheStatistics)
-		tclog_or_tty->print_cr("[STATISTICS] | OBJECT: %p | SIZE = %lu | NAME = %s",
-				pos, size, obj->klass()->internal_name());
+		tclog_or_tty->print_cr("[STATISTICS] | OBJECT: %p | SIZE = %lu | ID = %d | NAME = %s",
+				pos, size, obj->get_obj_group_id(), obj->klass()->internal_name());
 #endif
 
 	_start_array.tc_allocate_block((HeapWord *)pos);
@@ -509,6 +513,17 @@ void TeraCache::tc_flush_buffer() {
 #if ALIGN
 bool TeraCache::tc_obj_fit_in_region(size_t size) {
 	return r_is_obj_fits_in_region(size);
+}
+		
+// We save the current object group 'id' for tera-marked object to
+// promote this 'id' to its reference objects
+void TeraCache::set_cur_obj_group_id(long int id) {
+	cur_obj_group_id = id;
+}
+
+// Get the saved current object group id 
+long int TeraCache::get_cur_obj_group_id(void) {
+	return cur_obj_group_id;
 }
 
 #endif

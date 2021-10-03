@@ -49,28 +49,32 @@ class TeraCache {
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
 		 *---------------------------------------------*/
-		static uint64_t total_active_regions;      // Number of active regions
-		static uint64_t total_merged_regions;      // Number of merged regions
+		static uint64_t total_active_regions;      //< Number of active regions
+		static uint64_t total_merged_regions;      //< Number of merged regions
 
-		static uint64_t total_objects;             // Total number of objects located in TeraCache
-		static uint64_t total_objects_size;        // Total number of objects size
+		static uint64_t total_objects;             //< Total number of objects located in TeraCache
+		static uint64_t total_objects_size;        //< Total number of objects size
 
-		static uint64_t fwd_ptrs_per_fgc;	       // Total number of forward ptrs per FGC
-		static uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
-		static uint64_t trans_per_fgc;	           // Total number of objects transfered to 
-												   // TeraCache per FGC
-		static uint64_t tc_ct_trav_time[16];	   // Time to traverse TeraCards card table
-		static uint64_t heap_ct_trav_time[16];	   // Time to traverse heap card tables
+		static uint64_t fwd_ptrs_per_fgc;	       //< Total number of forward ptrs per FGC
+		static uint64_t back_ptrs_per_fgc;	       //< Total number of back ptrs per FGC
+		static uint64_t trans_per_fgc;	           //< Total number of objects transfered to 
+												   //< TeraCache per FGC
+		static uint64_t tc_ct_trav_time[16];	   //< Time to traverse TeraCards card table
+		static uint64_t heap_ct_trav_time[16];	   //< Time to traverse heap card tables
 
-		static uint64_t back_ptrs_per_mgc;		   // Total number of back ptrs per MGC
-		static uint64_t intra_ptrs_per_mgc;		   // Total number of intra ptrs between objects in TC per MGC
+		static uint64_t back_ptrs_per_mgc;		   //< Total number of back ptrs per MGC
+		static uint64_t intra_ptrs_per_mgc;		   //< Total number of intra ptrs between objects in TC per MGC
 
-		static uint64_t obj_distr_size[3];  // Object size distribution between B, KB, MB
+		static uint64_t obj_distr_size[3];         //< Object size distribution between B, KB, MB
 
 #if NEW_FEAT
-		static std::vector<HeapWord *> _mk_dirty;    //< These objects should
-													 // make dirty their cards
+		static std::vector<HeapWord *> _mk_dirty;  //< These objects should
+												   // make dirty their cards
 #endif
+		static long int cur_obj_group_id;	       //<We save the current object
+   												   // group id for tera-marked
+												   // object to promote this id
+												   // to their reference objects
 
 	public:
 		// Constructor
@@ -201,6 +205,13 @@ class TeraCache {
 		bool tc_obj_fit_in_region(size_t size);
 
 #endif
+
+		// We save the current object group 'id' for tera-marked object to
+		// promote this 'id' to its reference objects
+		void set_cur_obj_group_id(long int id);
+		
+		// Get the saved current object group id 
+		long int get_cur_obj_group_id(void);
 		
 		// 
 		// // Validate if all the dirty cards that we found are dirty now are

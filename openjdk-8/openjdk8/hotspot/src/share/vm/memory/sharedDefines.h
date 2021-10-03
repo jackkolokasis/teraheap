@@ -103,7 +103,7 @@
 									// memory of fast map is different from
 									// buffer cache. 
 									
-#define FMAP_HYBRID				 1  //< When we use fastmap hybrid version we
+#define FMAP_HYBRID				 0  //< When we use fastmap hybrid version we
 									// employ huge pages for mutator threads and
 									// regular pages for GC 
 

@@ -65,7 +65,7 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 	}
 	else {
 #if P_DISTINCT && !P_SD
-		obj->set_tera_cache();
+		obj->set_tera_cache(0);
 #endif
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
 
@@ -97,7 +97,7 @@ template <class T> inline bool PSScavenge::tc_should_trace(T* p) {
 	}
 	else {
 #if P_DISTINCT && !P_SD
-		obj->set_tera_cache();
+		obj->set_tera_cache(0);
 #endif
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
 

@@ -270,7 +270,8 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
       // obj = klass->allocate_instance(true, CHECK);
 
 #if TERA_FLAG
-      obj->set_tera_cache();
+	  // Use zero as group id as default value
+      obj->set_tera_cache(0);
 #endif
   }
 #else

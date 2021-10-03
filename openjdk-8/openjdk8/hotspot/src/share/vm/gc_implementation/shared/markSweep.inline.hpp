@@ -185,7 +185,7 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 					mark_object(obj);
 
 				if (!obj->is_tera_cache())
-					obj->set_tera_cache();
+					obj->set_tera_cache(Universe::teraCache()->get_cur_obj_group_id());
 #endif
 
 #if DEBUG_TERACACHE

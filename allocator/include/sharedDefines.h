@@ -6,8 +6,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEV "/mnt/fmap/file.txt"	     //< Device name
-#define DEV_SIZE (900*1024LU*1024*1024)    //< Device size (in bytes)
+#define DEV "/mnt/spark/file.txt"	     //< Device name
+#define DEV_SIZE (200*1024LU*1024*1024)    //< Device size (in bytes)
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)

@@ -92,7 +92,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 		// Check if the objects is marked to be moved in TeraCache
 		// Set the referent object to be moved in TeraCache
 		if (EnableTeraCache && obj->is_tera_cache()) {
-			referent->set_tera_cache();
+			referent->set_tera_cache((long int) obj->get_obj_group_id());
 		}
 #endif
 		ref->InstanceKlass::oop_follow_contents(obj);
