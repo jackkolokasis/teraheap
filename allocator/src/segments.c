@@ -5,7 +5,6 @@
 #include "../include/segments.h"
 #include "../include/regions.h"
 #include "../include/sharedDefines.h"
-#include <assert.h>
 
 struct region region_array[REGION_ARRAY_SIZE];
 struct group group_array[GROUP_ARRAY_SIZE];
@@ -69,9 +68,11 @@ char* allocate_to_region(size_t size, uint64_t rdd_id){
         return res;
     }
     if (size > ((region_array[id_array[rdd_id]].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[id_array[rdd_id]].last_allocated_end)){
+        printf("Not enough space, new region\n");
         //printf("Wasting %luB in region %d, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
         char * res = new_region(size);
         id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+        return res;
     }
     mark_used(region_array[id_array[rdd_id]].start_address);
     region_array[id_array[rdd_id]].last_allocated_start = region_array[id_array[rdd_id]].last_allocated_end;

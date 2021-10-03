@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "sharedDefines.h"
+#define SPARK_HINT 0
 /*
  * the struct for regions
  */

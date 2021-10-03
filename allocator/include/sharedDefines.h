@@ -35,6 +35,4 @@
 
 #define GROUP_DEBUG 0
 
-#define SPARK_HINT 1
-
 #endif
