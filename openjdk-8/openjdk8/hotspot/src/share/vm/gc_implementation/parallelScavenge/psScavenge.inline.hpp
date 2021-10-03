@@ -58,8 +58,10 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 		if (EnableTeraCache && TeraCacheStatistics)
 			Universe::teraCache()->incr_intra_ptrs_per_mgc();
 #endif
+#if REGIONS
         //Grouping
         Universe::teraCache()->group_regions((HeapWord *)p,(HeapWord*)obj);
+#endif
 		return false;
 	}
 	else if (PSScavenge::is_obj_in_young(heap_oop)) {

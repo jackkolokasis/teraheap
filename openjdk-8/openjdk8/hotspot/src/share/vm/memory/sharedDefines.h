@@ -74,7 +74,7 @@
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
-#define ASYNC				     1  //< Asynchronous I/O path for the writes in
+#define ASYNC				     0  //< Asynchronous I/O path for the writes in
 									// TeraCache
 
 #define FMAP				     0  //< When we use fastmap we need to ensure
@@ -93,6 +93,9 @@
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
+#define REGIONS     			 0  // We set this to 1 when we are using
+                                    // the region allocator and 0 when
+                                    // we are not
 /**********************************
  * Policies for TeraCache
  **********************************/

@@ -378,8 +378,8 @@ void TeraCache::group_region_enabled(HeapWord* obj){
 
 // Frees all unused regions
 void TeraCache::free_unused_regions(void){
-    struct segment_list *ptr = free_regions();
-    struct segment_list *prev = NULL;
+    struct region_list *ptr = free_regions();
+    struct region_list *prev = NULL;
     while (ptr != NULL){
         start_array()->tc_region_reset((HeapWord*)ptr->start,(HeapWord*)ptr->end);
         prev = ptr;

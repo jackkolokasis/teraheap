@@ -131,6 +131,7 @@ class CheckForPreciseMarks : public OopClosure {
 // do no work.  If this method needs to be called
 // when the space is empty, fix the calculation of
 // end_card to allow sp_top == sp->bottom().
+#if REGIONS
 void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_array,
 													  HeapWord* space_top,
 													  PSPromotionManager* pm,
@@ -383,6 +384,238 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		}
 	}
 }
+#else
+void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_array,
+                                                      HeapWord* space_top,
+                                                      PSPromotionManager* pm,
+                                                      uint stripe_number,
+                                                      uint stripe_total) {
+  
+    int ssize = 128; // Naked constant!  Work unit = 64k.
+    int dirty_card_count = 0;
+  
+    oop* sp_top = (oop*)space_top;
+    jbyte* start_card = byte_for(Universe::teraCache()->tc_get_addr_region());
+    jbyte* end_card = byte_for(sp_top - 1) + 1;
+
+    assertf(start_card != end_card, "Sanity check");
+
+     // Preventing scanning objects more than onece
+    oop* last_scanned = NULL;
+
+    // In the following loop, in the specified area (currently only TeraCache)
+    // process from bottom (start_card in the above variable declaration) to top
+    // (end_card in the above variable declaration).
+
+    // The width of the stripe ssize*stripe_total must be consistent with the
+    // number of so that the complete slice is covered.
+    //
+    // However, it does not process everything from bottom to top, but divides
+    // this into ParallelGCThreads and processes them in parallel.
+    //
+    // Your responsibility is indicated by the argument stripe_number.
+    // Specifically, it is processed as follows.
+    //  (1) Process ssize bytes from the address of start (start_card) + stripe_number * ssize
+    //  (2) Next, advance by ssize * ParallelGCThreads and process ssize bytes.
+    //      That is, ssize bytes from the address of the beginning + stripe_number * ssize + ssize * ParallelGCThreads)
+    //  (3) Further advance by ssize * ParallelGCThreads. Repeat until the
+    //  end_card is reached
+    //
+    // To be precise, start_card and end_card are not the start address or end
+    // address itself to be processed, but the address of the entry in the
+    // CardTableExtension corresponding to that address.
+    // The value 128 of ssize corresponds to 64K because the size of 1 card is
+    // 512 bytes.
+    size_t slice_width = ssize * stripe_total;
+        
+    for (jbyte* slice = start_card; slice < end_card; slice += slice_width) {
+
+        jbyte* worker_start_card = slice + stripe_number * ssize;
+        if (worker_start_card >= end_card)
+            return; // We're done.
+
+        jbyte* worker_end_card = worker_start_card + ssize;
+        if (worker_end_card > end_card) {
+            worker_end_card = end_card;
+        }
+    
+        // We do not want to scan objects more than once. In order to accomplish
+        // this, we assert that any object with an object head inside our
+        // 'slice' belongs to us. We may need to extend the range of scanned
+        // cards if the last object continues into the next 'slice'
+        //
+        // Note! ending cards are exclusive!
+        HeapWord* slice_start = addr_for(worker_start_card);
+        HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
+
+        // if there are not objects starting within the chunk, skip it.
+        if (!start_array->tc_object_starts_in_range(slice_start, slice_end))
+            continue;
+
+        // Update our beginning addr
+        HeapWord* first_object = start_array->tc_object_start(slice_start);
+
+        oop* first_object_within_slice = (oop*) first_object;
+        if (first_object < slice_start) {
+            last_scanned = (oop*)(first_object + oop(first_object)->size());
+            first_object_within_slice = last_scanned;
+            worker_start_card = byte_for(last_scanned);
+        }
+
+        // Update the ending card
+        //if (slice_end < (HeapWord*)sp_top && slice_end != slice_start) {
+        if (slice_end < (HeapWord*)sp_top) {
+            // The substaction is important! An object may start precisely at
+            // slice end
+            HeapWord* last_object = start_array->tc_object_start(slice_end - 1);
+            slice_end = last_object + oop(last_object)->size();
+            // worker_end_card is exclusive, so bumb it one past the end of
+            // last_object's covered span.
+            worker_end_card = byte_for(slice_end) + 1;
+
+            if (worker_end_card > end_card)
+                worker_end_card = end_card;
+        }
+        
+        assertf(slice_end <= (HeapWord*)sp_top, "Last object in slice crosses space boundary");
+        assertf(is_valid_card_address(worker_start_card), "Invalid worker start card");
+        assertf(is_valid_card_address(worker_end_card), "Invalid worker end card");
+        // Note that worker_start_card >= worker_end_card is legal, and happens when
+        // an object spans an entire slice.
+        assertf(worker_start_card <= end_card, "worker start card beyond end card");
+        assertf(worker_end_card <= end_card, "worker end card beyond end card");
+    
+        jbyte* current_card = worker_start_card;
+        while (current_card < worker_end_card) {
+            // Find an unclean card
+            while (current_card < worker_end_card && card_is_clean(*current_card)) {
+                current_card++;
+            }
+
+            jbyte* first_unclean_card = current_card;
+
+            // Find the end of a run of contiguous unclean cards
+            while (current_card < worker_end_card && !card_is_clean(*current_card)) {
+                while (current_card < worker_end_card && !card_is_clean(*current_card)) {
+                    current_card++;
+                }
+
+                if (current_card < worker_end_card) {
+                    // Some objects may be large enough to span several cards. If such
+                    // an object has more than one dirty card, separated by a clean card,
+                    // we will attempt to scan it twice. The test against "last_scanned"
+                    // prevents the redundant object scan, but it does not prevent newly
+                    // marked cards from being cleaned.
+                    HeapWord* last_object_in_dirty_region = start_array->tc_object_start(addr_for(current_card)-1);
+                    size_t size_of_last_object = oop(last_object_in_dirty_region)->size();
+
+                    HeapWord* end_of_last_object = last_object_in_dirty_region + size_of_last_object;
+                    jbyte* ending_card_of_last_object = byte_for(end_of_last_object);
+                    assertf(ending_card_of_last_object <= worker_end_card, "ending_card_of_last_object is greater than worker_end_card");
+
+                    if (ending_card_of_last_object > current_card) {
+                        // This means the object spans the next complete card.
+                        // We need to bump the current_card to ending_card_of_last_object
+                        current_card = ending_card_of_last_object;
+                    }
+                }
+            }
+
+            jbyte* following_clean_card = current_card;
+
+            if (first_unclean_card < worker_end_card) {
+                oop* p = (oop*) start_array->tc_object_start(addr_for(first_unclean_card));
+                assertf((HeapWord*)p <= addr_for(first_unclean_card), "checking");
+
+                // "p" should always be >= "last_scanned" because newly GC
+                // dirtied cards are no longer scanned again (see comments at
+                // end of loop on the increment of "current_card"). Test that
+                // hypothesis before removing this code.
+                // If this code is removed, deal with the first time through the
+                // loop when the last_scanned is the object starting in the
+                // previous slices.
+                assertf((p >= last_scanned) ||
+                        (last_scanned == first_object_within_slice),
+                        "Should no longer be possible");
+                if (p < last_scanned) {
+                    // Avoid scanning more than once; this can happen because
+                    // newgen cards set by GC may a different set than the
+                    // originally dirty set
+                    p = last_scanned;
+                }
+
+                oop* to = (oop*)addr_for(following_clean_card);
+
+                // Test slice_end first!
+                if ((HeapWord*)to > slice_end) {
+                    to = (oop*)slice_end;
+                } else if (to > sp_top) {
+                    to = sp_top;
+                }
+
+                // we know which cards to scan, now clear them
+                //
+                //if (first_unclean_card <= worker_start_card +1)
+                //  first_unclean_card = worker_start_card + 1;
+
+                //if (following_clean_card >= worker_end_card - 1)
+                //  following_clean_card = worker_end_card - 1;
+                //
+                //
+                if (first_unclean_card <= worker_start_card)
+                    first_unclean_card = worker_start_card;
+
+                if (following_clean_card >= worker_end_card)
+                    following_clean_card = worker_end_card;
+
+                while (first_unclean_card < following_clean_card) {
+                    *first_unclean_card++ = clean_card;
+                }
+
+
+                const int interval = PrefetchScanIntervalInBytes;
+
+                // scan all objects in the range
+                if (interval != 0) {
+                    while (p < to) {
+                        Prefetch::write(p, interval);
+                        oop m = oop(p);
+                        assertf(m->is_oop_or_null(), "check for header");
+                        m->tc_push_contents(pm);
+                        p += m->size();
+                    }
+
+                    pm->drain_stacks_cond_depth();
+
+                } else {
+
+                    while (p < to) {
+                        oop m = oop(p);
+                        assertf(m->is_oop_or_null(), "check for header");
+                        m->tc_push_contents(pm);
+                        p += m->size();
+                    }
+                    
+                    pm->drain_stacks_cond_depth();
+                }
+                last_scanned = p;
+            }
+            // "current_card" is still the "following_clean_card" or
+            // the current_card is >= the worker_end_card so the
+            // loop will not execute again.
+            assertf((current_card == following_clean_card) ||
+                    (current_card >= worker_end_card),
+                    "current_card should only be incremented if it still equals "
+                    "following_clean_card");
+            // Increment current_card so that it is not processed again.
+            // It may now be dirty because a old-to-young pointer was
+            // found on it an updated.  If it is now dirty, it cannot be
+            // be safely cleaned in the next iteration.
+            current_card++;
+        }
+    }
+}
+#endif
 #endif
 
 // We get passed the space_top value to prevent us from traversing into
