@@ -28,7 +28,7 @@ public class HashMap {
 	}
 
 	public static void main(String[] args) {
-		int num_elements = 100;
+		int num_elements = 1000;
 
 		System.out.println(Runtime.getRuntime().maxMemory());
 		
@@ -45,10 +45,10 @@ public class HashMap {
 			System.out.println(e.getKey() + " = " + e.getValue());
 		}
 		
-		gc();
+		//gc();
 		
 		h_map.put("Dali", "22");
-		gc();
+		//gc();
 		h_map.put("Nicosia", "22");
 
 		for (int i = 0; i < num_elements/2; i++)
@@ -56,24 +56,24 @@ public class HashMap {
 			h_map.put("Ammochostos " + i, "20404808");
 		}
 		
-		gc();
+		//gc();
 
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
 			System.out.println(e.getKey() + " = " + e.getValue());
 		}
 
-		gc();
+		//gc();
 		for (int i = num_elements/2; i < num_elements; i++)
 		{
 		  h_map.put("Apostolos Andreas" + i, "22");
 		}
-		gc();
-		gc();
+		//gc();
+		//gc();
 		for (int i = num_elements/2; i < num_elements; i++)
 		{
 		  h_map.put("Moires" + i, "22");
 		}
-		gc();
+		//gc();
 		
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
 			System.out.println(e.getKey() + " = " + e.getValue());
@@ -88,13 +88,13 @@ public class HashMap {
 		  h_map.put("Paphos" + i, "22");
 		}
 		
-		gc();
+		//gc();
 
 		for (ConcurrentHashMap.Entry<String, String> e : h_map.entrySet()) {
 			System.out.println(e.getKey() + " = " + e.getValue());
 		}
 
-		gc();
+		//gc();
 		for (int i = num_elements/2; i < num_elements; i++)
 		{
 		  h_map.put("Karpasia" + i, "22");
@@ -102,7 +102,7 @@ public class HashMap {
 
 		h_map.put("Mia milia", "22");
 		
-		gc();
+		//gc();
 		
 		for (int i = num_elements/2; i < num_elements; i++)
 		{
@@ -117,7 +117,7 @@ public class HashMap {
 		{
 			h_map.put("Heraklion" + i, "22");
 		}
-		gc();
+		//gc();
 		
 		for (int i = num_elements/2; i < num_elements; i++)
 		{
@@ -128,7 +128,7 @@ public class HashMap {
 			System.out.println(e.getKey() + " = " + e.getValue());
 		}
 		
-		gc();
+		//gc();
 		
 		for (int i = num_elements/2; i < num_elements; i++)
 		{

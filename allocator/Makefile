@@ -12,9 +12,9 @@ include ./Makefile_common.mk
 include ./makefile.colors
 
 #rules
-.PHONY: all lib test1 test2 test3 test4 clean distclean test
+.PHONY: all lib test1 test2 test3 test4 test5 test6 clean distclean test
 
-all: test1 test2 test3 test4
+all: test1 test2 test3 test4 test5 test6
 
 lib: $(REGIONSLIBRARY)
 
@@ -25,6 +25,10 @@ test2: $(TEST2EXE)
 test3: $(TEST3EXE)
 
 test4: $(TEST4EXE)
+
+test5: $(TEST5EXE)
+
+test6: $(TEST6EXE)
 
 $(TEST1EXE): $(TEST1OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
@@ -39,6 +43,14 @@ $(TEST3EXE): $(TEST3OBJ) $(REGIONSLIBRARY)
 	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
 
 $(TEST4EXE): $(TEST4OBJ) $(REGIONSLIBRARY)
+	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+
+$(TEST5EXE): $(TEST5OBJ) $(REGIONSLIBRARY)
+	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+
+$(TEST6EXE): $(TEST6OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
 	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
 
@@ -78,12 +90,12 @@ uninstall:
 	@rm $(INSTALL_PREFIX)/include/regions.h
 
 clean:
-	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ)
-	@$(RM) $(LIBREGIONSOBJS) $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ) $(TEST5OBJ) $(TEST6OBJ)
+	@$(RM) $(LIBREGIONSOBJS) $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ) $(TEST5OBJ) $(TEST6OBJ)
 
 distclean: clean
-	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE)
-	@$(RM) $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE) $(TEST5EXE) $(TEST6EXE)
+	@$(RM) $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE) $(TEST5EXE) $(TEST6EXE)
 	@echo -e '[$(BRED)RM$(RESET)]' $(REGIONSLIBRARY)
 	@$(RM) $(REGIONSLIBRARY)
 	@echo -e '[$(BRED)RM$(RESET)]' $(LIBDIR)

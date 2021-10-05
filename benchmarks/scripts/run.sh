@@ -17,7 +17,7 @@
 usage() {
     echo
     echo "Usage:"
-    echo -n "      $0 [option ...] [-k][-h]"
+    echo -n "      $0 [option ...] [-h]"
     echo
     echo "Options:"
     echo "      -n  Number of Runs"
@@ -26,8 +26,10 @@ usage() {
     echo "      -c  Enable TeraCache"
     echo "      -s  Enable serialization"
     echo "      -p  Enable perf tool"
+    echo "      -f  Enable profiler tool"
+    echo "      -f  Enable profiler tool"
     echo "      -a  Run experiments with high bench"
-    echo "      -k  Kill iostat and jstat processes"
+    echo "      -j  Enable metrics for JIT compiler"
     echo "      -h  Show usage"
     echo
 
@@ -165,7 +167,7 @@ printEndMsg() {
 }
 
 # Check for the input arguments
-while getopts ":n:t:o:cspkah" opt
+while getopts ":n:t:o:cspkajfdh" opt
 do
     case "${opt}" in
         n)
@@ -193,6 +195,15 @@ do
 		a)
 			HIGH_BENCH=true
 			;;
+		j)
+			JIT=true
+			;;
+		f)
+			PROFILER=true
+			;;
+		d)
+			FASTMAP=true
+			;;
         h)
             usage
             ;;
@@ -207,6 +218,22 @@ TIME=$(date +"%T-%d-%m-%Y")
 
 OUT="${OUTPUT_PATH}_${TIME}"
 mkdir -p ${OUT}
+
+# Enable perf event
+sudo sh -c 'echo -1 >/proc/sys/kernel/perf_event_paranoid'
+
+# Prepare devices for Shuffle and TeraCache accordingly
+if [ $SERDES ]
+then
+	./dev_setup.sh -d $DEV_SHFL
+else
+	if [ $FASTMAP ]
+	then
+		./dev_setup.sh -t -f -s $TC_FILE_SZ  -d $DEV_SHFL
+	else
+		./dev_setup.sh -t -s $TC_FILE_SZ  -d $DEV_SHFL
+	fi
+fi
 
 # Run each benchmark
 for benchmark in "${BENCHMARKS[@]}"
@@ -227,20 +254,43 @@ do
 			mkdir -p ${OUT}/${benchmark}/run${i}/conf${j}
 			RUN_DIR="${OUT}/${benchmark}/run${i}/conf${j}"
 
-			if [ -z "$HIGH_BENCH" ]
+			stop_spark
+
+			# Set configuration
+			if [ $SERDES ]
 			then
-				# Set configuration
-				if [ $SERDES ]
+				if [ $HIGH_BENCH ]
 				then
-					./update_conf.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} -s ${S_LEVEL[$j]} -r ${RAMDISK[$j]}
-				elif [ $TC ]
+					./update_conf_hibench.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
+						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -c $EXEC_CORES
+				else
+					./update_conf.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
+						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -c $EXEC_CORES
+				fi
+			elif [ $TC ]
+			then
+				if [ $HIGH_BENCH ]
 				then
-					./update_conf_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} -s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} -n ${NEW_GEN[$j]}
+					./update_conf_hibench_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
+						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} \
+						-n ${NEW_GEN[$j]} -c $EXEC_CORES
+				else
+					./update_conf_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
+						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} \
+						-n ${NEW_GEN[$j]} -c $EXEC_CORES
 				fi
 			fi
 
-			# Garbage collector statistics
-			./jstat.sh ${RUN_DIR}/jstat.txt ${EXECUTORS} &
+			start_spark
+
+			if [ -z "$JIT" ]
+			then
+				# Collect statics only for the garbage collector
+				./jstat.sh ${RUN_DIR} ${EXECUTORS} 0 &
+			else
+				# Collect statics for garbage collector and JIT
+				./jstat.sh ${RUN_DIR} ${EXECUTORS} 1 &
+			fi
 			
 			if [ $PERF_TOOL ]
 			then
@@ -248,11 +298,13 @@ do
 				./perf.sh ${RUN_DIR}/perf.txt ${EXECUTORS} &
 			fi
 
-			# Enable serialization/deserialization metric
-			#if [ ${SERDES} ]
-			#then
-				./serdes.sh ${RUN_DIR}/serdes.txt ${EXECUTORS} &
-			#fi
+			./serdes.sh ${RUN_DIR}/serdes.txt ${EXECUTORS} &
+			
+			# Enable profiler
+			if [ ${PROFILER} ]
+			then
+				./profiler.sh ${RUN_DIR}/profile.svg ${EXECUTORS} &
+			fi
 
 			# Drop caches
 			#sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
@@ -280,8 +332,20 @@ do
             # System statistics stop
 			~/system_util/stop_statistics.sh -d ${RUN_DIR}
 
-			# Parse cpu and disk statistics results
-			~/system_util/extract-data.sh -d ${RUN_DIR}
+			if [ $SERDES ]
+			then
+				# Parse cpu and disk statistics results
+				~/system_util/extract-data.sh -r ${RUN_DIR} -d ${DEV_SHFL}
+			elif [ $TC ]
+			then
+				if [ $FASTMAP ]
+				then
+					# Parse cpu and disk statistics results
+					~/system_util/extract-data.sh -r ${RUN_DIR} -d ${DEV_FMAP} -d ${DEV_SHFL}
+				else
+					~/system_util/extract-data.sh -r ${RUN_DIR} -d ${DEV_SHFL}
+				fi
+			fi
 
 			if [ $HIGH_BENCH ]
 			then

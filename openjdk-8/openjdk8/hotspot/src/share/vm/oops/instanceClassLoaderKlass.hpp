@@ -80,6 +80,7 @@ public:
 #if INCLUDE_ALL_GCS
 #if TERA_CARDS
   virtual void tc_oop_push_contents(PSPromotionManager* pm, oop obj);
+  virtual void tc_oop_trace_contents(PSPromotionManager* pm, oop obj);
 #endif
 #endif
 };

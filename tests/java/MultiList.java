@@ -31,7 +31,7 @@ public class MultiList {
 
     public static void main(String[] args) {
         //int num_elements = 10000000;
-        int num_elements = 100000;
+        int num_elements = 2000000;
 
 		mem_info("Memory Before");
 
@@ -46,7 +46,6 @@ public class MultiList {
         for (int i = 0; i < num_elements; i++)
           linkedList.add(i);
         
-		gc();
 
         System.out.println("=========================================");
         System.out.println("Create List2");
@@ -59,7 +58,6 @@ public class MultiList {
         for (int i = 0; i < num_elements; i++)
           linkedList2.add(i);
         
-        gc();
         
         System.out.println("=========================================");
         System.out.println("Create List3");
@@ -72,12 +70,23 @@ public class MultiList {
         for (int i = 0; i < num_elements; i++)
           linkedList3.add(i);
 
-        gc();
         
         System.out.println("=========================================");
         System.out.println("First Element = " + linkedList.getFirst());
         System.out.println("Last Element = " + linkedList.getLast());
         System.out.println("=========================================");
+        
+		System.out.println("=========================================");
+        System.out.println("Add Elements to the  List1");
+        System.out.println("=========================================");
+        for (int i = 0; i < num_elements; i++)
+          linkedList.add(i);
+        
+		System.out.println("=========================================");
+        System.out.println("Add Elements to the  List3");
+        System.out.println("=========================================");
+        for (int i = 0; i < num_elements; i++)
+          linkedList3.add(i);
 
 		mem_info("Memory After");
     }

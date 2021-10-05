@@ -617,6 +617,15 @@ void ObjArrayKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
       pm->tc_claim_or_forward_depth(p); \
     })
   }
+  
+void ObjArrayKlass::tc_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  assertf(obj->is_objArray(), "obj must be obj array");
+  ObjArrayKlass_OOP_ITERATE( \
+    objArrayOop(obj), p, \
+    if (PSScavenge::tc_should_trace(p)) { \
+      pm->tc_claim_or_forward_depth(p); \
+    })
+  }
 #endif
 
 int ObjArrayKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {

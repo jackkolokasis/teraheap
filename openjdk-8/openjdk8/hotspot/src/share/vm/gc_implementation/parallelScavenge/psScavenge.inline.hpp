@@ -68,16 +68,49 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 		return true;
 	}
 	else {
-#if !P_DISTINCT
-		obj->set_tera_cache();
+#if P_DISTINCT && !P_SD
+		obj->set_tera_cache(0);
 #endif
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
 
 		Universe::teraCache()->tc_push_object((void *)p, obj);
-        PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
 		return false;
 	}
 }
+
+template <class T> inline bool PSScavenge::tc_should_trace(T* p) {
+	T heap_oop = oopDesc::load_heap_oop(p);
+	
+	if (oopDesc::is_null(heap_oop))
+		return false;
+
+	oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+	if (Universe::teraCache()->tc_check(obj)) {
+#if !MT_STACK
+		if (EnableTeraCache && TeraCacheStatistics)
+			Universe::teraCache()->incr_intra_ptrs_per_mgc();
+#endif
+		return false;
+	}
+	else if (PSScavenge::is_obj_in_young(heap_oop)) {
+		Universe::teraCache()->tc_push_object((void *)p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
+		return false;
+	}
+	else {
+#if P_DISTINCT && !P_SD
+		obj->set_tera_cache(0);
+#endif
+		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
+
+		Universe::teraCache()->tc_push_object((void *)p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
+		return false;
+	}
+}
+
 #endif
 
 template <class T>
@@ -96,6 +129,18 @@ inline bool PSScavenge::should_scavenge(T* p, MutableSpace* to_space) {
 template <class T>
 inline bool PSScavenge::tc_should_scavenge(T* p, MutableSpace* to_space) {
 	if (tc_should_scavenge(p)) {
+		oop obj = oopDesc::load_decode_heap_oop_not_null(p);
+
+		// Skip objects copied to to_space since the scavenge started.
+		HeapWord* const addr = (HeapWord*)obj;
+		return addr < to_space_top_before_gc() || addr >= to_space->end();
+	}
+	return false;
+}
+
+template <class T>
+inline bool PSScavenge::tc_should_trace(T* p, MutableSpace* to_space) {
+	if (tc_should_trace(p)) {
 		oop obj = oopDesc::load_decode_heap_oop_not_null(p);
 
 		// Skip objects copied to to_space since the scavenge started.
@@ -126,6 +171,14 @@ inline bool PSScavenge::tc_should_scavenge(T* p, bool check_to_space) {
 	return tc_should_scavenge(p);
 }
 
+template <class T>
+inline bool PSScavenge::tc_should_trace(T* p, bool check_to_space) {
+	if (check_to_space) {
+		ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
+		return should_scavenge(p, heap->young_gen()->to_space());
+	}
+	return tc_should_trace(p);
+}
 #endif
 
 // Attempt to "claim" oop at p via CAS, push the new obj if successful

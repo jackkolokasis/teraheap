@@ -24,7 +24,7 @@ void init_regions(){
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
         if (i == 0)
             region_array[i].start_address = start_addr_mem_pool();
-        else region_array[i].start_address = region_array[i-1].start_address + (uint64_t)REGION_SIZE * 1024 * 1024; 
+        else region_array[i].start_address = region_array[i-1].start_address + (uint64_t)REGION_SIZE; 
         region_array[i].used = false;
         region_array[i].last_allocated_end = region_array[i].start_address;
         region_array[i].last_allocated_start = NULL;
@@ -61,17 +61,17 @@ char* new_region(size_t size){
 
 #if SPARK_HINT
 char* allocate_to_region(size_t size, uint64_t rdd_id){
-    assert(size <= (uint64_t)REGION_SIZE * 1024 * 1024);
+    assert(size <= (uint64_t)REGION_SIZE);
     if (id_array[rdd_id] == REGION_ARRAY_SIZE){
         char * res = new_region(size);
-        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
         return res;
     }
-    if (size > ((region_array[id_array[rdd_id]].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[id_array[rdd_id]].last_allocated_end)){
+    if (size > ((region_array[id_array[rdd_id]].start_address+(uint64_t)REGION_SIZE) - region_array[id_array[rdd_id]].last_allocated_end)){
         printf("Not enough space, new region\n");
         //printf("Wasting %luB in region %d, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
         char * res = new_region(size);
-        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
         return res;
     }
     mark_used(region_array[id_array[rdd_id]].start_address);
@@ -99,8 +99,8 @@ char* allocate_to_region(size_t size){
     region_array[cur_region].last_allocated_end = region_array[cur_region].start_address + size;
     return region_array[cur_region].start_address;
     #endif
-    assert(size <= (uint64_t)REGION_SIZE * 1024 * 1024);
-    if (size > ((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end)){
+    assert(size <= (uint64_t)REGION_SIZE);
+    if (size > ((region_array[cur_region].start_address+(uint64_t)REGION_SIZE) - region_array[cur_region].last_allocated_end)){
         //printf("Wasting %luB in region %d, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
         char * res = new_region(size);
         return res;
@@ -118,8 +118,8 @@ char* allocate_to_region(size_t size){
  */
 void references(char *obj1, char *obj2){
     
-    uint64_t seg1 = (obj1 - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
-    uint64_t seg2 = (obj2 - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    uint64_t seg1 = (obj1 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+    uint64_t seg2 = (obj2 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     if (seg1 >= REGION_ARRAY_SIZE || seg2 >= REGION_ARRAY_SIZE){ 
         printf("PROBLEM HERE\n");
         fflush(stdout);
@@ -163,7 +163,7 @@ void references(char *obj1, char *obj2){
  */
 void check_for_group(char *obj){
     uint64_t seg1 = region_enabled;
-    uint64_t seg2 = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    uint64_t seg2 = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     if (seg1 >= REGION_ARRAY_SIZE || seg2 >= REGION_ARRAY_SIZE )
        return;
     if (seg1 == seg2)
@@ -270,7 +270,7 @@ void reset_used(){
  * Arguments: obj: the object that is alive
  */
 void mark_used(char *obj){
-    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     if (region_array[seg].group_id != -1){
         group_array[region_array[seg].group_id].num_of_references -= region_array[seg].used;
         region_array[seg].used = 1;
@@ -356,7 +356,7 @@ bool is_before_last_object(char *obj){
     #if !REGIONS
     return true;
     #endif
-    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     if (obj >= region_array[seg].last_allocated_end){
         return false;
     } else {
@@ -368,7 +368,7 @@ bool is_before_last_object(char *obj){
  * Returns last object of region
  */
 char* get_last_object(char *obj){
-    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     return region_array[seg].last_allocated_end;
 }
 
@@ -377,7 +377,7 @@ bool is_region_start(char *obj){
     #if !REGIONS
         return false;
     #endif
-    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     if (region_array[seg].start_address == obj)
         return true;
     return false;
@@ -388,7 +388,7 @@ bool is_region_start(char *obj){
  * Enables groupping with the region in which obj belongs to
  */
 void enable_region_groups(char *obj){
-    region_enabled = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE * 1024 * 1024);
+    region_enabled = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
 }
 
 /*

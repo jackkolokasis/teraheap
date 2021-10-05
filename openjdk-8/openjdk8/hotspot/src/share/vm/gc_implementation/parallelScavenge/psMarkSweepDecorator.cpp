@@ -90,7 +90,7 @@ bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
 
 #elif P_DISTINCT && !P_SD && !P_NO_TRANSFER
 	return (oop(q)->is_tera_cache() 
-		&& !PSScavenge::is_obj_in_young(oop(q))  
+		//&& !PSScavenge::is_obj_in_young(oop(q))  
 		&& size >= TeraCacheThreshold) || (oop(q)->is_tc_to_old());
 	
 #elif P_SD && !P_NO_TRANSFER
@@ -225,7 +225,14 @@ void PSMarkSweepDecorator::precompact() {
 				// Encoding the pointer should preserve the mark
 				assertf(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
 
+#if NEW_FEAT
 				// Mark TeraCache Card Table
+				if (Universe::teraCache()->tc_should_mk_dirty(q)) {
+					BarrierSet *bs = Universe::heap()->barrier_set();
+					ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+					modBS->tc_write_ref_field(region_top);
+				}
+#endif
 
 				// Move to the next object
 				q += size;
@@ -428,7 +435,7 @@ void PSMarkSweepDecorator::precompact() {
 
 	_first_dead = first_dead;
 
-#if !DISABLE_TERACACHE
+#if !DISABLE_TERACACHE && !NEW_FEAT
 	// Invalidate tera cards for the new objects that will be allocated in the
 	// EnableTeraCache. Objects that are moved in TeraCache might have backward
 	// pointers to the heap. So we invalidate these cards that map the new
@@ -553,8 +560,10 @@ void PSMarkSweepDecorator::verify_compacted_objects()
 			assertf(obj->get_obj_state() == IN_TERA_CACHE,  "Error in compaction");
 		}
 		else {
-			assertf(obj->get_obj_state() == MOVE_TO_TERA 
-					|| obj->get_obj_state() == INIT_TF,  "Error in compaction");
+			assertf(obj->get_obj_state() == MOVE_TO_TERA
+					|| obj->get_obj_state() == INIT_TF  
+					|| obj->get_obj_state() == IN_TERA_CACHE,  
+					"Error in compaction");
 		}
 	}
 }
@@ -600,9 +609,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 	{
 		HeapWord* const end = _first_dead;
 
-		// Give advise to kernel to prefetch pages for TeraCache random
-		// Universe::teraCache()->tc_enable_rand();
-
 		while (q < end) {
 			/* Get the size of the object */
 			size_t size = oop(q)->size();
@@ -638,7 +644,11 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					oop(q)->set_obj_in_tc();
 					/* Initialize mark word of the destination */
 					oop(q)->init_mark();
+#if PR_BUFFER
+					Universe::teraCache()->tc_prbuf_insert((char *)q, (char *)compaction_top, size);
+#else
 					Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#endif
 #if FMAP_ASYNC
 					trans_to_tc = true;
 #endif
@@ -789,7 +799,11 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 #elif ASYNC
 			  oop(q)->set_obj_in_tc();
 			  oop(q)->init_mark();
+#if PR_BUFFER
+			  Universe::teraCache()->tc_prbuf_insert((char *)q, (char *)compaction_top, size);
+#else
 			  Universe::teraCache()->tc_awrite((char *)q, (char *)compaction_top, size);
+#endif
 #if FMAP_ASYNC
 			  trans_to_tc = true;
 #endif
@@ -829,7 +843,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 		  }
 #endif
 
-		  //assertf(oop(compaction_top)->klass() != NULL, "should have a class");
+		  assert(oop(compaction_top)->klass() != NULL, "should have a class");
 
 		  debug_only(prev_q = q);
 		  q += size;
@@ -851,7 +865,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 
   if (EnableTeraCache) {
 #if ASYNC
-  while(!Universe::teraCache()->tc_areq_completed());
+#if PR_BUFFER
+	  Universe::teraCache()->tc_flush_buffer();
+#endif
+	  while(!Universe::teraCache()->tc_areq_completed());
 #if FMAP_ASYNC
   if (trans_to_tc)
 	  Universe::teraCache()->tc_fsync();

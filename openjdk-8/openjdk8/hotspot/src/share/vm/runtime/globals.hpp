@@ -2427,6 +2427,9 @@ class CommandLineFlags {
 																			\
   product(uintx, TeraCacheThreshold, 0,                                     \
           "Initial threshold size to move objects in TeraCache (in words)") \
+																			\
+  product(uintx, TeraStripeSize, 512,                                       \
+          "Size of TeraCache stripe size (e.g 128)")                        \
                                                                             \
   product(bool, CacheGenerationEnabled, false,                              \
           "Enable Cache generation in ParalellGC")                          \

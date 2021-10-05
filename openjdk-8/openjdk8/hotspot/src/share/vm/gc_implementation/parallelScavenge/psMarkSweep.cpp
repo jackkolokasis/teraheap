@@ -286,11 +286,6 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
       } else {
         modBS->invalidate(MemRegion(old_mr.start(), old_mr.end()));
       }
-
-#if TERA_CARDS
-	//  if (EnableTeraCache && !Universe::teraCache()->tc_empty())
-	//	  modBS->tc_invalidate();
-#endif
     }
 
     // Delete metaspaces for unloaded class loaders and clean up loader_data graph

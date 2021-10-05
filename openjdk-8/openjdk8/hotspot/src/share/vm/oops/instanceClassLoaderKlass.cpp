@@ -185,6 +185,15 @@ void InstanceClassLoaderKlass::tc_oop_push_contents(PSPromotionManager* pm, oop 
   // all class loader data. So, we don't have to follow the class loader ->
   // class loader data link.
 }
+
+void InstanceClassLoaderKlass::tc_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  
+	InstanceKlass::tc_oop_trace_contents(pm, obj);
+
+  // This is called by the young collector. It will already have taken care of
+  // all class loader data. So, we don't have to follow the class loader ->
+  // class loader data link.
+}
 #endif
 
 int InstanceClassLoaderKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {

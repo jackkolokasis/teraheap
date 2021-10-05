@@ -62,6 +62,7 @@ void ObjArrayKlass::objarray_follow_contents(oop obj, int index) {
 
 #if CLOSURE
 	if (EnableTeraCache && obj->is_tera_cache()) {
+		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 		for (T* e = beg; e < end; e++) {
 			MarkSweep::tera_mark_and_push<T>(e);
 		}

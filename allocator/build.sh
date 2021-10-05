@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 
+SUDO=sudo
+
+if [ "$1" == "docker" ]
+then
+	SUDO=""
+fi
+
 make clean
 make distclean
-sudo make uninstall
+
+if [ "$1" != "docker" ]
+then
+	${SUDO} make uninstall
+fi
+
 make
-sudo make install
+
+$SUDO make install

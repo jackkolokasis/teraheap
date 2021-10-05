@@ -11,6 +11,7 @@
 #include "runtime/mutexLocker.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include <map>
 
 char*        TeraCache::_start_addr = NULL;
 char*        TeraCache::_stop_addr = NULL;
@@ -32,6 +33,14 @@ uint64_t TeraCache::heap_ct_trav_time[16];
 		
 uint64_t TeraCache::back_ptrs_per_mgc;
 uint64_t TeraCache::intra_ptrs_per_mgc;
+
+uint64_t TeraCache::obj_distr_size[3];	
+
+#if NEW_FEAT
+std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
+#endif
+
+long int TeraCache::cur_obj_group_id;
 
 // Constructor of TeraCache
 TeraCache::TeraCache() {
@@ -58,6 +67,18 @@ TeraCache::TeraCache() {
 
 	back_ptrs_per_mgc = 0;
 	intra_ptrs_per_mgc = 0;
+
+#if PR_BUFFER
+	_pr_buffer.size = 0;
+	_pr_buffer.start_obj_addr_in_tc = NULL;
+	_pr_buffer.buf_alloc_ptr = _pr_buffer.buffer;
+#endif
+
+	for (unsigned int i = 0; i < 3; i++) {
+		obj_distr_size[i] = 0;
+	}
+
+	cur_obj_group_id = 0;
 }
 		
 void TeraCache::tc_shutdown() {
@@ -117,11 +138,56 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 			(HeapWord *)obj, cur_alloc_ptr(), size, obj->klass()->internal_name());
 #endif
 
-	pos = allocate(size);
+	if (TeraCacheStatistics) {
+		size_t obj_size = (size * HeapWordSize) / 1024;
+		int count = 0;
+
+		while (obj_size > 0) {
+			count++;
+			obj_size/=1024;
+		}
+
+		assertf(count <=2, "Array out of range");
+
+		obj_distr_size[count]++;
+	}
+
+#if ALIGN
+	if (r_is_obj_fits_in_region(size))
+		pos = allocate(size);
+	else {
+		HeapWord *cur = (HeapWord *) cur_alloc_ptr();
+		HeapWord *region_end = (HeapWord *) r_region_top_addr();
+
+		typeArrayOop filler_oop = (typeArrayOop) cur;
+		filler_oop->set_mark(markOopDesc::prototype());
+		filler_oop->set_klass(Universe::intArrayKlassObj());
+  
+		const size_t array_length =
+			pointer_delta(region_end, cur) - typeArrayOopDesc::header_size(T_INT);
+
+		assertf( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, 
+				"array too big in PSPromotionLAB");
+
+		filler_oop->set_length((int)(array_length * (HeapWordSize/sizeof(jint))));
 	
+		//_start_array.tc_allocate_block((HeapWord *)cur);
+		if (TeraCacheStatistics)
+			tclog_or_tty->print_cr("[STATISTICS] | DUMMY_OBJECT SIZE = %d\n", filler_oop->size());
+	
+		_start_array.tc_allocate_block(cur);
+		
+		pos = allocate(size);
+	}
+#else
+	pos = allocate(size);
+#endif
+
+
 #if VERBOSE_TC
 	if (TeraCacheStatistics)
-		tclog_or_tty->print_cr("[STATISTICS] | OBJECT = %lu | Name = %s", size, obj->klass()->internal_name());
+		tclog_or_tty->print_cr("[STATISTICS] | OBJECT: %p | SIZE = %lu | ID = %d | NAME = %s",
+				pos, size, obj->get_obj_group_id(), obj->klass()->internal_name());
 #endif
 
 	_start_array.tc_allocate_block((HeapWord *)pos);
@@ -143,6 +209,8 @@ void TeraCache::scavenge()
 	struct timeval end_time;
 
 	gettimeofday(&start_time, NULL);
+
+	static int i = 0;
 
 	while (!_tc_stack.is_empty()) {
 		oop obj = _tc_stack.pop();
@@ -239,6 +307,8 @@ void TeraCache::tc_print_statistics() {
 
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
+	tclog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
+			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
 }
 		
 // Keep for each thread the time that need to traverse the TeraCache
@@ -299,12 +369,20 @@ void TeraCache::tc_print_mgc_statistics() {
 
 // Give advise to kernel to expect page references in sequential order
 void TeraCache::tc_enable_seq() {
+#if FMAP_HYBRID
+	r_enable_huge_flts();
+#else
 	r_enable_seq();
+#endif
 }
 
 // Give advise to kernel to expect page references in random order
 void TeraCache::tc_enable_rand() {
+#if FMAP_HYBRID
+	r_enable_regular_flts();
+#else
 	r_enable_rand();
+#endif
 }
 		
 // Explicit (using systemcall) write 'data' with 'size' to the specific
@@ -408,3 +486,116 @@ void TeraCache::disable_groups(void){
 void TeraCache::group_regions(HeapWord *obj1, HeapWord *obj2){
     references( (char*) obj1, (char*) obj2 );
 }
+
+#if NEW_FEAT
+// New feature
+void TeraCache::tc_mk_dirty(oop obj) {
+	_mk_dirty.push_back((HeapWord *)obj);
+
+}
+
+// New feature
+bool TeraCache::tc_should_mk_dirty(HeapWord* obj) {
+	for (unsigned long int i = 0; i < _mk_dirty.size(); i++) {
+		if (_mk_dirty[i] == obj) {
+			_mk_dirty.erase(_mk_dirty.begin() + i);
+			std::cout << "BKPTR | SIZE = " << _mk_dirty.size() << std::endl;
+			return true;
+		}
+	}
+	return false;
+}
+#endif
+
+#if PR_BUFFER
+// Add an object 'q' with size 'size' to the promotion buffer. We use
+// promotion buffer to reduce the number of system calls for small sized
+// objects.
+void  TeraCache::tc_prbuf_insert(char* q, char* new_adr, size_t size) {
+	char* start_adr = _pr_buffer.start_obj_addr_in_tc;
+	size_t cur_size = _pr_buffer.size;
+	size_t free_space = PR_BUFFER_SIZE - cur_size;
+
+	// Case1: Buffer is empty
+	if (cur_size == 0) {
+		assertf(start_adr == NULL, "Sanity check");
+		
+		if ((size * HeapWordSize) > PR_BUFFER_SIZE)
+			r_awrite(q, new_adr, size);
+		else {
+			memcpy(_pr_buffer.buf_alloc_ptr, q, size * HeapWordSize);
+
+			_pr_buffer.start_obj_addr_in_tc = new_adr;
+			_pr_buffer.buf_alloc_ptr += (size * HeapWordSize);
+			_pr_buffer.size = (size * HeapWordSize);
+		}
+
+		return;
+	}
+	
+	// Case2: Object size is grater than the available free space in buffer
+	// Case3: Object's new address is not contignious with the other objects -
+	// object belongs to other region in TeraCache
+	// In both cases we flush the buffer and allocate the object in a new
+	// buffer.
+	if (((size * HeapWordSize) > free_space) || ((start_adr + cur_size) != new_adr)) {
+		tc_flush_buffer();
+
+		// If the size of the object is still grater than the total promotion
+		// buffer size then bypass the buffer and write the object to TeraCache
+		// directly
+		if ((size * HeapWordSize) > PR_BUFFER_SIZE)
+			r_awrite(q, new_adr, size);
+		else {
+			memcpy(_pr_buffer.buf_alloc_ptr, q, size * HeapWordSize);
+
+			_pr_buffer.start_obj_addr_in_tc = new_adr;
+			_pr_buffer.buf_alloc_ptr += (size * HeapWordSize);
+			_pr_buffer.size = (size * HeapWordSize);
+		}
+
+		return;
+	}
+		
+	memcpy(_pr_buffer.buf_alloc_ptr, q, size * HeapWordSize);
+
+	_pr_buffer.buf_alloc_ptr += (size * HeapWordSize);
+	_pr_buffer.size += (size * HeapWordSize);
+}
+
+// Flush the promotion buffer to TeraCache and re-initialize the state of the
+// promotion buffer.
+void TeraCache::tc_flush_buffer() {
+	if (_pr_buffer.size != 0) {
+		assertf(_pr_buffer.size <= PR_BUFFER_SIZE, "Sanity check");
+		
+		// Write the buffer to TeraCache
+		r_awrite(_pr_buffer.buffer, _pr_buffer.start_obj_addr_in_tc, _pr_buffer.size / HeapWordSize);
+
+		memset(_pr_buffer.buffer, 0, sizeof(_pr_buffer.buffer));
+
+		_pr_buffer.buf_alloc_ptr = _pr_buffer.buffer;
+		_pr_buffer.start_obj_addr_in_tc = NULL;
+		_pr_buffer.size = 0;
+	}
+}
+
+#endif
+
+#if ALIGN
+bool TeraCache::tc_obj_fit_in_region(size_t size) {
+	return r_is_obj_fits_in_region(size);
+}
+		
+// We save the current object group 'id' for tera-marked object to
+// promote this 'id' to its reference objects
+void TeraCache::set_cur_obj_group_id(long int id) {
+	cur_obj_group_id = id;
+}
+
+// Get the saved current object group id 
+long int TeraCache::get_cur_obj_group_id(void) {
+	return cur_obj_group_id;
+}
+
+#endif

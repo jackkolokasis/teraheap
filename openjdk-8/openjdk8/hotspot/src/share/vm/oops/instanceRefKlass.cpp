@@ -92,7 +92,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 		// Check if the objects is marked to be moved in TeraCache
 		// Set the referent object to be moved in TeraCache
 		if (EnableTeraCache && obj->is_tera_cache()) {
-			referent->set_tera_cache();
+			referent->set_tera_cache((long int) obj->get_obj_group_id());
 		}
 #endif
 		ref->InstanceKlass::oop_follow_contents(obj);
@@ -583,6 +583,16 @@ void tc_specialized_oop_push_contents(InstanceRefKlass *ref,
   }
   ref->InstanceKlass::tc_oop_push_contents(pm, obj);
 }
+
+template <class T>
+void tc_specialized_oop_trace_contents(InstanceRefKlass *ref,
+                                   PSPromotionManager* pm, oop obj) {
+	ref->InstanceKlass::tc_oop_trace_contents(pm, obj);
+}
+
+
+
+
 #endif
 
 void InstanceRefKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
@@ -602,6 +612,16 @@ void InstanceRefKlass::tc_oop_push_contents(PSPromotionManager* pm, oop obj) {
     tc_specialized_oop_push_contents<oop>(this, pm, obj);
   }
 }
+
+void InstanceRefKlass::tc_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  if (UseCompressedOops) {
+    //specialized_oop_push_contents<narrowOop>(this, pm, obj);
+	assertf(false, "To be implement");
+  } else {
+    tc_specialized_oop_trace_contents<oop>(this, pm, obj);
+  }
+}
+
 #endif
 
 

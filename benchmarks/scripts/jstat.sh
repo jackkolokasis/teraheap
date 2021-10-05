@@ -20,6 +20,7 @@
 # Output file name
 OUTPUT=$1        
 NUM_OF_EXECUTORS=$2
+JIT=$3
 
 # Get the proccess id from the running
 processId=""
@@ -41,6 +42,13 @@ i=0
 
 for execId in ${processId}
 do
-    jstat -gcutil ${execId} 1000 > ${OUTPUT} &
+    jstat -gcutil ${execId} 1000 > ${OUTPUT}/jstat.txt &
+
+	if [ $JIT -eq 1 ]
+	then
+		jstat -printcompilation ${execId} 1000 > ${OUTPUT}/jit_method.txt &
+		jstat -compiler ${execId} 1000 > ${OUTPUT}/jit.txt &
+	fi
     i=$((i + 1))
+
 done

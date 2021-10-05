@@ -51,10 +51,15 @@
 
 #define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
 
+#define C2_ONLY_LEAF_CALL		 0  //< C2 Compiler version - Comparisons and
+									// card marking are all implemented in the
+									// make_leaf_call()
+
 #define TERA_INT			     1  //< Enable Interpreter to support TeraCache, TODO Set to 1
 
 #define MT_STACK				 1  //< Enable multi threaded stack in Minor GC 
 								    //  for TeraCache, TODO Set to 1
+
 #define CLOSURE					 1  //< Closure Calculation TEST  !!!!!
 
 #define DEBUG_INTR               0  //< Debug Interpreter
@@ -70,12 +75,21 @@
 #define PERF_TEST				 0  //< Performance tests in minor collection.
 									// Keep this here until testing a lot and
 									// then remove it.
+									
+#define ALIGN					 0  //< Allocate in TeraCache using allignment
+									// to avoid unnecessary pagefaults due to
+									// the traversal of card tables
 
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
 #define ASYNC				     0  //< Asynchronous I/O path for the writes in
 									// TeraCache
+
+#define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to
+									// reduce the number of system calls 
+
+#define PR_BUFFER_SIZE (2 * 1024 * 1024) //< Size of the promotion buffer in TeraCache
 
 #define FMAP				     0  //< When we use fastmap we need to ensure
 									// that all the writes in buffered cached
@@ -88,12 +102,16 @@
 									// will be flushed to the device because the
 									// memory of fast map is different from
 									// buffer cache. 
+									
+#define FMAP_HYBRID				 0  //< When we use fastmap hybrid version we
+									// employ huge pages for mutator threads and
+									// regular pages for GC 
 
-#define TERA_CARD_SIZE			 14  // This is the size of each card in
+#define TERA_CARD_SIZE			25 // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
-#define REGIONS     			 0  // We set this to 1 when we are using
+#define REGIONS     			 1  // We set this to 1 when we are using
                                     // the region allocator and 0 when
                                     // we are not
 /**********************************
@@ -157,7 +175,9 @@
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for TeraCache
 
-#define VERBOSE_TC				  0  //< Print objects in T
+#define VERBOSE_TC				  1  //< Print objects in T
 
+// TODO: This define must be removed
+#define NEW_FEAT				  1  //< Enable when you add new feature
 
 #endif  // _SHARE_DEFINES_H_

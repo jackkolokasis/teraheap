@@ -247,4 +247,26 @@ class TeraToHeapRootsTask : public GCTask {
   virtual void do_it(GCTaskManager* manager, uint which);
 };
 
+class TCToHeapRootsTask : public GCTask {
+ private:
+  TeraCache* _tc;
+  HeapWord* _tc_top;
+  uint _stripe_number;
+  uint _stripe_total;
+
+ public:
+  TCToHeapRootsTask(TeraCache *tc,
+                      HeapWord* tc_top,
+                      uint stripe_number,
+                      uint stripe_total) :
+    _tc(tc),
+    _tc_top(tc_top),
+    _stripe_number(stripe_number),
+    _stripe_total(stripe_total) { }
+
+  char* name() { return (char *)"tera-to-young-roots-task"; }
+
+  virtual void do_it(GCTaskManager* manager, uint which);
+};
+
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSTASKS_HPP

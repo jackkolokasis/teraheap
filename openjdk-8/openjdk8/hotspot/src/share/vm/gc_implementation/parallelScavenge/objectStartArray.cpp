@@ -47,7 +47,7 @@ void ObjectStartArray::tc_initialize(MemRegion reserved_region) {
 	  printf("Reserved Region: Start %p | End %p \n", reserved_region.start(), reserved_region.end());
   }
 #endif
-  size_t bytes_to_reserve = reserved_region.word_size() / tc_block_size_in_words * sizeof(short);
+  size_t bytes_to_reserve = reserved_region.word_size() / tc_block_size_in_words * sizeof(int);
   assertf(bytes_to_reserve > 0, "Sanity");
 
 #if DEBUG_TERACACHE
@@ -73,7 +73,7 @@ void ObjectStartArray::tc_initialize(MemRegion reserved_region) {
     vm_exit_during_initialization("Could not commit space for ObjectStartArray");
   }
 
-  _tc_raw_base = (short*)_virtual_space.low_boundary();
+  _tc_raw_base = (int*)_virtual_space.low_boundary();
   if (_tc_raw_base == NULL) {
     vm_exit_during_initialization("Could not get raw_base address");
   }
@@ -151,9 +151,9 @@ void ObjectStartArray::tc_set_covered_region(MemRegion mr) {
   HeapWord* low_bound  = mr.start();
   HeapWord* high_bound = mr.end();
   assertf((uintptr_t(low_bound)  & (tc_block_size - 1))  == 0, "heap must start at block boundary");
-  assertf((uintptr_t(high_bound) & (tc_block_size - 1))  == 0, "heap must end at block boundary");
+  //assertf((uintptr_t(high_bound) & (tc_block_size - 1))  == 0, "heap must end at block boundary");
 
-  size_t requested_blocks_size_in_bytes = mr.word_size() / tc_block_size_in_words * sizeof(short);
+  size_t requested_blocks_size_in_bytes = mr.word_size() / tc_block_size_in_words * sizeof(int);
 
   // Only commit memory in page sized chunks
   requested_blocks_size_in_bytes =
@@ -261,10 +261,10 @@ bool ObjectStartArray::tc_object_starts_in_range(HeapWord* start_addr,
 		return false;
 	}
 
-	short* start_block = tc_block_for_addr(start_addr);
-	short* end_block = tc_block_for_addr(end_addr);
+	int* start_block = tc_block_for_addr(start_addr);
+	int* end_block = tc_block_for_addr(end_addr);
 
-	for (short* block = start_block; block <= end_block; block++) {
+	for (int* block = start_block; block <= end_block; block++) {
 		if (*block != clean_block) {
 			return true;
 		}

@@ -13,7 +13,12 @@ void req_init() {
 	
 	for (i = 0; i < MAX_REQS; i++) {
 		request[i].state = 0;
+#if MALLOC_ON
 		request[i].buffer = NULL;
+#else
+		request[i].buffer = malloc(BUFFER_SIZE * sizeof(char));
+		request[i].size = BUFFER_SIZE;
+#endif
 	}
 }
 
@@ -35,10 +40,12 @@ static int find_slot() {
 
 			switch (request[i].state) {
 				case 0:
+#if MALLOC_ON
 					if (request[i].buffer != NULL) {
 						free(request[i].buffer);
 						request[i].buffer = NULL;
 					}
+#endif
 					return i;
 					break;
 
@@ -50,7 +57,7 @@ static int find_slot() {
 					break;
 
 				default:
-					assertf(0, "AIO_ERROR");
+					assertf(0, "AIO_ERROR %d", request[i].state);
 					break;
 			}
 		}
@@ -85,7 +92,15 @@ void req_add(int fd, char *data, size_t size, uint64_t offset) {
 
 	obj.aio_fildes = fd;
 	obj.aio_offset = offset;
+#if MALLOC_ON
 	request[slot].buffer = malloc(size * sizeof(char));
+#else
+	if (size > request[slot].size) {
+		char *ptr_new = realloc(request[slot].buffer, size);
+		request[slot].buffer = ptr_new;
+		request[slot].size = size;
+	}
+#endif
 	memcpy(request[slot].buffer, data, size);
 	obj.aio_buf = request[slot].buffer;
 	obj.aio_nbytes = size;            
@@ -111,10 +126,12 @@ int is_all_req_completed() {
 
 			switch (request[i].state) {
 				case 0:
+#if MALLOC_ON
 					if (request[i].buffer != NULL) {
 						free(request[i].buffer);
 						request[i].buffer = NULL;
 					}
+#endif
 					break;
 
 				case EINPROGRESS:

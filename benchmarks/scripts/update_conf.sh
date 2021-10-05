@@ -30,7 +30,7 @@ usage() {
 }
 
 # Check for the input arguments
-while getopts ":m:f:s:r:h" opt
+while getopts ":m:f:s:r:c:h" opt
 do
     case "${opt}" in
         m)
@@ -45,6 +45,9 @@ do
         r)
             RAMDISK=${OPTARG}
             ;;
+        c)
+            CORES=${OPTARG}
+            ;;
         h)
             usage
             ;;
@@ -56,6 +59,12 @@ done
 
 # Enter to spark configuration
 cd /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/conf
+
+# Change the worker cores
+sed -i '/SPARK_WORKER_CORES/c\SPARK_WORKER_CORES='"${CORES}" spark-env.sh
+
+# Change the worker memory
+sed -i '/SPARK_WORKER_MEMORY/c\SPARK_WORKER_MEMORY='"${MIN_HEAP}"'g' spark-env.sh
 
 # Change the minimum heap size
 # Change only the first -Xms 
@@ -69,8 +78,11 @@ cd -
 # Enter the spark-bechmarks
 cd ../spark-bench/conf/
 
-# Change spark benchmarks configuration
+# Change spark benchmarks configuration execur memory
 sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${MIN_HEAP}"'g' env.sh
+
+# Change spark benchmarks configuration executor core
+sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
 
 # Change storage level
 sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
@@ -87,8 +99,6 @@ then
 	# Create the new ramdisk
 	MEM=$(( ${RAMDISK} * 1024 * 1024 ))
 	sudo ./ramdisk_create_and_mount.sh -m ${MEM} -c
-
-	cd -
 
 	cd /mnt/ramdisk
 

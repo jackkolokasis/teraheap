@@ -32,7 +32,7 @@ usage() {
 }
 
 # Check for the input arguments
-while getopts ":m:f:s:r:t:n:h" opt
+while getopts ":m:f:s:r:t:n:c:h" opt
 do
     case "${opt}" in
         m)
@@ -53,6 +53,9 @@ do
 		n)
 			NEW_GEN=${OPTARG}
             ;;
+		c)
+			CORES=${OPTARG}
+            ;;
         h)
             usage
             ;;
@@ -64,6 +67,12 @@ done
 
 # Enter to spark configuration
 cd /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/conf
+
+# Change the worker cores
+sed -i '/SPARK_WORKER_CORES/c\SPARK_WORKER_CORES='"${CORES}" spark-env.sh
+
+# Change the worker memory
+sed -i '/SPARK_WORKER_MEMORY/c\SPARK_WORKER_MEMORY='"${TERACACHE}"'g' spark-env.sh
 
 # Change the minimum heap size
 # Change only the first -Xms 
@@ -98,6 +107,9 @@ cd ../spark-bench/conf/
 
 # Change spark benchmarks configuration
 sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${TERACACHE}"'g' env.sh
+
+# Change spark benchmarks configuration executor core
+sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
 
 # Change storage level
 sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh

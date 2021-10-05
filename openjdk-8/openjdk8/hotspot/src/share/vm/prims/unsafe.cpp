@@ -26,6 +26,7 @@
 #include "precompiled.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "utilities/macros.hpp"
+#include <cstdio>
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/g1/g1SATBCardTableModRefBS.hpp"
 #endif // INCLUDE_ALL_GCS
@@ -608,7 +609,19 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObject(JNIEnv *env, jobject unsafe, jobject obj)
   if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
 	return;
 
-  o->set_tera_cache();
+  o->set_tera_cache(0);
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe, jobject obj, jlong id))
+  UnsafeWrapper("Unsafe_TcMarkObjectWithId");
+  
+  oop o = JNIHandles::resolve_non_null(obj);
+  int i;
+
+  if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
+	return;
+
+  o->set_tera_cache(id);
 UNSAFE_END
 
 
@@ -1608,6 +1621,8 @@ static JNINativeMethod methods_18[] = {
 
 	// Mark object to be moved in TeraCache
     {CC"tcMarkObject",       CC"("OBJ")V",               FN_PTR(Unsafe_TcMarkObject)},
+	// Mark object to be moved in TeraCache using Id
+    {CC"tcMarkObjectWithId", CC"("OBJ"J)V",              FN_PTR(Unsafe_TcMarkObjectWithId)},
 
     {CC"reallocateMemory",   CC"("ADR"J)"ADR,            FN_PTR(Unsafe_ReallocateMemory)},
     {CC"freeMemory",         CC"("ADR")V",               FN_PTR(Unsafe_FreeMemory)},

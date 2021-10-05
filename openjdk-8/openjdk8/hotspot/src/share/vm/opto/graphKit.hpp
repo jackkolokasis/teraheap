@@ -129,8 +129,7 @@ class GraphKit : public Phase {
   }
 
   // Helper to get the TeraCache start address
-  Node* tc_start__node() {
-	  // Get base of card map
+  Node* tc_start_node() {
 	  if (Universe::teraCache()->tc_get_addr_region() != NULL) 
 		  return makecon(TypeRawPtr::make((address)Universe::teraCache()->tc_get_addr_region()));
 	  else

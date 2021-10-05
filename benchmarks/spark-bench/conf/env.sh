@@ -25,16 +25,38 @@ MC_LIST="nextgenio-cn18"
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench64"
 
 # 128GB Datasets
-# DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
+DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
 
+<<<<<<< HEAD
 DATA_HDFS="file:///mnt/pmem_fsdax1/SparkBench"
+=======
+# 256GB Datasets
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench256"
+
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench12"
+
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench6"
+
+# Testing
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBenchTests"
+
+#DATA_HDFS="file:///mnt/data/SparkBench"
+
+## This directory contains small generated datasets for testing
+#DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBenchTest"
+>>>>>>> master
 
 # Local dataset optional
 DATASET_DIR="${DATA_HDFS}/dataset"
 
 # Use this when run on Spark 2.3.0-kolokasis
 SPARK_VERSION=2.3.0
+<<<<<<< HEAD
 [ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis
+=======
+[ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/opt/spark/spark-2.3.0-kolokasis
+#[ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/opt/spark/spark-panthera
+>>>>>>> master
 
 # Use this when run on Spark 3.0.0-kolokasis
 #SPARK_VERSION=2.3.0

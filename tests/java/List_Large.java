@@ -63,18 +63,18 @@ public class List_Large {
 			x += linkedList.get(i).hashCode();
 		}
 
-		//System.out.println("=========================================");
-		//System.out.println("Access Cached Data");
-		//System.out.println("First Element = " + linkedList.getFirst());
-		//System.out.println("Str = " + str);
-		//System.out.println("Hashcode Element = " + x);
-		//
+		System.out.println("=========================================");
+		System.out.println("Access Cached Data");
+		System.out.println("First Element = " + linkedList.getFirst());
+		System.out.println("String = " + str);
+		System.out.println("Hashcode Element = " + x);
+		
 		gc();
 
-		//mem_info("Memory After");
+		mem_info("Memory After");
 
-		//gc();
+		gc();
 
-		//mem_info("Memory After");
+		mem_info("Memory After");
 	}
 }

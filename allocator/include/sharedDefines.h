@@ -17,19 +17,21 @@
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A);}
 // #define assertf(A, M, ...) ;
 
-#define ANONYMOUS 0
+#define ANONYMOUS    0
 
-#define SEG_SIZE 1073741824				 //< Segment size
+#define MAX_REQS	 64				  //< Maximum requests
 
-#define MAX_REQS 128						 //< Maximum requests
+#define BUFFER_SIZE  (8*1024LU*1024)  //< Buffer Size (in bytes) for async I/O
+
+#define MALLOC_ON	1				  //< Allocate buffers dynamically
+
+#define ALIGN_ON	0				  //< Enable allocation with allignment in TC
+
+#define REGION_SIZE	(512*1024LU*1024) //< Region size (in bytes) for allignment version
 
 #define REGIONS 1
 
-#define TC_SIZE (860 * 1024LU) // in MB
-
-#define REGION_SIZE (512LU) //in MB
-
-#define REGION_ARRAY_SIZE ((TC_SIZE)/(REGION_SIZE))
+#define REGION_ARRAY_SIZE ((DEV_SIZE)/(REGION_SIZE))
 
 #define GROUP_ARRAY_SIZE ((REGION_ARRAY_SIZE)/2)
 

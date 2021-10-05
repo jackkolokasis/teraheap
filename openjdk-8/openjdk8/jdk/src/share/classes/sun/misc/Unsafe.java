@@ -1145,5 +1145,13 @@ public final class Unsafe {
      * @param o object/array to update tera mark word
      */
     public native void tcMarkObject(Object o);
+	
+	/**
+     * Mark object to be moved to TeraCache using Id
+	 *
+     * @param o object/array to update tera mark word
+     * @param id id of the marking object
+     */
+    public native void tcMarkObjectWithId(Object o, long id);
 
 }

@@ -15,6 +15,7 @@
 #include "../include/segments.h"
 
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
+#define HEADER_SIZE (32)                   // Header size of the Dummy object	
 #define align_size_up_(size, alignment) (((size) + ((alignment) - 1)) & ~((alignment) - 1))
 
 struct _mem_pool tc_mem_pool;
@@ -51,6 +52,10 @@ void init(uint64_t align) {
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
     init_regions();
 	req_init();
+
+#if ALIGN_ON
+	tc_mem_pool.region_free_space = REGION_SIZE - HEADER_SIZE;
+#endif
 }
 
 
@@ -103,25 +108,38 @@ char* allocate(size_t size, uint64_t rdd_id) {
 // Args: `size` is in words, each word is 8 byte. Size should be > 0
 char* allocate(size_t size) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
+	size_t obj_size = size * HEAPWORD;
 
-	//assertf(alloc_ptr >= tc_mem_pool.start_address &&
-	//		alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
-	assertf(size > 0, "Object should be > 0");
-    #if REGIONS
-    alloc_ptr = allocate_to_region(size * HEAPWORD);
+	assertf(alloc_ptr >= tc_mem_pool.start_address &&
+			alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
+	assertf(obj_size > 0, "Object should be > 0");
+
+#if REGIONS && !ALIGN_ON
+    alloc_ptr = allocate_to_region(obj_size);
     if (alloc_ptr == NULL)
         printf("Total cached data:%zu\n",tc_mem_pool.size);
     assertf(alloc_ptr != NULL, "alloc_ptr is NULL");
-    #endif
-    tc_mem_pool.size += size;
-    tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);
+#endif
 
-	// Alighn to 8 words the pointer (TODO: CHANGE TO ASSERTION)
+#if ALIGN_ON && !REGIONS
+	assertf(obj_size <= (REGION_SIZE - HEADER_SIZE), "Oject size: %lu exceeds region size: %lu", 
+			obj_size, REGION_SIZE - HEADER_SIZE);
+#endif
+
+	tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + obj_size);
+	tc_mem_pool.size += size;
+
+#if ALIGN_ON && !REGIONS
+	// Decrease the available free space counter for the region
+	tc_mem_pool.region_free_space -= obj_size;
+#endif
+	
+	// Alighn to 8 words the pointer
 	if ((uint64_t) tc_mem_pool.cur_alloc_ptr % HEAPWORD != 0)
 		tc_mem_pool.cur_alloc_ptr = (char *)((((uint64_t)tc_mem_pool.cur_alloc_ptr) + (HEAPWORD - 1)) & -HEAPWORD);
 
-	//assertf(tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address,
-	//		"TeraCache if full");
+	assertf(tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address,
+			"TeraCache if full");
 
 	return alloc_ptr;
 }
@@ -196,3 +214,44 @@ void r_fsync() {
 	assertf(check == 0, "Error in fsync");
 }
 
+#if ALIGN_ON
+// Check if the current object with 'size' can fit in the available region
+// Return 1 on succesfull, and 0 otherwise
+int	r_is_obj_fits_in_region(size_t size) {
+	size_t obj_size = size * HEAPWORD;
+
+	assertf(obj_size > 0, "Object should be > 0");
+	assertf(obj_size <= REGION_SIZE - HEADER_SIZE, "Oject size: %lu exceeds region size: %lu",
+			obj_size, REGION_SIZE - HEADER_SIZE);
+
+	return (obj_size  <= tc_mem_pool.region_free_space);
+}
+
+// Get the top address of the current region and set the current_ptr to the
+// next region
+char* r_region_top_addr(void) {
+	// Set the current ptr to the next region and initialize next region's free space
+	// We reserve the last HEADE_SIZE bytes in regions for the dummy object
+	tc_mem_pool.cur_alloc_ptr += tc_mem_pool.region_free_space + HEADER_SIZE;
+
+	assertf(tc_mem_pool.cur_alloc_ptr >= tc_mem_pool.start_address &&
+			tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
+
+	tc_mem_pool.region_free_space = REGION_SIZE - HEADER_SIZE;
+
+	return tc_mem_pool.cur_alloc_ptr;
+}
+
+// This function if for the FastMap hybrid version. Give advise to kernel to
+// serve all the pagefault using regular pages.
+void r_enable_regular_flts(void) {
+	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_NOHUGEPAGE);
+}
+
+// This function if for the FastMap hybrid version. Give advise to kernel to
+// serve all the pagefault using huge pages.
+void r_enable_huge_flts(void) {
+	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_HUGEPAGE);
+}
+
+#endif

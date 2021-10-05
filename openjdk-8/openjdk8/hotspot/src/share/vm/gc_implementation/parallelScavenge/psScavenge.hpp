@@ -133,6 +133,14 @@ class PSScavenge: AllStatic {
   // Return true if a collection was done; false otherwise.
   static bool invoke_no_policy();
 
+#if TERA_CARDS
+  // Scavenge only the dirty objects in TeraCache. We use this function in case
+  // where we perform directly major gc without performing minor gc. So using
+  // this function we identify backward pointers (from TC to the heap) to use
+  // them during major gc.
+  static void tc_scavenge();
+#endif
+
   // If an attempt to promote fails, this method is invoked
   static void oop_promotion_failed(oop obj, markOop obj_mark);
 
@@ -140,6 +148,8 @@ class PSScavenge: AllStatic {
 
 #if TERA_CARDS
   template <class T> static inline bool tc_should_scavenge(T* p);
+  
+  template <class T> static inline bool tc_should_trace(T* p);
 #endif
 
   // These call should_scavenge() above and, if it returns true, also check that
@@ -152,6 +162,9 @@ class PSScavenge: AllStatic {
 #if TERA_CARDS
   template <class T> static inline bool tc_should_scavenge(T* p, MutableSpace* to_space);
   template <class T> static inline bool tc_should_scavenge(T* p, bool check_to_space);
+
+  template <class T> static inline bool tc_should_trace(T* p, MutableSpace* to_space);
+  template <class T> static inline bool tc_should_trace(T* p, bool check_to_space);
 #endif
 
   template <class T, bool promote_immediately>

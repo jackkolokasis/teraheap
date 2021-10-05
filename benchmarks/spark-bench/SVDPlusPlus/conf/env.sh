@@ -1,5 +1,10 @@
 # for preparation 
-numV=908800
+
+#numV=14722560  # 32GB
+#numV=5452800	# 12GB
+#numV=2726400	#  6GB
+numV=908800	    #  2GB
+#numV=44167680	#102GB
 NUM_OF_PARTITIONS=256
 mu=4.0
 sigma=1.3

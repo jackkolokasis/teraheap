@@ -235,6 +235,33 @@ JRT_END
 
 #endif // INCLUDE_ALL_GCS
 
+#if TERA_C2
+JRT_LEAF(void, SharedRuntime::tc_wb_post(void* obj))
+	CardTableModRefBS* ct = (CardTableModRefBS*)(Universe::heap()->barrier_set());
+#if C2_ONLY_LEAF_CALL
+	assertf(sizeof(*ct->tc_byte_map_base) == sizeof(jbyte), "Adjust users of this code");
+    assertf(ct->tc_byte_map_base != NULL, "TeraCache card table is NULL");
+	assertf(sizeof(*ct->byte_map_base) == sizeof(jbyte), "Adjust users of this code");
+    assertf(ct->byte_map_base != NULL, "Heap card table is NULL");
+	assertf(Universe::teraCache()->tc_is_in(obj) || Universe::heap()->is_in_reserved(obj),
+			"Objects is out of reserved space %p", (HeapWord*)obj);
+
+	if (Universe::teraCache()->tc_is_in(obj))
+		ct->tc_byte_map_base[uintptr_t(obj) >> CardTableModRefBS::tc_card_shift] = 0;
+	else
+		ct->byte_map_base[uintptr_t(obj) >> CardTableModRefBS::card_shift] = 0;
+#else
+	assertf(sizeof(*ct->tc_byte_map_base) == sizeof(jbyte), "adjust users of this code");
+    assertf(ct->tc_byte_map_base != NULL, "TeraCache card table is NULL");
+	assertf(Universe::teraCache()->tc_is_in(obj), 
+			"Objects is out of reserved space %p | HEAP = %d", 
+			(HeapWord*)obj, Universe::heap()->is_in_reserved(obj));
+		
+	ct->tc_byte_map_base[uintptr_t(obj) >> CardTableModRefBS::tc_card_shift] = 0;
+#endif
+	JRT_END
+#endif
+
 
 JRT_LEAF(jlong, SharedRuntime::lmul(jlong y, jlong x))
   return x * y;

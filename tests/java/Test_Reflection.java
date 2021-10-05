@@ -136,24 +136,11 @@ class Test_Reflection
 		gc();
 		mem_info("Memory Information");
 
-		// Creates object of the desired method by providing 
-		// the name of method as argument to the 
-		// getDeclaredMethod method 
-		Method methodcall3 = cls.getDeclaredMethod("method3"); 
+		mem_info("Memory Information");
+		gc();
+		mem_info("Memory Information");
 
-		// Invoke the method at runtime
-		// methodcall3.invoke(obj); 
-
-		// mem_info("Memory Information");
-		// gc();
-		// mem_info("Memory Information");
-
-		//mem_info("Memory Information");
-		//gc();
-		//mem_info("Memory Information");
-
-		//// invokes the method at runtime 
-		//methodcall3.invoke(obj); 
-		//methodcall2.invoke(obj); 
+		// invokes the method at runtime 
+		methodcall2.invoke(obj); 
 	} 
 } 

@@ -1,6 +1,11 @@
 # for preparation 
-#numV=1000000 #100000
-numV=942240
+#numV=61344			#> 109MB
+#numV=4907520		#> 11GB
+#numV=14722560		#> 32GB
+#numV=7361280		#> 16GB
+numV=942240		#> 2GB
+#numV=2826720		#> 6GB
+
 NUM_OF_PARTITIONS=256
 mu=4.0
 sigma=1.3

@@ -1,0 +1,21 @@
+image: carvicsforth/centos_carv:latest
+stages:
+    - build
+
+jvm_release_build:
+  stage: build
+  script:
+    - cd allocator
+    - ./build.sh docker
+    - cd ../openjdk-8/openjdk8
+    - bash ./configure --with-jobs=1 --disable-debug-symbols --with-extra-cflags='-O3' --with-extra-cxxflags='-O3'
+    - make DISABLE_HOTSPOT_OS_VERSION_CHECK=ok
+
+jvm_debug_build:
+  stage: build
+  script:
+    - cd allocator
+    - ./build.sh docker
+    - cd ../openjdk-8/openjdk8
+    - bash ./configure --with-debug-level=release --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
+    - make DISABLE_HOTSPOT_OS_VERSION_CHECK=ok

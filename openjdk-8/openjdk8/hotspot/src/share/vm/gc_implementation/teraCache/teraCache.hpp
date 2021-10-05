@@ -28,25 +28,53 @@ class TeraCache {
 		// TeraCache and point to objects in the heap. We adjust these pointers
 		// during adjust phase of the Full GC.
 		static Stack<oop *, mtGC> _tc_adjust_stack;
+
+#if PR_BUFFER
+		// We use promotion buffer to reduce the number of system calls for
+		// small sized objects.
+		struct pr_buffer {
+			char buffer[PR_BUFFER_SIZE];	  // Allocation buffer
+
+			char* start_obj_addr_in_tc;		  // Address in TeraCache for the
+											  // first object in the buffer
+
+			char* buf_alloc_ptr;			  // Allocation pointer for the buffer
+
+			size_t size;					  // Current size of the buffer
+		};
+
+		struct pr_buffer _pr_buffer; 
+#endif
 		
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
 		 *---------------------------------------------*/
-		static uint64_t total_active_regions;      // Number of active regions
-		static uint64_t total_merged_regions;      // Number of merged regions
+		static uint64_t total_active_regions;      //< Number of active regions
+		static uint64_t total_merged_regions;      //< Number of merged regions
 
-		static uint64_t total_objects;             // Total number of objects located in TeraCache
-		static uint64_t total_objects_size;        // Total number of objects size
+		static uint64_t total_objects;             //< Total number of objects located in TeraCache
+		static uint64_t total_objects_size;        //< Total number of objects size
 
-		static uint64_t fwd_ptrs_per_fgc;	       // Total number of forward ptrs per FGC
-		static uint64_t back_ptrs_per_fgc;	       // Total number of back ptrs per FGC
-		static uint64_t trans_per_fgc;	           // Total number of objects transfered to 
-												   // TeraCache per FGC
-		static uint64_t tc_ct_trav_time[16];	   // Time to traverse TeraCards card table
-		static uint64_t heap_ct_trav_time[16];	   // Time to traverse heap card tables
+		static uint64_t fwd_ptrs_per_fgc;	       //< Total number of forward ptrs per FGC
+		static uint64_t back_ptrs_per_fgc;	       //< Total number of back ptrs per FGC
+		static uint64_t trans_per_fgc;	           //< Total number of objects transfered to 
+												   //< TeraCache per FGC
+		static uint64_t tc_ct_trav_time[16];	   //< Time to traverse TeraCards card table
+		static uint64_t heap_ct_trav_time[16];	   //< Time to traverse heap card tables
 
-		static uint64_t back_ptrs_per_mgc;		   // Total number of back ptrs per MGC
-		static uint64_t intra_ptrs_per_mgc;		   // Total number of intra ptrs between objects in TC per MGC
+		static uint64_t back_ptrs_per_mgc;		   //< Total number of back ptrs per MGC
+		static uint64_t intra_ptrs_per_mgc;		   //< Total number of intra ptrs between objects in TC per MGC
+
+		static uint64_t obj_distr_size[3];         //< Object size distribution between B, KB, MB
+
+#if NEW_FEAT
+		static std::vector<HeapWord *> _mk_dirty;  //< These objects should
+												   // make dirty their cards
+#endif
+		static long int cur_obj_group_id;	       //<We save the current object
+   												   // group id for tera-marked
+												   // object to promote this id
+												   // to their reference objects
 
 	public:
 		// Constructor
@@ -145,10 +173,20 @@ class TeraCache {
 		// I/O have been completed succesfully.
 		int tc_areq_completed();
 		
-
 		// Fsync writes in TeraCache
 		// We need to make an fsync when we use fastmap
 		void tc_fsync();
+
+#if PR_BUFFER
+		// Add an object 'q' with size 'size' to the promotion buffer. 'New_adr'
+		// is used to know where the first object in the promotion buffer will
+		// move to TeraCache. We use promotion buffer to reduce the number of
+		// system calls for small sized objects.
+		void tc_prbuf_insert(char* q, char* new_adr, size_t size);
+		
+		// At the end of the major GC clear the promotion buffer.
+		void tc_flush_buffer();
+#endif
 
 		// Count the number of references between objects that are located in
 		// TC.
@@ -192,6 +230,30 @@ class TeraCache {
         
         // Groups the region of obj1 with the region of obj2
         void group_regions(HeapWord *obj1, HeapWord *obj2);
+#if NEW_FEAT
+		// New feature
+		void tc_mk_dirty(oop obj);
+		
+		// New feature
+		bool tc_should_mk_dirty(HeapWord* obj);
+#endif
+
+#if ALIGN
+		bool tc_obj_fit_in_region(size_t size);
+
+#endif
+
+		// We save the current object group 'id' for tera-marked object to
+		// promote this 'id' to its reference objects
+		void set_cur_obj_group_id(long int id);
+		
+		// Get the saved current object group id 
+		long int get_cur_obj_group_id(void);
+		
+		// 
+		// // Validate if all the dirty cards that we found are dirty now are
+		// // clean. If one of the dirty card is still dirty then fail
+		// bool validate_dirty_card(unsigned int tid);
 };
 
 #endif

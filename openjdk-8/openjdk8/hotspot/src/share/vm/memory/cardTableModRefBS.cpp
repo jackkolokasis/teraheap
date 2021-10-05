@@ -105,8 +105,8 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   
   // 0x7f6100600000 & 0xff (Heap)
   // 0x7f62258180200 & 0xff (TeraCache) assertions do not work for TeraCache
-  assertf((uintptr_t(tc_low_bound)  & (tc_card_size - 1))  == 0, "heap must start at card boundary %p | %p", low_bound, tc_low_bound);
-  assertf((uintptr_t(tc_high_bound) & (tc_card_size - 1))  == 0, "heap must end at card boundary");
+  assertf((uintptr_t(tc_low_bound)  & (tc_card_size - 1))  == 0, "TeraCache must start at card boundary %p | %p", low_bound, tc_low_bound);
+  //assertf((uintptr_t(tc_high_bound) & (tc_card_size - 1))  == 0, "TeraCache must end at card boundary %p | %p", tc_high_bound, tc_card_size);
   assertf(tc_card_size <= (1 << TERA_CARD_SIZE), "card_size  must be less equall %d", (1 << TERA_CARD_SIZE));
 
   _covered = new MemRegion[max_covered_regions];
@@ -715,6 +715,7 @@ void CardTableModRefBS::dirty_MemRegion(MemRegion mr) {
   assertf((HeapWord*)align_size_up  ((uintptr_t)mr.end(),   HeapWordSize) == mr.end(),   "Unaligned end"  );
   jbyte* cur  = byte_for(mr.start());
   jbyte* last = byte_after(mr.last());
+
   while (cur < last) {
     *cur = dirty_card;
     cur++;
@@ -737,6 +738,43 @@ void CardTableModRefBS::tc_invalidate(HeapWord *start, HeapWord* end) {
   //dirty_MemRegion(_tc_whole_heap);
   dirty_MemRegion(MemRegion(start, end));
 }
+#endif
+
+#if NEW_FEAT
+void CardTableModRefBS::tc_write_ref_field(HeapWord *obj) {
+  jbyte* card  = byte_for(obj);
+  *card = dirty_card;
+}
+
+bool CardTableModRefBS::tc_num_dirty_cards(HeapWord *start, HeapWord* end,
+									       bool before) {
+  assert((HeapWord*)align_size_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
+  assert((HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
+  jbyte* cur  = byte_for(start);
+  jbyte* last = byte_after(end);
+  unsigned long int counter = 0;
+  while (cur < last) {
+	  if (*cur++ != clean_card)
+		  counter++;
+  }
+
+  if (before)
+	  std::cout << "NUM_DIRTY_CARDS | BEFORE | " << counter << std::endl;
+  else
+	  std::cout << "NUM_DIRTY_CARDS | AFTER | " << counter << std::endl;
+
+  return true;
+}
+
+void CardTableModRefBS::tc_clean_cards(HeapWord *start, HeapWord* end) {
+  assert((HeapWord*)align_size_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
+  assert((HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
+  jbyte* cur  = byte_for(start);
+  jbyte* last = byte_for(end);
+
+  memset(cur, clean_card, (last-cur)-1);
+}
+
 #endif
 
 void CardTableModRefBS::clear_MemRegion(MemRegion mr) {
