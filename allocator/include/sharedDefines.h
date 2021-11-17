@@ -10,7 +10,7 @@
  * Sith 6 
  ************************************************/
 #define DEV "/mnt/pmem_fsdax0/file.txt"	     //< Device name
-#define DEV_SIZE (860*1024LU*1024*1024)  //< Device size (in bytes)
+#define DEV_SIZE (500*1024LU*1024*1024)  //< Device size (in bytes)
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
@@ -29,12 +29,14 @@
 
 #define REGION_SIZE	(512*1024LU*1024) //< Region size (in bytes) for allignment version
 
-#define REGIONS 1
+#define REGIONS 1 
 
 #define REGION_ARRAY_SIZE ((DEV_SIZE)/(REGION_SIZE))
 
 #define GROUP_ARRAY_SIZE ((REGION_ARRAY_SIZE)/2)
 
 #define GROUP_DEBUG 0
+
+#define STATISTICS 1
 
 #endif

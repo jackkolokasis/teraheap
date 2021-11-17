@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#define SPARK_HINT 0
+#define SPARK_HINT 1 
 /*
  * the struct for regions
  */
@@ -15,6 +15,7 @@ struct region{
     char *last_allocated_start;
     struct region *next_in_group;
     int group_id;
+    uint64_t rdd_id;
 };
 
 /*
@@ -133,4 +134,6 @@ void disable_region_groups(void);
  * arguments: obj: the object that must be checked to be groupped with the region_enabled
  */
 void check_for_group(char *obj);
+
+void print_objects_temporary_function(char *obj,const char *string);
 #endif
