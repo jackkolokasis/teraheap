@@ -228,6 +228,8 @@ class TeraCache {
         // Disables region groupping
         void disable_groups(void);
         
+        void print_object_name(HeapWord *obj,const char *name);
+
         // Groups the region of obj1 with the region of obj2
         void group_regions(HeapWord *obj1, HeapWord *obj2);
 #if NEW_FEAT

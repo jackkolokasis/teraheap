@@ -35,12 +35,10 @@ uint64_t TeraCache::back_ptrs_per_mgc;
 uint64_t TeraCache::intra_ptrs_per_mgc;
 
 uint64_t TeraCache::obj_distr_size[3];	
-
+long int TeraCache::cur_obj_group_id;
 #if NEW_FEAT
 std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
 #endif
-
-long int TeraCache::cur_obj_group_id;
 
 // Constructor of TeraCache
 TeraCache::TeraCache() {
@@ -180,7 +178,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 		pos = allocate(size);
 	}
 #else
-	pos = allocate(size);
+	pos = allocate(size,(uint64_t)obj->get_obj_group_id());
 #endif
 
 
@@ -586,7 +584,8 @@ void TeraCache::tc_flush_buffer() {
 bool TeraCache::tc_obj_fit_in_region(size_t size) {
 	return r_is_obj_fits_in_region(size);
 }
-		
+#endif
+
 // We save the current object group 'id' for tera-marked object to
 // promote this 'id' to its reference objects
 void TeraCache::set_cur_obj_group_id(long int id) {
@@ -598,4 +597,7 @@ long int TeraCache::get_cur_obj_group_id(void) {
 	return cur_obj_group_id;
 }
 
-#endif
+void TeraCache::print_object_name(HeapWord *obj,const char *name){
+    print_objects_temporary_function((char *)obj, name);
+}
+

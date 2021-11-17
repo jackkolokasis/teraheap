@@ -283,10 +283,16 @@ int InstanceMirrorKlass::oop_adjust_pointers(oop obj) {
   int size = oop_size(obj);
   InstanceKlass::oop_adjust_pointers(obj);
 
+  if (EnableTeraCache && obj->is_tera_cache()) {                                         \
+      Universe::teraCache()->enable_groups((HeapWord*) obj->mark()->decode_pointer());      \
+  }                                                              \
   InstanceMirrorKlass_OOP_ITERATE(                                                    \
     start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),        \
     MarkSweep::adjust_pointer(p),                                                     \
     assert_nothing)
+  if (EnableTeraCache && obj->is_tera_cache()){                  \
+      Universe::teraCache()->disable_groups();                   \
+  }                                                              \
   return size;
 }
 

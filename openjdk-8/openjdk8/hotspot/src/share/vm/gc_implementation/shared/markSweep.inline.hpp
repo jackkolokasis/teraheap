@@ -145,6 +145,7 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
             //TODO: MARK ACTIVE REGION
+            Universe::teraCache()->mark_used_region((HeapWord*)obj);
 			if (TeraCacheStatistics)
 				Universe::teraCache()->tc_increase_forward_ptrs();
 			return;
@@ -231,10 +232,10 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
 		}
 		else {
 			new_obj = oop(obj->mark()->decode_pointer());
+		}
 #if REGIONS
             Universe::teraCache()->group_region_enabled((HeapWord*) new_obj);
 #endif
-		}
 #else
 		oop new_obj = oop(obj->mark()->decode_pointer());
 

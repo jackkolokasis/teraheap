@@ -21,9 +21,9 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 //#if !NDEBUG
-//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 //#elif
-#define assertf(A, M, ...) ;
+//#define assertf(A, M, ...) ;
 //#endif
 
 /***********************************
@@ -138,10 +138,6 @@
 									//  combination with P_Balance or
 									//  P_Aggressive
 
-#define P_SIZE                  0	//< Move Objects to TeraCache based on their
-									//  size. This policy should be used in
-									//  combination with P_Balance or
-									//  P_Aggressive
 
 #define P_SD					1	//< Move Objects to TeraCache based on
 									//  serialization policy.  This policy
@@ -175,7 +171,7 @@
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for TeraCache
 
-#define VERBOSE_TC				  1  //< Print objects in T
+#define VERBOSE_TC				  0  //< Print objects in T
 
 // TODO: This define must be removed
 #define NEW_FEAT				  1  //< Enable when you add new feature

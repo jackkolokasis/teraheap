@@ -147,6 +147,7 @@ extern Mutex*   JfrThreadGroups_lock;            // protects JFR access to Threa
 #endif
 
 extern Mutex*   tera_cache_lock;                 // Mutex lock
+extern Mutex*   tera_cache_group_lock;                 // Mutex lock
 
 // A MutexLocker provides mutual exclusion with respect to a given mutex
 // for the scope which contains the locker.  The lock is an OS lock, not
