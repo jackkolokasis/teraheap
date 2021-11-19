@@ -28,7 +28,7 @@ public class HashMap {
 	}
 
 	public static void main(String[] args) {
-		int num_elements = 1000000;
+		int num_elements = 1000;
 
 		System.out.println(Runtime.getRuntime().maxMemory());
 		

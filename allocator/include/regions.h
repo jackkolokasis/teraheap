@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#include "segments.h"
+
 #if defined (__ia64__) || defined (__x86_64__)
 #define INT_PTR unsigned long
 
@@ -30,6 +32,12 @@ extern "C" {
 		uint64_t region_free_space;
 #endif
 	};
+    
+    struct region_list{
+        char *start;
+        char *end;
+        struct region_list *next;
+    };
 
 	extern struct _mem_pool tc_mem_pool;	//< Allocator pool
 	extern int fd;							//< File descriptor for the opended file
@@ -44,11 +52,16 @@ extern "C" {
 	
 	// Return the start address of the memory allocation pool
 	size_t     mem_pool_size(void);
-	
+
+#if SPARK_HINT
+	// Allocate a new object with `size` and return the `start allocation
+	// address`.
+	char *     allocate(size_t size, uint64_t rdd_id);
+#else
 	// Allocate a new object with `size` and return the `start allocation
 	// address`.
 	char *     allocate(size_t size);
-	
+#endif
 	// Return the last address of the memory allocation pool
 	char*      stop_addr_mem_pool(void);
 	

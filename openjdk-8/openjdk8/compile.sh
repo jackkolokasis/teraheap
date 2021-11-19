@@ -75,8 +75,8 @@ function release()
 {
   make dist-clean
   bash ./configure --with-jobs=32 --disable-debug-symbols --with-extra-cflags='-O3' --with-extra-cxxflags='-O3'
-  intercept-build make
-  cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
+  #intercept-build make
+  #cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
 }
 
 # Compile with debug symbols and assertions
@@ -85,8 +85,8 @@ function debug_symbols_on()
   make dist-clean
   bash ./configure --with-debug-level=release --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
   #bash ./configure --with-debug-level=slowdebug --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
-  intercept-build make
-  cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
+  #intercept-build make
+  #cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
 }
 
 function clean_make()

@@ -1,19 +1,19 @@
-/**************************************************
+/***************************************************
 *
 * file: test2.c
 *
 * @Author:   Iacovos G. Kolokasis
-* @Version:  09-03-2021 
+* @Version:  09-03-2021
 * @email:    kolokasis@ics.forth.gr
 *
 * Test to verify:
-*	- explicit write using system call
-*	- object allocation in the correct positions
-*	- read object using mmap
+*       - allocator initialization
+*       - object allocation in the correct positions
 ***************************************************/
 
 #include "../include/sharedDefines.h"
 #include "../include/regions.h"
+#include "../include/segments.h"
 
 #include <stdint.h>
 #include <stdio.h>

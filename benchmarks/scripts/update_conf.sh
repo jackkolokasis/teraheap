@@ -58,7 +58,7 @@ do
 done
 
 # Enter to spark configuration
-cd /opt/spark/spark-2.3.0-kolokasis/conf
+cd /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/conf
 
 # Change the worker cores
 sed -i '/SPARK_WORKER_CORES/c\SPARK_WORKER_CORES='"${CORES}" spark-env.sh

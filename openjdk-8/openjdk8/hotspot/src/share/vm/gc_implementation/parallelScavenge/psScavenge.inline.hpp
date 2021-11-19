@@ -33,6 +33,7 @@
 #include "memory/iterator.hpp"
 #include "memory/universe.hpp"
 #include "runtime/globals.hpp"
+#include "runtime/mutexLocker.hpp"
 
 inline void PSScavenge::save_to_space_top_before_gc() {
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
@@ -57,6 +58,13 @@ template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 #if !MT_STACK
 		if (EnableTeraCache && TeraCacheStatistics)
 			Universe::teraCache()->incr_intra_ptrs_per_mgc();
+#endif
+#if REGIONS
+        //Grouping
+#if MT_STACK
+        MutexLocker x(tera_cache_group_lock);
+#endif
+        Universe::teraCache()->group_regions((HeapWord *)p,(HeapWord*)obj);
 #endif
 		return false;
 	}

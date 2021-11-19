@@ -129,8 +129,8 @@ inline markOop markOopDesc::prototype_for_object(oop obj) {
   markOop prototype_header = obj->klass()->prototype_header();
   assert(prototype_header == prototype() || prototype_header->has_bias_pattern(), "corrupt prototype header");
 #endif
-  markOop prototype_header = obj->klass()->prototype_header();
-  assertf(prototype_header == prototype() || prototype_header->has_bias_pattern(), "corrupt prototype header");
+//  markOop prototype_header = obj->klass()->prototype_header();
+//  assertf(prototype_header == prototype() || prototype_header->has_bias_pattern(), "corrupt prototype header");
 
   return obj->klass()->prototype_header();
 }

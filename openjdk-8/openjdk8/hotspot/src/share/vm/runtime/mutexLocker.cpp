@@ -134,6 +134,7 @@ Mutex*   JfrThreadGroups_lock         = NULL;
 #endif
 
 Mutex*   tera_cache_lock              = NULL;
+Mutex*   tera_cache_group_lock        = NULL;
 
 #define MAX_NUM_MUTEX 128
 static Monitor * _mutex_array[MAX_NUM_MUTEX];
@@ -200,6 +201,7 @@ void mutex_init() {
     def(EvacFailureStack_lock      , Mutex  , nonleaf  ,   true );
   }
   def(tera_cache_lock              , Mutex  , leaf    ,    true ); // Used for teracache
+  def(tera_cache_group_lock        , Mutex  , leaf    ,    true ); // Used for teracache
   def(ParGCRareEvent_lock          , Mutex  , leaf     ,   true );
   def(DerivedPointerTableGC_lock   , Mutex,   leaf,        true );
   def(CodeCache_lock               , Mutex  , special,     true );

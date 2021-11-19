@@ -2,10 +2,10 @@
 # Global settings - Configurations
 
 # Spark Master
-master="sith4-fast"
+master="nextgenio-cn18"
 
 # A list of machines where the spark cluster is running
-MC_LIST="sith4-fast"
+MC_LIST="nextgenio-cn18"
 
 # Uncomment this line for sith1
 #[ -z "$HADOOP_HOME" ] && export HADOOP_HOME="/opt/spark/hadoop-2.6.4"
@@ -27,6 +27,9 @@ MC_LIST="sith4-fast"
 # 128GB Datasets
 DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
 
+<<<<<<< HEAD
+DATA_HDFS="file:///mnt/pmem_fsdax1/SparkBench"
+=======
 # 256GB Datasets
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench256"
 
@@ -41,14 +44,19 @@ DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBench128"
 
 ## This directory contains small generated datasets for testing
 #DATA_HDFS="hdfs://sith0-hadoop:9000/user/kolokasis/SparkBenchTest"
+>>>>>>> master
 
 # Local dataset optional
 DATASET_DIR="${DATA_HDFS}/dataset"
 
 # Use this when run on Spark 2.3.0-kolokasis
 SPARK_VERSION=2.3.0
+<<<<<<< HEAD
+[ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis
+=======
 [ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/opt/spark/spark-2.3.0-kolokasis
 #[ -z "$SPARK_HOME" ] &&  export SPARK_HOME=/opt/spark/spark-panthera
+>>>>>>> master
 
 # Use this when run on Spark 3.0.0-kolokasis
 #SPARK_VERSION=2.3.0
@@ -72,7 +80,7 @@ SPARK_EXECUTOR_CORES=8
 STORAGE_LEVEL=MEMORY_ONLY
 
 # For data generation
-NUM_OF_PARTITIONS=100
+NUM_OF_PARTITIONS=256
 
 # For running
 NUM_TRIALS=1

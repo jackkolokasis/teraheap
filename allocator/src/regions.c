@@ -12,6 +12,7 @@
 #include "../include/regions.h"
 #include "../include/sharedDefines.h"
 #include "../include/asyncIO.h"
+#include "../include/segments.h"
 
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
 #define HEADER_SIZE (32)                   // Header size of the Dummy object	
@@ -49,7 +50,7 @@ void init(uint64_t align) {
 	tc_mem_pool.cur_alloc_ptr = tc_mem_pool.start_address;
 	tc_mem_pool.size = 0;
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
-
+    init_regions();
 	req_init();
 
 #if ALIGN_ON
@@ -76,17 +77,51 @@ size_t mem_pool_size() {
 	return DEV_SIZE;
 }
 
+#if SPARK_HINT
+char* allocate(size_t size, uint64_t rdd_id) {
+	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
+
+	//assertf(alloc_ptr >= tc_mem_pool.start_address &&
+	//		alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
+	assertf(size > 0, "Object should be > 0");
+    #if REGIONS
+    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id);
+    if (alloc_ptr == NULL)
+        printf("Total cached data:%zu\n",tc_mem_pool.size);
+    assertf(alloc_ptr != NULL, "alloc_ptr is NULL");
+    #endif
+    tc_mem_pool.size += size;
+    tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);
+
+	// Alighn to 8 words the pointer (TODO: CHANGE TO ASSERTION)
+	if ((uint64_t) tc_mem_pool.cur_alloc_ptr % HEAPWORD != 0)
+		tc_mem_pool.cur_alloc_ptr = (char *)((((uint64_t)tc_mem_pool.cur_alloc_ptr) + (HEAPWORD - 1)) & -HEAPWORD);
+
+	//assertf(tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address,
+	//		"TeraCache if full");
+
+	return alloc_ptr;
+}
+#else
 // Allocate a new object with `size` and return the `start allocation
 // address`.
 // Args: `size` is in words, each word is 8 byte. Size should be > 0
 char* allocate(size_t size) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
 	size_t obj_size = size * HEAPWORD;
-	
-	assertf(obj_size > 0, "Object should be > 0");
+
 	assertf(alloc_ptr >= tc_mem_pool.start_address &&
 			alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
-#if ALIGN_ON
+	assertf(obj_size > 0, "Object should be > 0");
+
+#if REGIONS && !ALIGN_ON
+    alloc_ptr = allocate_to_region(obj_size);
+    if (alloc_ptr == NULL)
+        printf("Total cached data:%zu\n",tc_mem_pool.size);
+    assertf(alloc_ptr != NULL, "alloc_ptr is NULL");
+#endif
+
+#if ALIGN_ON && !REGIONS
 	assertf(obj_size <= (REGION_SIZE - HEADER_SIZE), "Oject size: %lu exceeds region size: %lu", 
 			obj_size, REGION_SIZE - HEADER_SIZE);
 #endif
@@ -94,7 +129,7 @@ char* allocate(size_t size) {
 	tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + obj_size);
 	tc_mem_pool.size += size;
 
-#if ALIGN_ON
+#if ALIGN_ON && !REGIONS
 	// Decrease the available free space counter for the region
 	tc_mem_pool.region_free_space -= obj_size;
 #endif
@@ -108,6 +143,7 @@ char* allocate(size_t size) {
 
 	return alloc_ptr;
 }
+#endif
 
 // Return the current allocation pointer
 char* cur_alloc_ptr() {

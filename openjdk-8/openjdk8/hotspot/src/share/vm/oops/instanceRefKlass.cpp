@@ -70,15 +70,16 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 		// Heap oop decription
 		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-#if TEST_CLOSURE
+//#if TEST_CLOSURE
 	if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
 	{
 		// We have to keep it here (CHECK)
-		MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type());
+		//MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type());
 
-		goto TERACACHE;
+		//goto TERACACHE;
+        Universe::teraCache()->mark_used_region((HeapWord*)referent);
 	}
-#endif
+//#endif
 	
     if (!referent->is_gc_marked() && 
 			MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
@@ -333,6 +334,9 @@ template <class T> void trace_reference_gc(const char *s, oop obj,
 #endif
 
 template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, oop obj) {
+  if (EnableTeraCache && obj->is_tera_cache()) {                                         \
+      Universe::teraCache()->enable_groups((HeapWord*) obj->mark()->decode_pointer());      \
+  }                                                              \
   T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
   MarkSweep::adjust_pointer(referent_addr);
 
@@ -341,7 +345,9 @@ template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, o
 
   T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
   MarkSweep::adjust_pointer(discovered_addr);
-
+  if (EnableTeraCache && obj->is_tera_cache()){                  \
+      Universe::teraCache()->disable_groups();                   \
+  }                                                              \
   debug_only(trace_reference_gc("InstanceRefKlass::oop_adjust_pointers", obj,
                                 referent_addr, next_addr, discovered_addr);)
 }

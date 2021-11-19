@@ -577,6 +577,7 @@ TOTAL_CONFS=${#HEAP[@]}
 ## Total Configurations
 #TOTAL_CONFS=${#HEAP[@]}
 
+
 ######################
 # New arguments 
 ######################
@@ -620,3 +621,4 @@ EXECUTORS=1
 
 # Total Configurations
 TOTAL_CONFS=${#HEAP[@]}
+

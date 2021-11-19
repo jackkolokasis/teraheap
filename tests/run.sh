@@ -4,15 +4,26 @@ XMS=5
 MAX=6
 TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 PARALLEL_GC_THREADS=16
+PLATFORM="nextgenio"
 
-JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
-JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-EXEC=( "Array" "Array_List_Float" "Array_List_Int" "Array_List" "Array_List_Scalar" "Clone" \
-	"Extend_Lambda" "HashMap" "List_Large" "List_Small" "MultiList" \
-	"Rehashing" "Simple_Array" "Simple_Lambda" "Test_Reference" "Test_Reflection" )
-#EXEC=( "Clone" )
+if [ $PLATFORM == "nextgenio" ] 
+then
+    JAVA="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
+    JDB="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
+    #EXEC=("Array_List" "Simple_Array" "List_Small" "List_Large" "MultiList" \
+    #	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_String" "HashMap" \
+    # 	"Clone" "Rehashing")
 
-V_JAVA="/usr/lib/jvm/java-8-kolokasis/build/linux-x86_64-normal-server-release/jdk/bin/java"
+    EXEC=( "Groupping" )
+else 
+    JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
+    JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
+    EXEC=( "Array" "Array_List_Float" "Array_List_Int" "Array_List" "Array_List_Scalar" "Clone" \
+        "Extend_Lambda" "HashMap" "List_Large" "List_Small" "MultiList" \
+        "Rehashing" "Simple_Array" "Simple_Lambda" "Test_Reference" "Test_Reflection" )
+    #EXEC=( "Clone" )
+fi
+V_JAVA="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.292.b10-1.el7_9.x86_64/bin/java"
 
 # Run tests using only interpreter mode
 function interpreter_mode() {
@@ -27,7 +38,7 @@ function interpreter_mode() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${OLD}m \
+		-Xms${XMS}m \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
@@ -47,7 +58,7 @@ function c1_mode() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${OLD}m \
+		-Xms${XMS}m \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
@@ -66,7 +77,7 @@ function c2_mode() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${OLD}g \
+		-Xms${XMS}g \
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \

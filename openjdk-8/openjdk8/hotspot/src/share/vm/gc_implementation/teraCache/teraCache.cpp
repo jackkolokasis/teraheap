@@ -35,12 +35,10 @@ uint64_t TeraCache::back_ptrs_per_mgc;
 uint64_t TeraCache::intra_ptrs_per_mgc;
 
 uint64_t TeraCache::obj_distr_size[3];	
-
+long int TeraCache::cur_obj_group_id;
 #if NEW_FEAT
 std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
 #endif
-
-long int TeraCache::cur_obj_group_id;
 
 // Constructor of TeraCache
 TeraCache::TeraCache() {
@@ -180,7 +178,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 		pos = allocate(size);
 	}
 #else
-	pos = allocate(size);
+	pos = allocate(size,(uint64_t)obj->get_obj_group_id());
 #endif
 
 
@@ -252,7 +250,9 @@ void TeraCache::tc_adjust() {
 
 	while (!_tc_adjust_stack.is_empty()) {
 		oop* obj = _tc_adjust_stack.pop();
+        Universe::teraCache()->enable_groups((HeapWord*) obj);
 		MarkSweep::adjust_pointer(obj);
+        Universe::teraCache()->disable_groups();
 	}
 	
 	gettimeofday(&end_time, NULL);
@@ -415,6 +415,76 @@ void TeraCache::incr_intra_ptrs_per_mgc(void) {
 	intra_ptrs_per_mgc++;
 }
 
+// Checks if the address of obj is before the empty part of the region
+bool TeraCache::check_if_valid_object(HeapWord *obj) {
+    return is_before_last_object((char *)obj);
+}
+
+// Returns the ending address of the last object in the region obj
+// belongs to
+HeapWord* TeraCache::get_last_object_end(HeapWord *obj) {
+    return (HeapWord*)get_last_object((char *) obj);
+}
+
+// Checks if the address of obj is the beginning of a region
+bool TeraCache::is_start_of_region(HeapWord *obj) {
+    return is_region_start((char *) obj);
+}
+
+// Resets the used field of all regions
+void TeraCache::reset_used_field(void) {
+    reset_used();
+}
+
+// Marks the region containing obj as used
+void TeraCache::mark_used_region(HeapWord *obj) {
+    mark_used((char *) obj);
+}
+
+// Prints all active regions
+void TeraCache::print_active_regions(void){
+    print_used_regions();
+}
+
+// If obj is in a different tc region than the region enabled, they
+// are grouped 
+void TeraCache::group_region_enabled(HeapWord* obj){
+    check_for_group((char*) obj);
+}
+
+// Frees all unused regions
+void TeraCache::free_unused_regions(void){
+    struct region_list *ptr = free_regions();
+    struct region_list *prev = NULL;
+    while (ptr != NULL){
+        start_array()->tc_region_reset((HeapWord*)ptr->start,(HeapWord*)ptr->end);
+        prev = ptr;
+        ptr = ptr->next;
+        free(prev);
+    }
+}
+   
+// Prints all the region groups
+void TeraCache::print_region_groups(void){
+    print_groups();
+}
+
+// Enables groupping with region of obj
+void TeraCache::enable_groups(HeapWord* obj){
+    enable_region_groups((char*) obj);
+}
+
+// Disables region groupping
+void TeraCache::disable_groups(void){
+    disable_region_groups();
+}
+
+
+// Groups the region of obj1 with the region of obj2
+void TeraCache::group_regions(HeapWord *obj1, HeapWord *obj2){
+    references( (char*) obj1, (char*) obj2 );
+}
+
 #if NEW_FEAT
 // New feature
 void TeraCache::tc_mk_dirty(oop obj) {
@@ -514,7 +584,8 @@ void TeraCache::tc_flush_buffer() {
 bool TeraCache::tc_obj_fit_in_region(size_t size) {
 	return r_is_obj_fits_in_region(size);
 }
-		
+#endif
+
 // We save the current object group 'id' for tera-marked object to
 // promote this 'id' to its reference objects
 void TeraCache::set_cur_obj_group_id(long int id) {
@@ -526,4 +597,7 @@ long int TeraCache::get_cur_obj_group_id(void) {
 	return cur_obj_group_id;
 }
 
-#endif
+void TeraCache::print_object_name(HeapWord *obj,const char *name){
+    print_objects_temporary_function((char *)obj, name);
+}
+

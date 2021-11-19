@@ -21,9 +21,9 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 //#if !NDEBUG
-//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 //#elif
-#define assertf(A, M, ...) ;
+//#define assertf(A, M, ...) ;
 //#endif
 
 /***********************************
@@ -76,14 +76,14 @@
 									// Keep this here until testing a lot and
 									// then remove it.
 									
-#define ALIGN					 1  //< Allocate in TeraCache using allignment
+#define ALIGN					 0  //< Allocate in TeraCache using allignment
 									// to avoid unnecessary pagefaults due to
 									// the traversal of card tables
 
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
-#define ASYNC				     1  //< Asynchronous I/O path for the writes in
+#define ASYNC				     0  //< Asynchronous I/O path for the writes in
 									// TeraCache
 
 #define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to
@@ -111,6 +111,9 @@
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
+#define REGIONS     			 1  // We set this to 1 when we are using
+                                    // the region allocator and 0 when
+                                    // we are not
 /**********************************
  * Policies for TeraCache
  **********************************/
@@ -135,10 +138,6 @@
 									//  combination with P_Balance or
 									//  P_Aggressive
 
-#define P_SIZE                  0	//< Move Objects to TeraCache based on their
-									//  size. This policy should be used in
-									//  combination with P_Balance or
-									//  P_Aggressive
 
 #define P_SD					1	//< Move Objects to TeraCache based on
 									//  serialization policy.  This policy
@@ -172,7 +171,7 @@
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for TeraCache
 
-#define VERBOSE_TC				  1  //< Print objects in T
+#define VERBOSE_TC				  0  //< Print objects in T
 
 // TODO: This define must be removed
 #define NEW_FEAT				  1  //< Enable when you add new feature

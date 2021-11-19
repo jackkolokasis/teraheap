@@ -16,7 +16,6 @@
 
 #include <stdint.h>
 #include <stdio.h>
-
 #define CARD_SIZE ((uint64_t) (1 << 9))
 #define PAGE_SIZE ((uint64_t) (1 << 12))
 
