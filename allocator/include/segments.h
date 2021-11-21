@@ -5,9 +5,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #define SPARK_HINT 1 
+#define ONE_WAY 0
 /*
  * the struct for regions
  */
+#if ONE_WAY
+struct region{
+    char *start_address;
+    uint64_t used;
+    char *last_allocated_end;
+    char *last_allocated_start;
+    struct group *dependency_list;
+    uint64_t rdd_id;
+};
+#else
 struct region{
     char *start_address;
     uint64_t used;
@@ -17,14 +28,22 @@ struct region{
     int group_id;
     uint64_t rdd_id;
 };
+#endif
 
 /*
  * the struct for group array
  */
+#if ONE_WAY
+struct group{
+    struct region *region;
+    struct group *next;
+};
+#else
 struct group{
     struct region *region;
     int num_of_references;
 };
+#endif
 
 /*
  * Initialize region array, group array and their fields

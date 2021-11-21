@@ -21,9 +21,9 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 //#if !NDEBUG
-#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 //#elif
-//#define assertf(A, M, ...) ;
+#define assertf(A, M, ...) ;
 //#endif
 
 /***********************************
@@ -83,7 +83,7 @@
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
-#define ASYNC				     0  //< Asynchronous I/O path for the writes in
+#define ASYNC				     1  //< Asynchronous I/O path for the writes in
 									// TeraCache
 
 #define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to
@@ -169,7 +169,10 @@
 /***********************************
  * Statistics
  **********************************/
-#define STATISTICS			      0  //< Enable statistics for TeraCache
+#define STATISTICS			      0  //< Enable statistics for
+                                     // TeraCache Allocator. Do NOT
+                                     // use this flug in performance
+                                     // measurements
 
 #define VERBOSE_TC				  0  //< Print objects in T
 

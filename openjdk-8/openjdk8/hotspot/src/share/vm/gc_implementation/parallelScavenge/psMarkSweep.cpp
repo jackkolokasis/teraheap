@@ -238,7 +238,9 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
 #if REGIONS
     // Print Region Groups
+#if STATISTICS
     Universe::teraCache()->print_region_groups();
+#endif
     
     // Free all the regions that are unused after marking
     Universe::teraCache()->free_unused_regions();
@@ -710,8 +712,9 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 		tclog_or_tty->print_cr("[STATISTICS] | PHASE1 = %llu\n",
 				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
 				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
-        //TODO: PRINT ACTIVE REGIONS
+#if STATISTICS
         Universe::teraCache()->print_active_regions();
+#endif
 	}
 #endif
 
