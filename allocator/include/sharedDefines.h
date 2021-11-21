@@ -37,6 +37,8 @@
 
 #define GROUP_DEBUG 0
 
-#define STATISTICS 1
+#define STATISTICS 0
+
+#define DEBUG_PRINT 0
 
 #endif
