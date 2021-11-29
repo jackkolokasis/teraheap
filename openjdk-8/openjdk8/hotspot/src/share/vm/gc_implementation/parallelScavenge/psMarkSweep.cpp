@@ -216,8 +216,9 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     //Universe::teraCache()->print_region_groups();
 
 #if REGIONS
-    // Reset the used field of all regions
-    Universe::teraCache()->reset_used_field();
+	if (EnableTeraCache)
+		// Reset the used field of all regions
+		Universe::teraCache()->reset_used_field();
 #endif
     // Recursive mark all the live objects
     mark_sweep_phase1(clear_all_softrefs);
@@ -237,13 +238,19 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     mark_sweep_phase4();
 
 #if REGIONS
-    // Print Region Groups
+	if (EnableTeraCache) {
 #if STATISTICS
+    // Print Region Groups
     Universe::teraCache()->print_region_groups();
 #endif
-    
+
+#if DEBUG_PLACEMENT
+		Universe::teraCache()->tc_print_objects_per_region();
+#endif
+
     // Free all the regions that are unused after marking
     Universe::teraCache()->free_unused_regions();
+	}
 #endif   
     restore_marks();
 

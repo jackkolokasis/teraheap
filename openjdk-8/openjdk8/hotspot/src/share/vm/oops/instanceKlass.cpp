@@ -2304,6 +2304,8 @@ void InstanceKlass::oop_follow_contents(oop obj) {
 	if (EnableTeraCache && obj->is_tera_cache())
 	{
 		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+		Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+
 #if P_SD
 		InstanceKlass_TC_OOP_MAP_ITERATE( \
 				obj, \

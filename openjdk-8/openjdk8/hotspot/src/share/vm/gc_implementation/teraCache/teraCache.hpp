@@ -75,6 +75,10 @@ class TeraCache {
    												   // group id for tera-marked
 												   // object to promote this id
 												   // to their reference objects
+		static long int cur_obj_part_id;	       //<We save the current object
+   												   // partition id for tera-marked
+												   // object to promote this id
+												   // to their reference objects
 
 	public:
 		// Constructor
@@ -251,6 +255,18 @@ class TeraCache {
 		
 		// Get the saved current object group id 
 		long int get_cur_obj_group_id(void);
+		
+		// We save the current object partition 'id' for tera-marked object to
+		// promote this 'id' to its reference objects
+		void set_cur_obj_part_id(long int id);
+		
+		// Get the saved current object partition id 
+		long int get_cur_obj_part_id(void);
+
+		// Iterate over all objects in each region and print their states
+		// This function is for debugging purposes to understand and fix the
+		// locality in regions
+		void tc_print_objects_per_region(void);
 		
 		// 
 		// // Validate if all the dirty cards that we found are dirty now are

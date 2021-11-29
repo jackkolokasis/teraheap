@@ -36,6 +36,7 @@ uint64_t TeraCache::intra_ptrs_per_mgc;
 
 uint64_t TeraCache::obj_distr_size[3];	
 long int TeraCache::cur_obj_group_id;
+long int TeraCache::cur_obj_part_id;
 #if NEW_FEAT
 std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
 #endif
@@ -597,7 +598,46 @@ long int TeraCache::get_cur_obj_group_id(void) {
 	return cur_obj_group_id;
 }
 
+// We save the current object partition 'id' for tera-marked object to
+// promote this 'id' to its reference objects
+void TeraCache::set_cur_obj_part_id(long int id) {
+	cur_obj_part_id = id;
+}
+
+// Get the saved current object partition id 
+long int TeraCache::get_cur_obj_part_id(void) {
+	return cur_obj_part_id;
+}
+
 void TeraCache::print_object_name(HeapWord *obj,const char *name){
     print_objects_temporary_function((char *)obj, name);
+}
+
+void TeraCache::tc_print_objects_per_region() {
+	HeapWord *next_region;
+	HeapWord *obj_addr;
+	oop obj;
+
+	start_iterate_regions();
+
+	next_region = (HeapWord *) get_next_region();
+
+	while(next_region != NULL) {
+		obj_addr = next_region;
+
+		while (1) {
+			obj = oop(obj_addr);
+
+			fprintf(stderr, "[PLACEMENT] OBJ = %p | RDD = %d | PART_ID = %lu\n", obj,
+					obj->get_obj_group_id(), obj->get_obj_part_id());
+
+			if (!check_if_valid_object(obj_addr + obj->size()))
+				break;
+
+			obj_addr += obj->size();
+		}
+
+		next_region = (HeapWord *) get_next_region();
+	}
 }
 

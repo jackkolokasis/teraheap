@@ -16,5 +16,3 @@ then
 fi
 
 make
-
-$SUDO make install

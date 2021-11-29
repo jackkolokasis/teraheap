@@ -7,6 +7,11 @@ jvm_release_build:
   script:
     - cd allocator
     - ./build.sh docker
+    - export LIBRARY_PATH=$(pwd)/lib/:$LIBRARY_PATH
+    - export LD_LIBRARY_PATH=$(pwd)/lib/:$LD_LIBRARY_PATH                                                                                           
+    - export PATH=$(pwd)/include/:$PATH
+    - export C_INCLUDE_PATH=$(pwd)/include/:$C_INCLUDE_PATH                                                                                         
+    - export CPLUS_INCLUDE_PATH=$(pwd)/include/:$CPLUS_INCLUDE_PATH
     - cd ../openjdk-8/openjdk8
     - bash ./configure --with-jobs=1 --disable-debug-symbols --with-extra-cflags='-O3' --with-extra-cxxflags='-O3'
     - make DISABLE_HOTSPOT_OS_VERSION_CHECK=ok
@@ -16,6 +21,11 @@ jvm_debug_build:
   script:
     - cd allocator
     - ./build.sh docker
+    - export LIBRARY_PATH=$(pwd)/lib/:$LIBRARY_PATH
+    - export LD_LIBRARY_PATH=$(pwd)/lib/:$LD_LIBRARY_PATH                                                                                           
+    - export PATH=$(pwd)/include/:$PATH
+    - export C_INCLUDE_PATH=$(pwd)/include/:$C_INCLUDE_PATH                                                                                         
+    - export CPLUS_INCLUDE_PATH=$(pwd)/include/:$CPLUS_INCLUDE_PATH
     - cd ../openjdk-8/openjdk8
     - bash ./configure --with-debug-level=release --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
     - make DISABLE_HOTSPOT_OS_VERSION_CHECK=ok

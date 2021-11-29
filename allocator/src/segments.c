@@ -13,10 +13,15 @@ uint64_t cur_group;
 uint64_t cur_region;
 uint64_t region_enabled;
 uint64_t id_array[REGION_ARRAY_SIZE];
+
 #if STATISTICS
 double alloc_elapsedtime = 0.0;
 double free_elapsedtime = 0.0;
 #endif
+
+int _next_region;						//< Get the next active region during 
+										// region iteration
+
 /*
  * Initialize region array, group array and their fields
  */
@@ -24,7 +29,7 @@ void init_regions(){
     int i;
     cur_region = 0;
     region_enabled = -1;
-#ifdef DEBUG_PRINT
+#if DEBUG_PRINT
     printf("Total regions:%lu\n",REGION_ARRAY_SIZE);
 #endif
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
@@ -272,24 +277,44 @@ void merge_groups(int group1, int group2){
     }
 }
 
+
+/**
+ * Get total number of groups
+ */
+long get_total_groups() {
+    int i;
+    long counter = 0;
+
+    for (i = 0; i < GROUP_ARRAY_SIZE; i++) {
+		if (group_array[i].region != NULL)
+			counter++;
+    }
+
+	return counter;
+}
+
 /*
  * prints all the region groups that contain something
  */
-void print_groups(){
+void print_groups() {
     int i;
-    printf("Groups:\n");
+
+    fprintf(stderr, "Groups:\n");
+
     for (i = 0; i < GROUP_ARRAY_SIZE ; i++){
         if (group_array[i].region != NULL){
             struct region *ptr = group_array[i].region;
-            printf("Group %d \n",i);
+
+            fprintf(stderr, "Group %d \n",i);
+
             while (ptr != NULL){
-                printf("Region %lu\n",ptr-region_array);
+                fprintf(stderr, "Region %lu\n", ptr-region_array);
                 ptr = ptr->next_in_group;
             }
-            printf("%d references\n",group_array[i].num_of_references);
+
+            fprintf(stderr, "%d references\n", group_array[i].num_of_references);
         }
     }
-    fflush(stdout);
 }
 
 /*
@@ -363,8 +388,7 @@ struct region_list* free_regions(){
             head = new_node;
             region_array[i].last_allocated_end = region_array[i].start_address;
             region_array[i].last_allocated_start = NULL;
-            printf("Freeing region %d \n",i);
-            fflush(stdout);
+            fprintf(stderr, "Freeing region %d \n", i);
         }
     }
     for (i = 0; i < GROUP_ARRAY_SIZE ; i++){
@@ -381,8 +405,7 @@ struct region_list* free_regions(){
                 ptr->last_allocated_end = ptr->start_address;
                 ptr->last_allocated_start = NULL;
                 prev = ptr;
-                printf("Freeing region from group: %lu \n", ptr-region_array);
-                fflush(stdout);
+                fprintf(stderr, "Freeing region from group: %lu \n", ptr-region_array);
                 ptr = ptr->next_in_group;
                 prev->next_in_group = NULL;
             }
@@ -400,15 +423,47 @@ struct region_list* free_regions(){
 }
 
 /*
+ * Get the total allocated regions
+ * Return the total number of allocated regions or zero, otherwise
+ */
+long total_allocated_regions() {
+	int i;
+	long counter = 0;
+
+	for (i = 0; i < REGION_ARRAY_SIZE ; i++){
+		if (region_array[i].last_allocated_end != region_array[i].start_address)
+			counter++;
+	}
+
+	return counter;
+}
+
+/*
  * Prints all the allocated regions
  */
 void print_regions(){
     int i;
-    printf("Regions:\n");
+    fprintf(stderr, "Regions:\n");
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
         if (region_array[i].last_allocated_end != region_array[i].start_address)
-            printf("Region %d\n",i);
+            fprintf(stderr, "Region %d\n", i);
     }
+}
+
+/*
+ * Get the total number of used regions
+ * Return the total number of used regions or zero, otherwise
+ */
+long total_used_regions() {
+    int i;
+	long counter = 0;
+
+	for (i = 0 ; i < REGION_ARRAY_SIZE ; i++) {
+		if (region_array[i].used == 1)
+			counter++;
+	}
+
+	return counter;
 }
 
 /*
@@ -419,7 +474,7 @@ void print_used_regions(){
     printf("Used Regions:\n");
     for (i = 0 ; i < REGION_ARRAY_SIZE ; i++){
         if (region_array[i].used == 1)
-            printf("Region %d\n",i);
+            printf("Region %d\n", i);
     }
     fflush(stdout);
 }
@@ -479,4 +534,35 @@ void print_objects_temporary_function(char *obj,const char *string){
     if (region_array[seg].rdd_id == 29 || region_array[seg].rdd_id == 42){
         printf("Object name: %s\n",string);
     }
+}
+
+/*
+ * Start iteration over all active regions to print their object state.
+ */
+void start_iterate_regions() {
+	_next_region = 0;
+}
+
+/*
+ * Return the next active region or NULL if we reached the end of the region
+ * array.
+ */
+char* get_next_region() {
+	char *region_start_addr;
+
+	// Find the next active region
+	while (_next_region < REGION_ARRAY_SIZE &&
+			region_array[_next_region].used == 0) {
+		_next_region++; 
+	}
+
+	if (_next_region >= REGION_ARRAY_SIZE)
+		return NULL;
+
+	fprintf(stderr, "[PLACEMENT] Region: %d\n", _next_region);
+
+	region_start_addr = region_array[_next_region].start_address;
+	_next_region++;
+
+	return region_start_addr;
 }

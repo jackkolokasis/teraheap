@@ -91,6 +91,12 @@ void merge_groups(int group1, int group2);
  */
 void references(char *obj1, char *obj2);
 
+/**
+ * Get the total number of groups
+ * Return number of groups that exist, or zero otherwise
+ */
+long get_total_groups();
+
 /*
  * Prints all the region groups that contain something
  */
@@ -113,10 +119,22 @@ void mark_used(char *obj);
  */
 struct region_list* free_regions();
 
+/**
+ * Get the total number of allocated regions
+ * Return the total number of allocated regions or zero, otherwise
+ */
+long total_allocated_regions();
+
 /*
  * Prints all the allocated regions
  */
 void print_regions();
+
+/*
+ * Get the total number of used regions
+ * Return the number of used regions or zero, otherwise
+ */
+long total_used_regions();
 
 /*
  * Prints all the used regions
@@ -155,4 +173,15 @@ void disable_region_groups(void);
 void check_for_group(char *obj);
 
 void print_objects_temporary_function(char *obj,const char *string);
+
+/*
+ * Start iteration over all active regions to print their object state
+ */
+void start_iterate_regions(void);
+
+/*
+ * Get the next active region
+ */
+char* get_next_region(void);
+
 #endif

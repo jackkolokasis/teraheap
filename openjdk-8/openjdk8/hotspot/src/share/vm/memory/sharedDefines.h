@@ -21,9 +21,9 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 //#if !NDEBUG
-//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 //#elif
-#define assertf(A, M, ...) ;
+//#define assertf(A, M, ...) ;
 //#endif
 
 /***********************************
@@ -67,6 +67,10 @@
 #define DEBUG_VECTORS			 0  //< Enable debug vectors in compaction phase
 									//  to check every memmove operation if
 									//  overwrites other objects
+
+#define DEBUG_PLACEMENT          0  //< Enable debug object placement in
+									// TeraCache showing their RDD ID and
+									// Partition ID
 
 #define TEST_CLOSURE             0
 

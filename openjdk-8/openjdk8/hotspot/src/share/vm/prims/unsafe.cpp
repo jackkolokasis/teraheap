@@ -609,10 +609,11 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObject(JNIEnv *env, jobject unsafe, jobject obj)
   if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
 	return;
 
-  o->set_tera_cache(0);
+  o->set_tera_cache(0, 0);
 UNSAFE_END
 
-UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe, jobject obj, jlong id))
+UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong rdd_id, jlong part_id))
   UnsafeWrapper("Unsafe_TcMarkObjectWithId");
   
   oop o = JNIHandles::resolve_non_null(obj);
@@ -621,7 +622,7 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe, jobjec
   if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
 	return;
 
-  o->set_tera_cache(id);
+  o->set_tera_cache(rdd_id, part_id);
 UNSAFE_END
 
 
@@ -1622,7 +1623,7 @@ static JNINativeMethod methods_18[] = {
 	// Mark object to be moved in TeraCache
     {CC"tcMarkObject",       CC"("OBJ")V",               FN_PTR(Unsafe_TcMarkObject)},
 	// Mark object to be moved in TeraCache using Id
-    {CC"tcMarkObjectWithId", CC"("OBJ"J)V",              FN_PTR(Unsafe_TcMarkObjectWithId)},
+    {CC"tcMarkObjectWithId", CC"("OBJ"JJ)V",              FN_PTR(Unsafe_TcMarkObjectWithId)},
 
     {CC"reallocateMemory",   CC"("ADR"J)"ADR,            FN_PTR(Unsafe_ReallocateMemory)},
     {CC"freeMemory",         CC"("ADR")V",               FN_PTR(Unsafe_FreeMemory)},
