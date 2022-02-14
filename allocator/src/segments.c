@@ -1,36 +1,40 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <limits.h>
 #include "../include/segments.h"
 #include "../include/regions.h"
 #include "../include/sharedDefines.h"
 
 struct region region_array[REGION_ARRAY_SIZE];
-struct group group_array[GROUP_ARRAY_SIZE];
 uint64_t cur_group;
 uint64_t cur_region;
-uint64_t region_enabled;
-uint64_t id_array[REGION_ARRAY_SIZE];
-
+int region_enabled;
+struct region *id_array[MAX_PARTITIONS*MAX_RDD_ID];
+struct offset *offset_list;
 #if STATISTICS
 double alloc_elapsedtime = 0.0;
 double free_elapsedtime = 0.0;
+unsigned int total_deps = 0;
 #endif
 
-int _next_region;						//< Get the next active region during 
-										// region iteration
+int _next_region;
+
 
 /*
  * Initialize region array, group array and their fields
  */
 void init_regions(){
-    int i;
+    uint64_t i;
     cur_region = 0;
     region_enabled = -1;
+    offset_list = NULL;
 #if DEBUG_PRINT
-    printf("Total regions:%lu\n",REGION_ARRAY_SIZE);
+    printf("Total num of regions:%lu\n",REGION_ARRAY_SIZE);
 #endif
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
         if (i == 0)
@@ -39,16 +43,54 @@ void init_regions(){
         region_array[i].used = 0;
         region_array[i].last_allocated_end = region_array[i].start_address;
         region_array[i].last_allocated_start = NULL;
-        region_array[i].next_in_group = NULL;
-        region_array[i].rdd_id = REGION_ARRAY_SIZE;
-        id_array[i] = REGION_ARRAY_SIZE;
-        region_array[i].group_id = -1;
+        region_array[i].first_allocated_start = NULL;
+        region_array[i].dependency_list = NULL;
+        region_array[i].size_mapped = 0;
+        region_array[i].offset_list = NULL;
+        region_array[i].rdd_id = MAX_PARTITIONS*MAX_RDD_ID;
     }
-    for ( i = 0; i < GROUP_ARRAY_SIZE ; i++){
-        group_array[i].region = NULL;
-        group_array[i].num_of_references = 0;
+    for (i = 0 ; i < (MAX_PARTITIONS*MAX_RDD_ID) ; i++){
+        id_array[i] = NULL;
+    }
+    struct offset *prev = NULL;
+    for (i = 0 ; i < DEV_SIZE / MMAP_SIZE ; i++){
+        struct offset *ptr = malloc(sizeof(struct offset));
+        ptr->offset = MMAP_SIZE * i;
+        ptr->next = NULL;
+        if (offset_list == NULL){
+            offset_list = ptr;
+        } else {
+            prev->next = ptr;
+        }
+        prev = ptr;
     }
 }
+
+/*
+ * Returns the start of cont_regions empty regions
+ */
+unsigned int get_cont_regions(unsigned int cont_regions){
+    unsigned int i;
+    unsigned int j;
+    for(i = 0 ; i < REGION_ARRAY_SIZE ; i++ ) {
+        for (j = i ; j < i + cont_regions ; j++) {
+            if (region_array[i % REGION_ARRAY_SIZE].last_allocated_end == region_array[i % REGION_ARRAY_SIZE].start_address) {
+                continue;
+            }
+            else {
+                break;
+            }
+        }
+        if (j == i + cont_regions){
+            return i;
+        } else {
+            i = j;
+        }
+    }
+    return -1;
+}
+            
+
 
 /*
  * Finds an empty region and returns its starting address
@@ -56,73 +98,202 @@ void init_regions(){
  * Bytes)
  */
 char* new_region(size_t size){
-    int i;
-    //for (i = cur_region ; i < cur_region+REGION_ARRAY_SIZE ; i++){
-    for(i = 0 ; i < REGION_ARRAY_SIZE ; i++ ) {
-        if (region_array[i % REGION_ARRAY_SIZE].last_allocated_end == region_array[i % REGION_ARRAY_SIZE].start_address) {
-            cur_region = i % REGION_ARRAY_SIZE;
-            mark_used(region_array[cur_region].start_address);
-            region_array[cur_region].last_allocated_start = region_array[cur_region].last_allocated_end;
-            region_array[cur_region].last_allocated_end = region_array[cur_region].start_address + size;
-            return region_array[cur_region].start_address;
-        }
+    unsigned int i;
+    unsigned int cont_regions = (size / REGION_SIZE) + 1;
+    cur_region = get_cont_regions(cont_regions) % REGION_ARRAY_SIZE;
+    if (cur_region == -1 )
+        return NULL;
+    for (i = cur_region ; i < cur_region + cont_regions ; i++){
+        references(region_array[cur_region].start_address,region_array[i].start_address);
+        mark_used(region_array[i].start_address);
+        region_array[i].last_allocated_start = region_array[cur_region].start_address;
+        region_array[i].first_allocated_start = region_array[cur_region].start_address;
+        region_array[i].last_allocated_end = region_array[cur_region].start_address + size;
     }
+    return region_array[cur_region].start_address;
 #if DEBUG_PRINT
     printf("No empty regions\n");
 #endif
-    return NULL;
 }
 
 #if SPARK_HINT
-char* allocate_to_region(size_t size, uint64_t rdd_id){
+uint64_t get_id(uint64_t rdd_id, uint64_t partition_id){
+    return (rdd_id % MAX_RDD_ID) * MAX_PARTITIONS + partition_id;
+}
+
+char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t partition_id){
 #if STATISTICS
     struct timeval t1,t2;
     gettimeofday(&t1, NULL);
 #endif
+#if ANONYMOUS
     assert(size <= (uint64_t)REGION_SIZE);
-    if (id_array[rdd_id] == REGION_ARRAY_SIZE){
+#endif
+    uint64_t id_index = get_id(rdd_id,partition_id);
+    if (id_array[id_index] == NULL){
         char * res = new_region(size);
-        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+        //struct group *node = malloc(sizeof(struct group));
+        //node->region = &region_array[((res+size) - region_array[0].start_address) / ((uint64_t)REGION_SIZE)];
+        //node->next = NULL;
+        //id_array[id_index] = node;
+        id_array[id_index] = &region_array[((res+size) - region_array[0].start_address) / ((uint64_t)REGION_SIZE)];
+        id_array[id_index]->rdd_id = id_index;
 #if DEBUG_PRINT
-        printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[rdd_id]);
-        fflush(stdout);
+        //printf("INDEX %zu, RDDID %zu, PARTID %zu, REGION %zu\n", id_index, rdd_id, partition_id, id_array[id_index]);
+        //fflush(stdout);
 #endif
-        region_array[id_array[rdd_id]].rdd_id = rdd_id;
 #if STATISTICS
         gettimeofday(&t2, NULL);
         alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
         alloc_elapsedtime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 #endif
+#if ANONYMOUS
+        uint64_t i = 0;
+        struct offset *mmap_offset = offset_list;
+        for (i = 0; i < (size/MMAP_SIZE)+1 ; i++){
+            struct offset *tmp = offset_list;
+            assert(tmp != NULL);
+            offset_list = offset_list->next;
+            tmp->next = id_array[id_index]->offset_list;
+            id_array[id_index]->offset_list = tmp;
+        }
+        char *address_mmapped = mmap(res, MMAP_SIZE * ((size/MMAP_SIZE)+1), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, mmap_offset->offset);
+        id_array[id_index]->size_mapped += MMAP_SIZE * ((size/MMAP_SIZE)+1);
+        if (address_mmapped == MAP_FAILED){
+            fprintf(stderr, "mmap to file failed 1\n");
+        }
+#endif
         return res;
     }
-    if (size > ((region_array[id_array[rdd_id]].start_address+(uint64_t)REGION_SIZE) - region_array[id_array[rdd_id]].last_allocated_end)){
-#if STATISTICS
-        printf("Wasting %luB in region %d, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
+    if ((id_array[id_index]->start_address+(uint64_t)REGION_SIZE) < id_array[id_index]->last_allocated_end || size > ((id_array[id_index]->start_address+(uint64_t)REGION_SIZE) - id_array[id_index]->last_allocated_end)){
+        //struct group *ptr = id_array[id_index];
+#if !ANONYMOUS
+        /*
+        if (id_array[id_index]->start_address + (uint64_t) REGION_SIZE - id_array[id_index]->last_allocated_end < 0.05 * REGION_SIZE){
+           struct group *ptr = id_array[id_index];
+           id_array[id_index] = id_array[id_index]->next;
+           free(ptr);
+        }
+        */
+        /*
+        struct group *prev = NULL;
+        while (ptr != NULL){
+            if (size <= ptr->region->start_address + (uint64_t) REGION_SIZE - ptr->region->last_allocated_end){
+                mark_used(ptr->region->start_address);
+                ptr->region->last_allocated_start = ptr->region->last_allocated_end;
+                ptr->region->last_allocated_end = ptr->region->last_allocated_start + size;
+                if (prev != NULL){
+                    prev->next = ptr->next;
+                    ptr->next = id_array[id_index];
+                    id_array[id_index] = ptr;
+                }
+                return ptr->region->last_allocated_start;
+            }
+            prev = ptr;
+            ptr = ptr->next;
+        }
+        */
 #endif
+        //ptr = malloc(sizeof(struct group));
         char * res = new_region(size);
-        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-#if DEBUG_PRINTS
-        printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[rdd_id]);
-        fflush(stdout);
-#endif
-        region_array[id_array[rdd_id]].rdd_id = rdd_id;
+        //ptr->region = &region_array[((res+size) - region_array[0].start_address) / ((uint64_t)REGION_SIZE)];
+        //ptr->next = id_array[id_index];
+        //id_array[id_index] = ptr;
+        id_array[id_index] = &region_array[((res+size) - region_array[0].start_address) / ((uint64_t)REGION_SIZE)];
+        id_array[id_index]->rdd_id = id_index;
 #if STATISTICS
         gettimeofday(&t2, NULL);
         alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
         alloc_elapsedtime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 #endif
+#if ANONYMOUS
+        /*
+        uint64_t i = 0;
+        struct offset *mmap_offset = offset_list;
+        for (i = 0; i < (size/MMAP_SIZE)+1 ; i++){
+            struct offset *tmp = offset_list;
+            assert(tmp != NULL);
+            offset_list = offset_list->next;
+            tmp->next = id_array[id_index]->offset_list;
+            id_array[id_index]->offset_list = tmp;
+        }
+        char *address_mmapped = mmap(res, MMAP_SIZE * ((size/MMAP_SIZE)+1), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, mmap_offset->offset);
+        id_array[id_index]->size_mapped += MMAP_SIZE * ((size/MMAP_SIZE)+1);
+        if (address_mmapped == MAP_FAILED){
+            fprintf(stderr, "mmap to file failed 2\n");
+        }
+        */
+        uint64_t i = 0;
+        for (i = 0; i < (size/MMAP_SIZE)+1 ; i++){
+            struct offset *tmp = offset_list;
+            assert(tmp != NULL);
+            offset_list = offset_list->next;
+            tmp->next = id_array[id_index]->offset_list;
+            id_array[id_index]->offset_list = tmp;
+            char *address_mmapped = mmap(res + id_array[id_index]->size_mapped, MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, tmp->offset);
+            id_array[id_index]->size_mapped += MMAP_SIZE;
+            if (address_mmapped == MAP_FAILED){
+                fprintf(stderr, "mmap to file failed 2\n");
+            }
+        }
+#endif
         return res;
     }
-    mark_used(region_array[id_array[rdd_id]].start_address);
-    region_array[id_array[rdd_id]].last_allocated_start = region_array[id_array[rdd_id]].last_allocated_end;
-    region_array[id_array[rdd_id]].last_allocated_end = region_array[id_array[rdd_id]].last_allocated_start + size;
+    mark_used(id_array[id_index]->start_address);
+    id_array[id_index]->last_allocated_start = id_array[id_index]->last_allocated_end;
+    id_array[id_index]->last_allocated_end = id_array[id_index]->last_allocated_start + size;
+#if ANONYMOUS
+    if (size > MMAP_SIZE || id_array[id_index]->last_allocated_end > id_array[id_index]->start_address+id_array[id_index]->size_mapped){
+        size_t missing_size =  id_array[id_index]->last_allocated_end - (id_array[id_index]->start_address + id_array[id_index]->size_mapped); 
+        uint64_t i = 0;
+        /*
+        for (i = 0; i < (size/MMAP_SIZE)+1 ; i++){
+            struct offset *tmp = offset_list;
+            assert(tmp != NULL);
+            offset_list = offset_list->next;
+            tmp->next = id_array[id_index]->offset_list;
+            id_array[id_index]->offset_list = tmp;
+        }
+        void *address_mmapped = mmap(id_array[id_index]->start_address + id_array[id_index]->size_mapped, MMAP_SIZE * ((missing_size/MMAP_SIZE)+1), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, fd, mmap_offset->offset);
+        */
+        for (i = 0; i < (missing_size/MMAP_SIZE)+1 ; i++){
+            struct offset *tmp = offset_list;
+            assert(tmp != NULL);
+            offset_list = offset_list->next;
+            tmp->next = id_array[id_index]->offset_list;
+            id_array[id_index]->offset_list = tmp;
+            void *address_mmapped = mmap(id_array[id_index]->start_address + id_array[id_index]->size_mapped, MMAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, fd, tmp->offset);
+            id_array[id_index]->size_mapped += MMAP_SIZE;
+            if (address_mmapped == MAP_FAILED){
+                fprintf(stderr, "mmap to file failed 3\n");
+                fprintf(stderr, "Start of region:%p\n",id_array[id_index]->start_address);
+                fprintf(stderr, "Last object ends at:%p\n",id_array[id_index]->last_allocated_start );
+                fprintf(stderr, "MMAPS needed:%zu\n",((missing_size/MMAP_SIZE)+1));
+                fprintf(stderr, "size:%zu\n",size);
+                fprintf(stderr, "missing size:%zu\n",missing_size);
+                return NULL;
+            }
+        }
+        /*
+        id_array[id_index]->size_mapped += MMAP_SIZE * ((missing_size/MMAP_SIZE)+1);
+        if (address_mmapped == MAP_FAILED){
+            fprintf(stderr, "mmap to file failed 3\n");
+            fprintf(stderr, "Start of region:%p\n",id_array[id_index]->start_address);
+            fprintf(stderr, "Last object ends at:%p\n",id_array[id_index]->last_allocated_start );
+            fprintf(stderr, "MMAPS needed:%zu\n",((missing_size/MMAP_SIZE)+1));
+            fprintf(stderr, "size:%zu\n",size);
+            fprintf(stderr, "missing size:%zu\n",missing_size);
+            return NULL;
+        }
+        */
+    }
+#endif
 #if STATISTICS
     gettimeofday(&t2, NULL);
     alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
     alloc_elapsedtime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 #endif
-    return region_array[id_array[rdd_id]].last_allocated_start;
-
+    return id_array[id_index]->last_allocated_start;
 }
 #else
 /*
@@ -136,10 +307,8 @@ char* allocate_to_region(size_t size){
     cur_region = 0;
     while (region_array[i % REGION_ARRAY_SIZE].last_allocated_end == region_array[i % REGION_ARRAY_SIZE].start_address)
         cur_region++;
-#if DEBUG_PRINT
     printf("ALLOCATING IN REGION %d\n",cur_region);
     printf("Allocating at address %p, object of size %zu\n",region_array[cur_region].last_allocated_end, size);
-#endif
     mark_used(region_array[cur_region].start_address);
     region_array[cur_region].last_allocated_start = region_array[cur_region].last_allocated_end;
     region_array[cur_region].last_allocated_end = region_array[cur_region].start_address + size;
@@ -147,9 +316,6 @@ char* allocate_to_region(size_t size){
     #endif
     assert(size <= (uint64_t)REGION_SIZE);
     if (size > ((region_array[cur_region].start_address+(uint64_t)REGION_SIZE) - region_array[cur_region].last_allocated_end)){
-#if STATISTICS
-        printf("Wasting %luB in region %d, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
-#endif
         char * res = new_region(size);
         return res;
     }
@@ -159,162 +325,87 @@ char* allocate_to_region(size_t size){
     return region_array[cur_region].last_allocated_start;
 }
 #endif
+
 /*
  * function that connects two regions in a group
  * arguments: obj1: the object that references the other
  * obj2 the object that is referenced (order does not matter)
  */
 void references(char *obj1, char *obj2){
-    
-    uint64_t seg1 = (obj1 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-    uint64_t seg2 = (obj2 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-    if (seg1 >= REGION_ARRAY_SIZE || seg2 >= REGION_ARRAY_SIZE){ 
+    int seg1 = (obj1 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+    int seg2 = (obj2 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+    if (seg1 >= REGION_ARRAY_SIZE || seg2 >= REGION_ARRAY_SIZE || seg1 < 0 || seg2 < 0){ 
         return;
     }
     if (seg1 == seg2)
         return;
-    if (region_array[seg1].group_id == -1 && region_array[seg2].group_id == -1){
-        region_array[seg1].group_id = new_group();
-        region_array[seg2].group_id = region_array[seg1].group_id;
-        group_array[region_array[seg1].group_id].region = &region_array[seg1];
-        region_array[seg1].next_in_group = &region_array[seg2];
-        group_array[region_array[seg1].group_id].num_of_references += region_array[seg1].used;
-        group_array[region_array[seg2].group_id].num_of_references += region_array[seg2].used;
+    struct group *ptr = region_array[seg1].dependency_list;
+    while (ptr != NULL){
+        if (ptr->region == &region_array[seg2])
+            break;
+        ptr = ptr->next;
     }
-    else if (region_array[seg1].group_id == -1 || region_array[seg2].group_id == -1){
-        if (region_array[seg1].group_id == -1){
-            struct region *tmp = region_array[seg2].next_in_group;
-            region_array[seg2].next_in_group = &region_array[seg1];
-            region_array[seg1].next_in_group = tmp;
-            region_array[seg1].group_id = region_array[seg2].group_id;
-            group_array[region_array[seg1].group_id].num_of_references += region_array[seg1].used;
-        } else {
-            struct region *tmp = region_array[seg1].next_in_group;
-            region_array[seg1].next_in_group = &region_array[seg2];
-            region_array[seg2].next_in_group = tmp;
-            region_array[seg2].group_id = region_array[seg1].group_id;
-            group_array[region_array[seg1].group_id].num_of_references += region_array[seg2].used;
-        }
-    } else if (region_array[seg1].group_id == region_array[seg2].group_id ) {
+    if (ptr)
         return;
-    } else {
-        merge_groups(region_array[seg1].group_id,region_array[seg2].group_id);
-    }
+    struct group *new = malloc(sizeof(struct group));
+#if STATISTICS
+    total_deps++;
+#endif
+    new->next = region_array[seg1].dependency_list;
+    new->region = &region_array[seg2];
+    region_array[seg1].dependency_list = new;
+    if (region_array[seg1].used)
+        mark_used(region_array[seg2].start_address);
 }
-
 
 /*
  * function that connects two regions in a group
  * arguments: obj: the object that must be checked to be groupped with the region_enabled
  */
 void check_for_group(char *obj){
-    uint64_t seg1 = region_enabled;
-    uint64_t seg2 = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-    if (seg1 >= REGION_ARRAY_SIZE || seg2 >= REGION_ARRAY_SIZE )
-       return;
+    int seg1 = region_enabled;
+    int seg2 = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+    if (seg1 >= REGION_ARRAY_SIZE || seg2 >= REGION_ARRAY_SIZE || seg1 < 0 || seg2 < 0){ 
+        return;
+    }
     if (seg1 == seg2)
         return;
-    if (region_array[seg1].group_id == -1 && region_array[seg2].group_id == -1){
-        region_array[seg1].group_id = new_group();
-        region_array[seg2].group_id = region_array[seg1].group_id;
-        group_array[region_array[seg1].group_id].region = &region_array[seg1];
-        region_array[seg1].next_in_group = &region_array[seg2];
-        group_array[region_array[seg1].group_id].num_of_references += region_array[seg1].used;
-        group_array[region_array[seg2].group_id].num_of_references += region_array[seg2].used;
-    }
-    else if (region_array[seg1].group_id == -1 || region_array[seg2].group_id == -1){
-        if (region_array[seg1].group_id == -1){
-            struct region *tmp = region_array[seg2].next_in_group;
-            region_array[seg2].next_in_group = &region_array[seg1];
-            region_array[seg1].next_in_group = tmp;
-            region_array[seg1].group_id = region_array[seg2].group_id;
-            group_array[region_array[seg1].group_id].num_of_references += region_array[seg1].used;
-        } else {
-            struct region *tmp = region_array[seg1].next_in_group;
-            region_array[seg1].next_in_group = &region_array[seg2];
-            region_array[seg2].next_in_group = tmp;
-            region_array[seg2].group_id = region_array[seg1].group_id;
-            group_array[region_array[seg1].group_id].num_of_references += region_array[seg2].used;
-        }
-    } else if (region_array[seg1].group_id == region_array[seg2].group_id ) {
-        return;
-    } else {
-        merge_groups(region_array[seg1].group_id,region_array[seg2].group_id);
-    }
-}
-
-
-/*
- * returns an empty position of the group_array
- */
-int new_group(){
-    int i;
-    for (i = cur_group ; i < cur_group+GROUP_ARRAY_SIZE ; i++){
-        if (group_array[i % GROUP_ARRAY_SIZE].region == NULL){
-            return i % GROUP_ARRAY_SIZE;
-        }
-    }
-    return -1;
-}
-
-/* merges two groups of regions that already exist.
- * arguments: group1: the id of the first group
- * group2: the id of the second group
- */
-void merge_groups(int group1, int group2){
-    struct region *ptr = group_array[group1].region;
-    int group_id = group_array[group1].region->group_id;
-    group_array[group1].num_of_references += group_array[group2].num_of_references;
-    while (ptr->next_in_group != NULL){
-       ptr = ptr->next_in_group;
-    }
-    ptr->next_in_group = group_array[group2].region;
-    group_array[group2].region = NULL;
-    group_array[group2].num_of_references = 0;
+    struct group *ptr = region_array[seg1].dependency_list;
     while (ptr != NULL){
-        ptr->group_id = group_id;
-        ptr = ptr->next_in_group;
+        if (ptr->region == &region_array[seg2])
+            break;
+        ptr = ptr->next;
     }
-}
-
-
-/**
- * Get total number of groups
- */
-long get_total_groups() {
-    int i;
-    long counter = 0;
-
-    for (i = 0; i < GROUP_ARRAY_SIZE; i++) {
-		if (group_array[i].region != NULL)
-			counter++;
-    }
-
-	return counter;
+    if (ptr)
+        return;
+    struct group *new = malloc(sizeof(struct group));
+#if STATISTICS
+    total_deps++;
+#endif
+    new->next = region_array[seg1].dependency_list;
+    new->region = &region_array[seg2];
+    region_array[seg1].dependency_list = new;
+    if (region_array[seg1].used)
+        mark_used(region_array[seg2].start_address);
 }
 
 /*
  * prints all the region groups that contain something
  */
-void print_groups() {
+void print_groups(){
     int i;
-
-    fprintf(stderr, "Groups:\n");
-
-    for (i = 0; i < GROUP_ARRAY_SIZE ; i++){
-        if (group_array[i].region != NULL){
-            struct region *ptr = group_array[i].region;
-
-            fprintf(stderr, "Group %d \n",i);
-
+    printf("Groups:\n");
+    for (i = 0; i < REGION_ARRAY_SIZE ; i++){
+        if (region_array[i].dependency_list != NULL){
+            struct group *ptr = region_array[i].dependency_list;
+            printf("Region %d depends on regions: \n",i);
             while (ptr != NULL){
-                fprintf(stderr, "Region %lu\n", ptr-region_array);
-                ptr = ptr->next_in_group;
+                printf("Region %lu\n",ptr->region-region_array);
+                ptr = ptr->next;
             }
-
-            fprintf(stderr, "%d references\n", group_array[i].num_of_references);
         }
     }
+    fflush(stdout);
 }
 
 /*
@@ -325,9 +416,6 @@ void reset_used(){
     for (i = 0 ; i < REGION_ARRAY_SIZE ; i++){
         region_array[i].used = 0;
     }
-    for (i = 0 ; i < GROUP_ARRAY_SIZE ; i++){
-        group_array[i].num_of_references = 0;
-    }
 }
 
 /*
@@ -337,12 +425,13 @@ void reset_used(){
  */
 void mark_used(char *obj){
     uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-    if (region_array[seg].group_id != -1){
-        group_array[region_array[seg].group_id].num_of_references -= region_array[seg].used;
-        region_array[seg].used = 1;
-        group_array[region_array[seg].group_id].num_of_references += 1;
-    } else {
-        region_array[seg].used = 1;
+    if (region_array[seg].used == 1)
+        return;
+    region_array[seg].used = 1;
+    struct group *ptr = region_array[seg].dependency_list;
+    while (ptr){
+        mark_used(ptr->region->start_address);
+        ptr = ptr->next;
     }
 }
 
@@ -353,17 +442,21 @@ void print_statistics(){
     int i;
     int flag = 0;
     for(i = 0 ; i < REGION_ARRAY_SIZE ; i++ ) {
-        if (region_array[i % REGION_ARRAY_SIZE].last_allocated_end != region_array[i % REGION_ARRAY_SIZE].start_address) {
+        if (region_array[i % REGION_ARRAY_SIZE].last_allocated_end != region_array[i % REGION_ARRAY_SIZE].start_address ) {
             total_regions++;
-            wasted_space += (region_array[i].start_address + (uint64_t) REGION_SIZE) - region_array[i].last_allocated_end; 
-            if (flag == 0){
-                flag++;
+            if (region_array[i].last_allocated_end <= region_array[i].start_address + REGION_SIZE){ 
+                wasted_space += (region_array[i].start_address + (uint64_t) REGION_SIZE) - region_array[i].last_allocated_end; 
+                if (flag == 0){
+                    flag++;
+                }
             }
         }
     }
-    printf("Total Wasted Space: %zu Bytes\n",wasted_space);
+    printf("Total Wasted Space: %zu GBytes\n",wasted_space/(1024*1024*1024));
     printf("Total regions: %zu\n",total_regions);
-    printf("Average wasted space: %zu Bytes\n",total_regions);
+    if (total_regions)
+        printf("Average wasted space: %zu MBytes\n",wasted_space/(1024*1024*total_regions));
+    printf("Total dependencies:%d\n",total_deps);
     printf("Total time spent in allocate_to_region:%f ms\n",alloc_elapsedtime);
     printf("Total time spent in free_regions:%f ms\n",free_elapsedtime);
 }
@@ -380,37 +473,51 @@ struct region_list* free_regions(){
     int i;
     struct region_list *head = NULL;
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
-        if (region_array[i].used == 0 && region_array[i].last_allocated_end != region_array[i].start_address && region_array[i].group_id == -1){
+        if (region_array[i].used == 0 && region_array[i].last_allocated_end != region_array[i].start_address){
+            struct group *ptr = region_array[i].dependency_list;
+            struct group *next = NULL;
+            while (ptr != NULL) {
+                next = ptr->next;
+                free(ptr);
+                ptr = next;
+            }
+            region_array[i].dependency_list = NULL;
             struct region_list *new_node = malloc(sizeof(struct region_list));
             new_node->start = region_array[i].start_address;
             new_node->end = region_array[i].last_allocated_start;
             new_node->next = head;
             head = new_node;
             region_array[i].last_allocated_end = region_array[i].start_address;
+            //memset(region_array[i].start_address, 0, REGION_SIZE);
             region_array[i].last_allocated_start = NULL;
-            fprintf(stderr, "Freeing region %d \n", i);
-        }
-    }
-    for (i = 0; i < GROUP_ARRAY_SIZE ; i++){
-        if (group_array[i].region != NULL && group_array[i].num_of_references == 0){
-            struct region *ptr = group_array[i].region;
-            struct region *prev = NULL;
-            while (ptr != NULL){
-                struct region_list *new_node = malloc(sizeof(struct region_list));
-                new_node->start = ptr->start_address;
-                new_node->end = ptr->last_allocated_start;
-                new_node->next = head;
-                head = new_node;
-                ptr->group_id = -1;
-                ptr->last_allocated_end = ptr->start_address;
-                ptr->last_allocated_start = NULL;
-                prev = ptr;
-                fprintf(stderr, "Freeing region from group: %lu \n", ptr-region_array);
-                ptr = ptr->next_in_group;
-                prev->next_in_group = NULL;
+            region_array[i].first_allocated_start = NULL;
+            
+#if ANONYMOUS
+            /* 
+            int check = munmap(region_array[i].start_address, REGION_SIZE);
+            if (check == -1){
+                fprintf(stderr, "mmap to file failed 1\n");
             }
-            group_array[i].region = NULL;
-            group_array[i].num_of_references = 0;
+            */ 
+            region_array[i].size_mapped = 0;
+            struct offset *offset_ptr = region_array[i].offset_list;
+            struct offset *temp = offset_ptr;
+            while (offset_ptr != NULL){
+               temp = offset_ptr->next;
+               offset_ptr->next = offset_list;
+               offset_list = offset_ptr;
+               offset_ptr = temp;
+            }
+            region_array[i].offset_list = NULL;
+#endif
+            if (id_array[region_array[i].rdd_id] == &region_array[i]){
+                id_array[region_array[i].rdd_id] = NULL;
+            }
+            region_array[i].rdd_id = MAX_PARTITIONS * MAX_RDD_ID;
+#if STATISTICS
+            printf("Freeing region %d \n",i);
+            fflush(stdout);
+#endif
         }
     }
 #if STATISTICS
@@ -423,47 +530,15 @@ struct region_list* free_regions(){
 }
 
 /*
- * Get the total allocated regions
- * Return the total number of allocated regions or zero, otherwise
- */
-long total_allocated_regions() {
-	int i;
-	long counter = 0;
-
-	for (i = 0; i < REGION_ARRAY_SIZE ; i++){
-		if (region_array[i].last_allocated_end != region_array[i].start_address)
-			counter++;
-	}
-
-	return counter;
-}
-
-/*
  * Prints all the allocated regions
  */
 void print_regions(){
     int i;
-    fprintf(stderr, "Regions:\n");
+    printf("Regions:\n");
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
         if (region_array[i].last_allocated_end != region_array[i].start_address)
-            fprintf(stderr, "Region %d\n", i);
+            printf("Region %d\n",i);
     }
-}
-
-/*
- * Get the total number of used regions
- * Return the total number of used regions or zero, otherwise
- */
-long total_used_regions() {
-    int i;
-	long counter = 0;
-
-	for (i = 0 ; i < REGION_ARRAY_SIZE ; i++) {
-		if (region_array[i].used == 1)
-			counter++;
-	}
-
-	return counter;
 }
 
 /*
@@ -474,7 +549,7 @@ void print_used_regions(){
     printf("Used Regions:\n");
     for (i = 0 ; i < REGION_ARRAY_SIZE ; i++){
         if (region_array[i].used == 1)
-            printf("Region %d\n", i);
+            printf("Region %d\n",i);
     }
     fflush(stdout);
 }
@@ -487,7 +562,7 @@ bool is_before_last_object(char *obj){
     return true;
     #endif
     uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-    if (obj >= region_array[seg].last_allocated_end){
+    if (obj >= region_array[seg].last_allocated_end || region_array[seg].last_allocated_end >= region_array[seg].start_address + REGION_SIZE){
         return false;
     } else {
         return true;
@@ -530,10 +605,7 @@ void disable_region_groups(void){
 
 
 void print_objects_temporary_function(char *obj,const char *string){
-    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-    if (region_array[seg].rdd_id == 29 || region_array[seg].rdd_id == 42){
-        printf("Object name: %s\n",string);
-    }
+    printf("Object name: %s\n",string);
 }
 
 /*
@@ -565,4 +637,9 @@ char* get_next_region() {
 	_next_region++;
 
 	return region_start_addr;
+}
+
+char *get_first_object(char *addr){
+    uint64_t seg = (addr - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+    return region_array[seg].first_allocated_start;
 }

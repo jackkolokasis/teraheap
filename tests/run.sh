@@ -10,11 +10,11 @@ if [ $PLATFORM == "nextgenio" ]
 then
     JAVA="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
     JDB="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-    #EXEC=("Array_List" "Simple_Array" "List_Small" "List_Large" "MultiList" \
-    #	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_String" "HashMap" \
-    # 	"Clone" "Rehashing")
+   EXEC=("Array_List" "Simple_Array" "List_Small" "List_Large" "MultiList" \
+    	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_String" "HashMap" \
+     	"Clone" "Rehashing" "Groupping")
 
-    EXEC=( "Groupping" )
+   # EXEC=( "Groupping" )
 else 
     JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
     JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"

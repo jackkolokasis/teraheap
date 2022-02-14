@@ -96,7 +96,6 @@ bool TeraCache::tc_check(oop ptr) {
 // TeraCache then the function returns true, either it returns false.
 bool TeraCache::tc_is_in(void *p) {
 	char* const cp = (char *)p;
-
 	return cp >= _start_addr && cp < _stop_addr;
 }
 
@@ -179,7 +178,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 		pos = allocate(size);
 	}
 #else
-	pos = allocate(size,(uint64_t)obj->get_obj_group_id());
+	pos = allocate(size,(uint64_t)obj->get_obj_group_id(),(uint64_t)obj->get_obj_part_id());
 #endif
 
 
@@ -641,3 +640,6 @@ void TeraCache::tc_print_objects_per_region() {
 	}
 }
 
+HeapWord *TeraCache::get_first_object_in_region(HeapWord *addr){
+    return (HeapWord*) get_first_object((char*)addr);
+}

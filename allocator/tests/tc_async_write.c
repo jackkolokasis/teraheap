@@ -1,4 +1,3 @@
-
 /***************************************************
 *
 * file: tc_async_write.c
@@ -23,15 +22,14 @@
 #define CARD_SIZE ((uint64_t) (1 << 9))
 #define PAGE_SIZE ((uint64_t) (1 << 12))
 
-#define SIZE_80B   (80)
-#define SIZE_160B  (160)
+#define SIZE_80B (80)
+#define SIZE_160B (160)
 #define SIZE_1M (1*1024LU*1024)
 #define SIZE_4M (4*1024LU*1024)
 
 #define HEAPWORD (8)
 
-#define SIZE_TO_WORD(SIZE) \
-	((size_t) (SIZE / HEAPWORD))
+#define SIZE_TO_WORD(SIZE) ((size_t) (SIZE / HEAPWORD))
 
 int main() {
 	char *obj1, *obj2, *obj3, *obj4;

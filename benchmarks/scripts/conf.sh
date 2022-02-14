@@ -232,30 +232,30 @@
 # Logistic Regression
 #############################################
 # Heap size for executors
-HEAP=( 32 )
-
-## New generation size '-Xmn'
-## if the value is 0: let the JVM to decide
-## if the value > 0 : set the size of the New Generation based on the value
-NEW_GEN=( 0 )
-
-## DRAM shrink
-## THere
-RAMDISK=( 172 )
-
-## Spark memory fraction
-MEM_FRACTON=( 0.5 )
-
-S_LEVEL=( "MEMORY_AND_DISK" )
-
-## Running benchmarks
-BENCHMARKS=( "SVM" )
-
-## Number of executors
-EXECUTORS=1
-
-## Total Configurations
-TOTAL_CONFS=${#HEAP[@]}
+#HEAP=( 32 )
+#
+### New generation size '-Xmn'
+### if the value is 0: let the JVM to decide
+### if the value > 0 : set the size of the New Generation based on the value
+#NEW_GEN=( 0 )
+#
+### DRAM shrink
+### THere
+#RAMDISK=( 0 )
+#
+### Spark memory fraction
+#MEM_FRACTON=( 0.5 )
+#
+#S_LEVEL=( "MEMORY_AND_DISK" )
+#
+### Running benchmarks
+#BENCHMARKS=( "SVM" )
+#
+### Number of executors
+#EXECUTORS=1
+#
+### Total Configurations
+#TOTAL_CONFS=${#HEAP[@]}
 ##########################################
 
 ###############################################
@@ -332,7 +332,7 @@ TOTAL_CONFS=${#HEAP[@]}
 #NEW_GEN=( 0 )
 #
 ## DRAM shrink 200GB
-#RAMDISK=( 204 )
+#RAMDISK=( 0 )
 #
 ## Spark memory fraction: 'spark.memory.storagefraction'
 #MEM_FRACTON=( 0.8 )
@@ -582,19 +582,19 @@ TOTAL_CONFS=${#HEAP[@]}
 # New arguments 
 ######################
 # Device for shuffle
-DEV_SHFL=nvme0n1
+DEV_SHFL=pmem0
 
 # Device Fastmap
-DEV_FMAP=nvme2n1p1
+DEV_FMAP=pmem0
 
 # TeraCache file size in GB e.g 800 -> 800GB
 TC_FILE_SZ=900
 
 # Executor cores
 EXEC_CORES=8
-2
+
 # Heap size for executors '-Xms'
-HEAP=( 64 )
+HEAP=( 20 )
 
 # New generation size '-Xmn'
 # if the value is 0: let the JVM to decide
@@ -614,7 +614,7 @@ S_LEVEL=( "MEMORY_ONLY" )
 TERACACHE=( 900 )
 
 # Running benchmarks
-BENCHMARKS=( "PageRank" )
+BENCHMARKS=( "NaiveBayes" )
 
 # Number of executors
 EXECUTORS=1

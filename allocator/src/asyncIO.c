@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <aio.h>
+#include <unistd.h>
 #include "../include/asyncIO.h"
 
 struct ioRequest request[MAX_REQS];
@@ -81,6 +82,7 @@ void req_add(int fd, char *data, size_t size, uint64_t offset) {
 
 	// Wait here until find an available slot for the request
 	while (slot == -1) {
+        usleep(100);
 		slot = find_slot();
 	}
 

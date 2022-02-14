@@ -75,8 +75,9 @@ function release()
 {
   make dist-clean
   CC=gcc-4.8.5 CXX=g++-4.8.5 bash ./configure --with-jobs=32 --disable-debug-symbols --with-extra-cflags='-O3' --with-extra-cxxflags='-O3'
-  intercept-build make
-  cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
+  #intercept-build make
+  #cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
+  make
 }
 
 # Compile with debug symbols and assertions

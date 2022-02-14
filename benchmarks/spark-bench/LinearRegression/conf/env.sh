@@ -23,15 +23,15 @@
 #############################################
 
 ################## 128GB #######################
-#NUM_OF_EXAMPLES=20000
-#NUM_OF_FEATURES=355554
-#NUM_OF_PARTITIONS=256
+NUM_OF_EXAMPLES=20000
+NUM_OF_FEATURES=355554
+NUM_OF_PARTITIONS=256
 ###############################################
 
 ################## 256GB #######################
-NUM_OF_EXAMPLES=20000
-NUM_OF_FEATURES=711108
-NUM_OF_PARTITIONS=256
+#NUM_OF_EXAMPLES=20000
+#NUM_OF_FEATURES=711108
+#NUM_OF_PARTITIONS=256
 ###############################################
 
 EPS=0.5

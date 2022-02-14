@@ -41,7 +41,7 @@ usage() {
 #   Start Spark
 ##
 start_spark() {
-    /home/nx05/nx05/kolokasis/TeraCache-2.3.0/spark-2.3.0-kolokasis/sbin/start-all.sh
+    /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/sbin/start-all.sh
 }
 
 ##
@@ -49,7 +49,7 @@ start_spark() {
 #   Stop Spark
 ##
 stop_spark() {
-    /home/nx05/nx05/kolokasis/TeraCache-2.3.0/spark-2.3.0-kolokasis/sbin/stop-all.sh
+    /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/sbin/stop-all.sh
 }
 
 ##
@@ -167,7 +167,7 @@ printEndMsg() {
 }
 
 # Check for the input arguments
-while getopts ":n:t:o:cspkajfdh" opt
+while getopts ":n:t:o:cspkajfdbh" opt
 do
     case "${opt}" in
         n)
@@ -204,6 +204,9 @@ do
 		d)
 			FASTMAP=true
 			;;
+		b)
+			CUSTOM_BENCHMARK=true
+			;;
         h)
             usage
             ;;
@@ -220,20 +223,20 @@ OUT="${OUTPUT_PATH}_${TIME}"
 mkdir -p ${OUT}
 
 # Enable perf event
-sudo sh -c 'echo -1 >/proc/sys/kernel/perf_event_paranoid'
+#sudo sh -c 'echo -1 >/proc/sys/kernel/perf_event_paranoid'
 
 # Prepare devices for Shuffle and TeraCache accordingly
-if [ $SERDES ]
-then
-	./dev_setup.sh -d $DEV_SHFL
-else
-	if [ $FASTMAP ]
-	then
-		./dev_setup.sh -t -f -s $TC_FILE_SZ  -d $DEV_SHFL
-	else
-		./dev_setup.sh -t -s $TC_FILE_SZ  -d $DEV_SHFL
-	fi
-fi
+#if [ $SERDES ]
+#then
+#	./dev_setup.sh -d $DEV_SHFL
+#else
+#	if [ $FASTMAP ]
+#	then
+#		./dev_setup.sh -t -f -s $TC_FILE_SZ  -d $DEV_SHFL
+#	else
+#		./dev_setup.sh -t -s $TC_FILE_SZ  -d $DEV_SHFL
+#	fi
+#fi
 
 # Run each benchmark
 for benchmark in "${BENCHMARKS[@]}"
@@ -277,7 +280,7 @@ do
 				else
 					./update_conf_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
 						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} \
-						-n ${NEW_GEN[$j]} -c $EXEC_CORES
+						-n ${NEW_GEN[$j]} -c $EXEC_CORES -b ${CUSTOM_BENCHMARK}
 				fi
 			fi
 
@@ -315,16 +318,21 @@ do
             # System statistics start
 			~/system_util/start_statistics.sh -d ${RUN_DIR}
 
-			if [ $HIGH_BENCH ]
-			then
-				cd ~/HiBench
-				./bin/workloads/ml/${benchmark}/spark/run.sh
-				cd -
-			else
-				# Run benchmark and save output to tmp_out.txt
-				../spark-bench/${benchmark}/bin/run.sh \
-					> ${RUN_DIR}/tmp_out.txt
-			fi
+            if [ -z ${CUSTOM_BENCHMARK} ]
+            then
+                if [ $HIGH_BENCH ]
+                then
+                    cd ~/HiBench
+                    ./bin/workloads/ml/${benchmark}/spark/run.sh
+                    cd -
+                else
+                    # Run benchmark and save output to tmp_out.txt
+                    ../spark-bench/${benchmark}/bin/run.sh \
+                        > ${RUN_DIR}/tmp_out.txt
+                fi
+            else
+                ./custom_benchmark.sh ${RUN_DIR} $EXEC_CORES ${TERACACHE[$j]} ${S_LEVEL[$j]}
+            fi
             
             # Pmem stats after
             sudo ipmctl show -performance >> ${RUN_DIR}/pmem_after.txt
@@ -347,16 +355,18 @@ do
 				fi
 			fi
 
-			if [ $HIGH_BENCH ]
-			then
-				# Save the total duration of the benchmark execution
-				tail -n 1 ~/HiBench/report/hibench.report >> ${RUN_DIR}/total_time.txt
-			else
-				# Save the total duration of the benchmark execution
-				tail -n 1 ../spark-bench/num/bench-report.dat >> ${RUN_DIR}/total_time.txt
-			fi
+            if [ -z ${CUSTOM_BENCHMARK} ]
+            then
+                if [ $HIGH_BENCH ]
+                then
+                    # Save the total duration of the benchmark execution
+                    tail -n 1 ~/HiBench/report/hibench.report >> ${RUN_DIR}/total_time.txt
+                else
+                    # Save the total duration of the benchmark execution
+                    tail -n 1 ../spark-bench/num/bench-report.dat >> ${RUN_DIR}/total_time.txt
+                fi
+            fi
 				
-
 			if [ $PERF_TOOL ]
 			then
 				# Stop perf monitor

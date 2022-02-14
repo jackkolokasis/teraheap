@@ -87,7 +87,7 @@
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
-#define ASYNC				     1  //< Asynchronous I/O path for the writes in
+#define ASYNC				     0  //< Asynchronous I/O path for the writes in
 									// TeraCache
 
 #define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to

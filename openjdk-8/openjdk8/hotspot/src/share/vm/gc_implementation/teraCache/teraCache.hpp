@@ -236,6 +236,8 @@ class TeraCache {
 
         // Groups the region of obj1 with the region of obj2
         void group_regions(HeapWord *obj1, HeapWord *obj2);
+
+        HeapWord *get_first_object_in_region(HeapWord *addr);
 #if NEW_FEAT
 		// New feature
 		void tc_mk_dirty(oop obj);
