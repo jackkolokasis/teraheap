@@ -56,16 +56,16 @@ int main() {
 	memset(tmp4, '4', SIZE_4M);
 	tmp4[SIZE_4M - 1] = '\0';
 	
-	obj1 = allocate(SIZE_TO_WORD(SIZE_80B), 0);
+	obj1 = allocate(SIZE_TO_WORD(SIZE_80B), 0, 0);
 	r_awrite(tmp, obj1, SIZE_TO_WORD(SIZE_80B));
 	
-	obj2 = allocate(SIZE_TO_WORD(SIZE_160B), 1);
+	obj2 = allocate(SIZE_TO_WORD(SIZE_160B), 1, 0);
 	r_awrite(tmp2, obj2, SIZE_TO_WORD(SIZE_160B));
 	
-	obj3 = allocate(SIZE_TO_WORD(SIZE_1M), 0);
+	obj3 = allocate(SIZE_TO_WORD(SIZE_1M), 0, 0);
 	r_awrite(tmp3, obj3, SIZE_TO_WORD(SIZE_1M));
 	
-	obj4 = allocate(SIZE_TO_WORD(SIZE_4M), 1);
+	obj4 = allocate(SIZE_TO_WORD(SIZE_4M), 1, 0);
 	r_awrite(tmp4, obj4, SIZE_TO_WORD(SIZE_4M));
 
 	while (!r_areq_completed());

@@ -78,20 +78,28 @@ size_t mem_pool_size() {
 }
 
 #if SPARK_HINT
-char* allocate(size_t size, uint64_t rdd_id) {
+char* allocate(size_t size, uint64_t rdd_id, uint64_t part_id) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
+	char* prev_alloc_ptr = tc_mem_pool.cur_alloc_ptr;
 
 	//assertf(alloc_ptr >= tc_mem_pool.start_address &&
 	//		alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
 	assertf(size > 0, "Object should be > 0");
     #if REGIONS
-    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id);
+    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id, part_id);
     if (alloc_ptr == NULL)
         printf("Total cached data:%zu\n",tc_mem_pool.size);
     assertf(alloc_ptr != NULL, "alloc_ptr is NULL");
     #endif
     tc_mem_pool.size += size;
     tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);
+
+	if (prev_alloc_ptr > tc_mem_pool.cur_alloc_ptr)
+		tc_mem_pool.cur_alloc_ptr = prev_alloc_ptr;
+
+	// TODO Check
+	assertf(prev_alloc_ptr <= tc_mem_pool.cur_alloc_ptr, 
+			"Error alloc ptr: Prev = %p, Cur = %p", prev_alloc_ptr, tc_mem_pool.cur_alloc_ptr);
 
 	// Alighn to 8 words the pointer (TODO: CHANGE TO ASSERTION)
 	if ((uint64_t) tc_mem_pool.cur_alloc_ptr % HEAPWORD != 0)

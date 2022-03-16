@@ -56,7 +56,7 @@ extern "C" {
 #if SPARK_HINT
 	// Allocate a new object with `size` and return the `start allocation
 	// address`.
-	char *     allocate(size_t size, uint64_t rdd_id);
+	char *     allocate(size_t size, uint64_t rdd_id, uint64_t part_id);
 #else
 	// Allocate a new object with `size` and return the `start allocation
 	// address`.

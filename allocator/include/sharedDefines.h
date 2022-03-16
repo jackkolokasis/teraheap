@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEV "/mnt/spark/file.txt"	     //< Device name
+#define DEV "/mnt/fmap/file.txt"	     //< Device name
 #define DEV_SIZE (900*1024LU*1024*1024)  //< Device size (in bytes)
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
@@ -37,5 +37,9 @@
 #define STATISTICS 0				  //< Enable allocator to print statistics
 
 #define DEBUG_PRINT 0			      //< Enable debug prints
+
+#define TOTAL_PARTITIONS 1			  //< Total number of partitions
+
+#define TOTAL_RDDS ((REGION_ARRAY_SIZE)/(TOTAL_PARTITIONS)) //< Support up to 28 RDDs
 
 #endif

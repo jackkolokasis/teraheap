@@ -41,6 +41,7 @@ void init_regions(){
         region_array[i].last_allocated_start = NULL;
         region_array[i].next_in_group = NULL;
         region_array[i].rdd_id = REGION_ARRAY_SIZE;
+        region_array[i].part_id = REGION_ARRAY_SIZE;
         id_array[i] = REGION_ARRAY_SIZE;
         region_array[i].group_id = -1;
     }
@@ -74,20 +75,22 @@ char* new_region(size_t size){
 }
 
 #if SPARK_HINT
-char* allocate_to_region(size_t size, uint64_t rdd_id){
+char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t part_id){
+	int index = ((rdd_id % TOTAL_RDDS) * TOTAL_PARTITIONS) + part_id;
 #if STATISTICS
     struct timeval t1,t2;
     gettimeofday(&t1, NULL);
 #endif
     assert(size <= (uint64_t)REGION_SIZE);
-    if (id_array[rdd_id] == REGION_ARRAY_SIZE){
+    if (id_array[index] == REGION_ARRAY_SIZE){
         char * res = new_region(size);
-        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+        id_array[index] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
 #if DEBUG_PRINT
         printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[rdd_id]);
         fflush(stdout);
 #endif
-        region_array[id_array[rdd_id]].rdd_id = rdd_id;
+        region_array[id_array[index]].rdd_id = rdd_id;
+        region_array[id_array[index]].part_id = part_id;
 #if STATISTICS
         gettimeofday(&t2, NULL);
         alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
@@ -95,17 +98,17 @@ char* allocate_to_region(size_t size, uint64_t rdd_id){
 #endif
         return res;
     }
-    if (size > ((region_array[id_array[rdd_id]].start_address+(uint64_t)REGION_SIZE) - region_array[id_array[rdd_id]].last_allocated_end)){
+    if (size > ((region_array[id_array[index]].start_address+(uint64_t)REGION_SIZE) - region_array[id_array[index]].last_allocated_end)){
 #if STATISTICS
-        printf("Wasting %luB in region %d, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
+        printf("Wasting %luB in region %lu, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
 #endif
         char * res = new_region(size);
-        id_array[rdd_id] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+        id_array[index] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
 #if DEBUG_PRINTS
-        printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[rdd_id]);
+        printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[index]);
         fflush(stdout);
 #endif
-        region_array[id_array[rdd_id]].rdd_id = rdd_id;
+        region_array[id_array[index]].rdd_id = rdd_id;
 #if STATISTICS
         gettimeofday(&t2, NULL);
         alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
@@ -113,15 +116,15 @@ char* allocate_to_region(size_t size, uint64_t rdd_id){
 #endif
         return res;
     }
-    mark_used(region_array[id_array[rdd_id]].start_address);
-    region_array[id_array[rdd_id]].last_allocated_start = region_array[id_array[rdd_id]].last_allocated_end;
-    region_array[id_array[rdd_id]].last_allocated_end = region_array[id_array[rdd_id]].last_allocated_start + size;
+    mark_used(region_array[id_array[index]].start_address);
+    region_array[id_array[index]].last_allocated_start = region_array[id_array[index]].last_allocated_end;
+    region_array[id_array[index]].last_allocated_end = region_array[id_array[index]].last_allocated_start + size;
 #if STATISTICS
     gettimeofday(&t2, NULL);
     alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
     alloc_elapsedtime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 #endif
-    return region_array[id_array[rdd_id]].last_allocated_start;
+    return region_array[id_array[index]].last_allocated_start;
 
 }
 #else
@@ -565,4 +568,46 @@ char* get_next_region() {
 	_next_region++;
 
 	return region_start_addr;
+}
+
+/*
+ * Get objects 'obj' region start address
+ */
+char* get_region_start_addr(char *obj, long rdd_id, long part_id) {
+    #if !REGIONS
+        return false;
+    #endif
+	int index;
+
+	index = ((rdd_id % TOTAL_RDDS) * TOTAL_PARTITIONS) + part_id;
+
+	return region_array[id_array[index]].start_address;
+}
+
+/*
+ * Get object 'groupId' (RDD Id). Each object is allocated based on a group Id
+ * and the partition Id that locates in teraflag.
+ *
+ * @obj: address of the object
+ *
+ * Return: the object rdd id
+ */
+uint64_t get_obj_group_id(char *obj) {
+    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+	return region_array[seg].rdd_id;
+
+}
+
+/*
+ * Get object 'groupId'. Each object is allocated based on a group Id
+ * and the partition Id that locates in teraflag.
+ *
+ * obj: address of the object
+ *
+ * returns: the object partition Id
+ */
+uint64_t get_obj_part_id(char *obj) {
+    uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+
+	return region_array[seg].part_id;
 }
