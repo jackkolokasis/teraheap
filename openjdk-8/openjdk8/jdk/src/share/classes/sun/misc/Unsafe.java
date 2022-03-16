@@ -1154,4 +1154,13 @@ public final class Unsafe {
      * @param part_id partition id of the marking object
      */
     public native void tcMarkObjectWithId(Object o, long rdd_id, long part_id);
+	
+	/**
+     * Prefetch partition data
+	 *
+     * @param o object/array to prefectch its data
+     * @param rdd_id rdd id
+     * @param part_id partition id
+     */
+    public native void tcPrefetchPartitionData(Object o, long rdd_id, long part_id);
 }

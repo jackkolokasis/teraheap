@@ -21,9 +21,9 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 //#if !NDEBUG
-#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 //#elif
-//#define assertf(A, M, ...) ;
+#define assertf(A, M, ...) ;
 //#endif
 
 /***********************************
@@ -87,7 +87,7 @@
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
-#define ASYNC				     1  //< Asynchronous I/O path for the writes in
+#define ASYNC				     0  //< Asynchronous I/O path for the writes in
 									// TeraCache
 
 #define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to
@@ -111,7 +111,7 @@
 									// employ huge pages for mutator threads and
 									// regular pages for GC 
 
-#define TERA_CARD_SIZE			25 // This is the size of each card in
+#define TERA_CARD_SIZE			 13 // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
@@ -148,8 +148,11 @@
 									//  should be used in combination with
 									//  P_DISTINCT 
 
-#define P_SD_BITMAP				0	//< Bitmap to optimize the search in tree
+#define P_SD_BITMAP				1	//< Bitmap to optimize the search in tree
 									//  
+
+#define P_SD_BACK_REF_CLOSURE	0	//< Find the transitive closure of backward
+									// edges
 
 #define P_NO_TRANSFER           0	//< This policy is ONLY for debugging.
 									//  Calculate the closure but do not move
@@ -169,18 +172,19 @@
 
 #define INIT_TF				   2035	//< Initial object state
 
+#define TRANSIENT_FIELD		   428	//< Objects is pointed by transient field
 
 /***********************************
  * Statistics
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for
                                      // TeraCache Allocator. Do NOT
-                                     // use this flug in performance
+                                     // use this flag in performance
                                      // measurements
 
-#define VERBOSE_TC				  0  //< Print objects in T
+#define VERBOSE_TC				  0  //< Print objects in TeraCache during
+									 // allocation
 
-// TODO: This define must be removed
-#define NEW_FEAT				  1  //< Enable when you add new feature
+#define PREFETCHING				  0  //< Enable read ahead in TeraCache
 
 #endif  // _SHARE_DEFINES_H_

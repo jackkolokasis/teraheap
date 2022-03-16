@@ -89,12 +89,13 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   GCCause::Cause gc_cause = heap->gc_cause();
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
+  bool full_gc_done = false;
 
   // Scavenge youngest generation before each full GC used with
   // UseParallelGC.
   // ScavengeBeforeFullGC by default is true
   if (ScavengeBeforeFullGC) {
-    PSScavenge::invoke_no_policy();
+	  PSScavenge::invoke_no_policy();
   }
 
   const bool clear_all_soft_refs =
@@ -102,7 +103,12 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 
   uint count = maximum_heap_compaction ? 1 : MarkSweepAlwaysCompactCount;
   UIntFlagSetting flag_setting(MarkSweepAlwaysCompactCount, count);
-  PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+  full_gc_done = PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+
+#if TERA_CARDS
+  // If the major GC fails then we need to clear the backward stacks
+  Universe::teraCache()->tc_clear_stacks();
+#endif
 }
 
 // This method contains no policy. You should probably
@@ -596,11 +602,6 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
     
-#if !DISABLE_TERACACHE
-	// Traverse TeraCache
-	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
-		Universe::teraCache()->scavenge();
-#endif
 
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
@@ -632,6 +633,12 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
+
+#if !DISABLE_TERACACHE
+	// Traverse TeraCache
+	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
+		Universe::teraCache()->scavenge();
+#endif
   }
 
   // Next, mark all objects that can be recursively traced from the marked object.

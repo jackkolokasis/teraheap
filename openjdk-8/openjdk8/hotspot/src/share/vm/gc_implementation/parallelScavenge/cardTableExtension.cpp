@@ -632,7 +632,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
                     else
                         m->tc_trace_contents(pm);
                     
-                    if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size() ))
+                    if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size()))
                         break;
 
                     p += m->size();

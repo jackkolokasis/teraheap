@@ -110,7 +110,6 @@ inline void PSPromotionManager::claim_or_forward_depth(T* p) {
 #if TERA_CARDS
 template <class T>
 inline void PSPromotionManager::tc_claim_or_forward_depth(T* p) {
-  assertf(PSScavenge::tc_should_scavenge(p, true), "revisiting object?");
   assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
   assertf(Universe::teraCache()->tc_is_in((void *)p), "pointer outside of TeraCache");
 

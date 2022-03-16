@@ -280,20 +280,24 @@ void InstanceMirrorKlass::oop_follow_contents(ParCompactionManager* cm,
 #endif // INCLUDE_ALL_GCS
 
 int InstanceMirrorKlass::oop_adjust_pointers(oop obj) {
-  int size = oop_size(obj);
-  InstanceKlass::oop_adjust_pointers(obj);
+	int size = oop_size(obj);
+	InstanceKlass::oop_adjust_pointers(obj);
 
-  if (EnableTeraCache && obj->is_tera_cache()) {                                         \
-      Universe::teraCache()->enable_groups((HeapWord*) obj->mark()->decode_pointer());      \
-  }                                                              \
-  InstanceMirrorKlass_OOP_ITERATE(                                                    \
-    start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),        \
-    MarkSweep::adjust_pointer(p),                                                     \
-    assert_nothing)
-  if (EnableTeraCache && obj->is_tera_cache()){                  \
-      Universe::teraCache()->disable_groups();                   \
-  }                                                              \
-  return size;
+#if REGIONS
+  if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer())))
+	  Universe::teraCache()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+
+	InstanceMirrorKlass_OOP_ITERATE(                                                    \
+			start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),        \
+			MarkSweep::adjust_pointer(p),                                                     \
+			assert_nothing)
+#if REGIONS
+	if (EnableTeraCache && obj->is_tera_cache())
+		Universe::teraCache()->disable_groups();
+#endif
+
+	return size;
 }
 
 #define InstanceMirrorKlass_SPECIALIZED_OOP_ITERATE_DEFN(T, nv_suffix)                \
