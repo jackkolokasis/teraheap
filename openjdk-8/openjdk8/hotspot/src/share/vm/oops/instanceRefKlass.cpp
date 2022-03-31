@@ -78,6 +78,9 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 
 		//goto TERACACHE;
         Universe::teraCache()->mark_used_region((HeapWord*)referent);
+#if GC_ANALYSIS
+            obj->set_live();
+#endif
 	}
 //#endif
 	

@@ -269,7 +269,14 @@ class TeraCache {
 		// This function is for debugging purposes to understand and fix the
 		// locality in regions
 		void tc_print_objects_per_region(void);
+
+        void mark_live(HeapWord *p);
+
+        void tc_mark_live_objects_per_region();
 		
+        void tc_count_marked_objects();
+
+        void tc_reset_marked_objects();
 		// 
 		// // Validate if all the dirty cards that we found are dirty now are
 		// // clean. If one of the dirty card is still dirty then fail

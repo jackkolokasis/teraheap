@@ -21,9 +21,9 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
 		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
 //#if !NDEBUG
-#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
+//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
 //#elif
-//#define assertf(A, M, ...) ;
+#define assertf(A, M, ...) ;
 //#endif
 
 /***********************************
@@ -169,6 +169,10 @@
 
 #define INIT_TF				   2035	//< Initial object state
 
+#define LIVE_TERA_OBJ           202 //< Object marked as live during GC Analysis
+
+#define VISITED_TERA_OBJ           203 //< Object visited during GC Analysis
+
 
 /***********************************
  * Statistics
@@ -182,5 +186,7 @@
 
 // TODO: This define must be removed
 #define NEW_FEAT				  1  //< Enable when you add new feature
+
+#define GC_ANALYSIS               1
 
 #endif  // _SHARE_DEFINES_H_
