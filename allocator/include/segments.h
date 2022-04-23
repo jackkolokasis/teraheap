@@ -212,4 +212,14 @@ uint64_t get_obj_group_id(char *obj);
  */
 uint64_t get_obj_part_id(char *obj);
 
+/*
+ * Check if these two objects belong to the same group
+ *
+ * obj1: address of the object
+ * obj2: address of the object
+ *
+ * returns: 1 if objects are in the same group, 0 otherwise
+ */
+uint64_t is_in_the_same_group(char *obj1, char *obj2);
+
 #endif

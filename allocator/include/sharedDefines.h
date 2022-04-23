@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #define DEV "/mnt/fmap/file.txt"	     //< Device name
-#define DEV_SIZE (900*1024LU*1024*1024)  //< Device size (in bytes)
+#define DEV_SIZE (150*1024LU*1024*1024)  //< Device size (in bytes)
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
@@ -24,7 +24,7 @@
 
 #define ALIGN_ON	0				  //< Enable allocation with allignment in TC
 
-#define REGION_SIZE	(512*1024LU*1024) //< Region size (in bytes) for allignment version
+#define REGION_SIZE	(256*1024LU*1024) //< Region size (in bytes) for allignment version
 
 #define REGIONS 1					  //< Enable region allocation mode
 

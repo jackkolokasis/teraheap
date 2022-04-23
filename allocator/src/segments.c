@@ -35,7 +35,8 @@ void init_regions(){
     for (i = 0; i < REGION_ARRAY_SIZE ; i++){
         if (i == 0)
             region_array[i].start_address = start_addr_mem_pool();
-        else region_array[i].start_address = region_array[i-1].start_address + (uint64_t)REGION_SIZE; 
+        else 
+			region_array[i].start_address = region_array[i-1].start_address + (uint64_t)REGION_SIZE; 
         region_array[i].used = 0;
         region_array[i].last_allocated_end = region_array[i].start_address;
         region_array[i].last_allocated_start = NULL;
@@ -68,15 +69,14 @@ char* new_region(size_t size){
             return region_array[cur_region].start_address;
         }
     }
-#if DEBUG_PRINT
-    printf("No empty regions\n");
-#endif
     return NULL;
 }
 
 #if SPARK_HINT
 char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t part_id){
 	int index = ((rdd_id % TOTAL_RDDS) * TOTAL_PARTITIONS) + part_id;
+	assertf(index >= 0 && index < REGION_ARRAY_SIZE, 
+			"Index out of range!! rdd_id = %lu | part_id = %lu\n", rdd_id, part_id);
 #if STATISTICS
     struct timeval t1,t2;
     gettimeofday(&t1, NULL);
@@ -84,13 +84,15 @@ char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t part_id){
     assert(size <= (uint64_t)REGION_SIZE);
     if (id_array[index] == REGION_ARRAY_SIZE){
         char * res = new_region(size);
+		assertf(res != NULL, "No empty region");
         id_array[index] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+
 #if DEBUG_PRINT
-        printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[rdd_id]);
-        fflush(stdout);
+        fprintf(stderr, "RDD %zu in region %zu of tc\n",rdd_id, id_array[rdd_id]);
 #endif
         region_array[id_array[index]].rdd_id = rdd_id;
         region_array[id_array[index]].part_id = part_id;
+
 #if STATISTICS
         gettimeofday(&t2, NULL);
         alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
@@ -98,17 +100,21 @@ char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t part_id){
 #endif
         return res;
     }
-    if (size > ((region_array[id_array[index]].start_address+(uint64_t)REGION_SIZE) - region_array[id_array[index]].last_allocated_end)){
+    if (size > ((region_array[id_array[index]].start_address + (uint64_t)REGION_SIZE) - region_array[id_array[index]].last_allocated_end)) {
+
 #if STATISTICS
-        printf("Wasting %luB in region %lu, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
+        fprintf(stderr, "Wasting %luB in region %lu, object is of size %zuB, last allocated is %p, start of next region is %p\n",((region_array[cur_region].start_address+(uint64_t)REGION_SIZE * 1024 * 1024) - region_array[cur_region].last_allocated_end), cur_region, size, region_array[cur_region].last_allocated_end, region_array[cur_region+1].start_address);
 #endif
         char * res = new_region(size);
+		assertf(res != NULL, "No empty region");
         id_array[index] = (res - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+
 #if DEBUG_PRINTS
-        printf("RDD %zu in region %zu of tc\n",rdd_id, id_array[index]);
-        fflush(stdout);
+        fprintf(stderr, "RDD %zu in region %zu of tc\n",rdd_id, id_array[index]);
 #endif
         region_array[id_array[index]].rdd_id = rdd_id;
+        region_array[id_array[index]].part_id = part_id;
+
 #if STATISTICS
         gettimeofday(&t2, NULL);
         alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
@@ -116,16 +122,18 @@ char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t part_id){
 #endif
         return res;
     }
+
     mark_used(region_array[id_array[index]].start_address);
     region_array[id_array[index]].last_allocated_start = region_array[id_array[index]].last_allocated_end;
     region_array[id_array[index]].last_allocated_end = region_array[id_array[index]].last_allocated_start + size;
+
 #if STATISTICS
     gettimeofday(&t2, NULL);
     alloc_elapsedtime += (t2.tv_sec - t1.tv_sec) * 1000.0;
     alloc_elapsedtime += (t2.tv_usec - t1.tv_usec) / 1000.0;
 #endif
-    return region_array[id_array[index]].last_allocated_start;
 
+    return region_array[id_array[index]].last_allocated_start;
 }
 #else
 /*
@@ -167,7 +175,7 @@ char* allocate_to_region(size_t size){
  * arguments: obj1: the object that references the other
  * obj2 the object that is referenced (order does not matter)
  */
-void references(char *obj1, char *obj2){
+void references(char *obj1, char *obj2) {
     
     uint64_t seg1 = (obj1 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
     uint64_t seg2 = (obj2 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
@@ -610,4 +618,21 @@ uint64_t get_obj_part_id(char *obj) {
     uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
 
 	return region_array[seg].part_id;
+}
+
+/*
+ * Check if these two objects belong to the same group
+ *
+ * obj1: address of the object
+ * obj2: address of the object
+ *
+ * returns: 1 if objects are in the same group, 0 otherwise
+ */
+uint64_t is_in_the_same_group(char *obj1, char *obj2) {
+	uint64_t seg1 = (obj1 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+	uint64_t seg2 = (obj2 - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+
+	assertf(seg1 < REGION_ARRAY_SIZE && seg2 < REGION_ARRAY_SIZE, "Out of range"); 
+
+    return (seg1 == seg2 || region_array[seg1].group_id == region_array[seg2].group_id);
 }
