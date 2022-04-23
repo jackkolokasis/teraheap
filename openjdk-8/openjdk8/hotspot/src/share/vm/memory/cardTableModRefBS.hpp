@@ -221,6 +221,18 @@ class CardTableModRefBS: public ModRefBarrierSet {
   }
 #endif
 
+#if TERA_CARDS
+  bool is_field_in_tera_heap(const void *p) const {
+	  assertf(_whole_heap.contains(p) || _tc_whole_heap.contains(p), 
+			  "Attempt to access p = %p out of bounds of card marking \
+			  arrays _whole_heap = [%p, %p] and _tc_whole_heap = [%p, %p]", 
+			  p, _whole_heap.start(), _whole_heap.end(), _tc_whole_heap.start(),
+			  _tc_whole_heap.end());
+
+	  return !_whole_heap.contains(p);
+  }
+#endif
+
   // The card table byte one after the card marking array
   // entry for argument address. Typically used for higher bounds
   // for loops iterating through the card table.

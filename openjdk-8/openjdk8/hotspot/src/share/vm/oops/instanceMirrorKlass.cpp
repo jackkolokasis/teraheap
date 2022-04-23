@@ -149,12 +149,13 @@ template <class T> void assert_nothing(T *p) {}
 }
 
 void InstanceMirrorKlass::oop_follow_contents(oop obj) {
-#if TEST_CLOSURE
-
-#if DEBUG_TERACACHE
 	// Debugging
 	if (EnableTeraCache)
 		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
+
+#if P_SD_EXCLUDE_CLOSURE
+	if (EnableTeraCache && obj->is_tera_cache())
+		obj->set_obj_state();
 #endif
 
 	InstanceKlass::oop_follow_contents(obj);
@@ -170,9 +171,9 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
 		// by calling follow_class_loader explicitly. For non-anonymous classes
 		// the call to follow_class_loader is made when the class loader itself
 		// is handled.
-		if (klass->oop_is_instance() && InstanceKlass::cast(klass)->is_anonymous()) 
+		if (klass->oop_is_instance() && InstanceKlass::cast(klass)->is_anonymous())
 			MarkSweep::follow_class_loader(klass->class_loader_data());
-		else 
+		else
 			MarkSweep::follow_klass(klass);
 	} 
 	else {
@@ -181,8 +182,18 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
 		// roots in Universe::oops_do.
 		assertf(java_lang_Class::is_primitive(obj), "Sanity check");
 	}
-
+	
+#if P_SD_EXCLUDE_CLOSURE
+	InstanceMirrorKlass_OOP_ITERATE(                       \
+			start_of_static_fields(obj),                   \
+			java_lang_Class::static_oop_field_count(obj),  \
+			MarkSweep::mark_and_push(p),                   \
+			assert_is_in_closed_subset)
+#else
 	if (EnableTeraCache && obj->is_tera_cache()) {
+		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+		Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+
 		InstanceMirrorKlass_OOP_ITERATE(                       \
 				start_of_static_fields(obj),                   \
 				java_lang_Class::static_oop_field_count(obj),  \
@@ -190,47 +201,12 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
 				assert_is_in_closed_subset)
 	}
 	else {
-	InstanceMirrorKlass_OOP_ITERATE(                       \
-			start_of_static_fields(obj),                   \
-			java_lang_Class::static_oop_field_count(obj),  \
-			MarkSweep::mark_and_push(p),                   \
-			assert_is_in_closed_subset)
+		InstanceMirrorKlass_OOP_ITERATE(                       \
+				start_of_static_fields(obj),                   \
+				java_lang_Class::static_oop_field_count(obj),  \
+				MarkSweep::mark_and_push(p),                   \
+				assert_is_in_closed_subset)
 	}
-#else
-	// Debugging
-	if (EnableTeraCache)
-		assertf(!Universe::teraCache()->tc_check(obj), "Object is in TeraCache");
-
-	InstanceKlass::oop_follow_contents(obj);
-
-	// Follow the klass field in the mirror.
-	Klass* klass = java_lang_Class::as_Klass(obj);
-
-	if (klass != NULL) {
-		// An anonymous class doesn't have its own class loader, so the call
-		// to follow_klass will mark and push its java mirror instead of the
-		// class loader. When handling the java mirror for an anonymous class
-		// we need to make sure its class loader data is claimed, this is done
-		// by calling follow_class_loader explicitly. For non-anonymous classes
-		// the call to follow_class_loader is made when the class loader itself
-		// is handled.
-		if (klass->oop_is_instance() && InstanceKlass::cast(klass)->is_anonymous()) 
-			MarkSweep::follow_class_loader(klass->class_loader_data());
-		else 
-			MarkSweep::follow_klass(klass);
-	} 
-	else {
-		// If klass is NULL then this a mirror for a primitive type.
-		// We don't have to follow them, since they are handled as strong
-		// roots in Universe::oops_do.
-		assertf(java_lang_Class::is_primitive(obj), "Sanity check");
-	}
-
-	InstanceMirrorKlass_OOP_ITERATE(                       \
-			start_of_static_fields(obj),                   \
-			java_lang_Class::static_oop_field_count(obj),  \
-			MarkSweep::mark_and_push(p),                   \
-			assert_is_in_closed_subset)
 #endif
 }
 

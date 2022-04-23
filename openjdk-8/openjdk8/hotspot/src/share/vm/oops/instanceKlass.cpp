@@ -2088,7 +2088,7 @@ template <class T> void assert_nothing(T *p) {}
   } else {                                                                    \
 	  int i = 0;                                                              \
 	  while (map < end_map) {                                                 \
-		  if (TestBit(_transient_field_bitmap, i))                            \
+		  if (false) {                                                        \
 			  InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                      \
 					  obj->obj_field_addr<oop>(map->offset()), map->count(),  \
 					  MarkSweep::mark_and_push_transient(p), assert_fn)       \
@@ -2224,14 +2224,10 @@ void InstanceKlass::oop_follow_contents(oop obj) {
 	MarkSweep::follow_klass(obj->klass());
 
 #if CLOSURE
-
 	if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
-	{
 		assertf(false, "Object is in TeraCache");
-	}
 
-	if (EnableTeraCache && obj->is_tera_cache())
-	{
+	if (EnableTeraCache && obj->is_tera_cache()) {
 		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 		Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 

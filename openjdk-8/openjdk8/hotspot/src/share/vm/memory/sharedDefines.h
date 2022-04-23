@@ -45,6 +45,7 @@
 
 #define TERA_CARDS				 1  //< Disable teraCache, TODO Set to 1
 
+
 #define TERA_FLAG				 1  //< Define teraFlag word, TODO Set to 1
 
 #define TERA_C1				     1  //< Enable C1 to support TeraCache, TODO Set to 1
@@ -151,7 +152,7 @@
 #define P_SD_BITMAP				1	//< Bitmap to optimize the search in tree
 									//  
 
-#define P_SD_BACK_REF_CLOSURE	0	//< Find the transitive closure of backward
+#define P_SD_BACK_REF_CLOSURE	1	//< Find the transitive closure of backward
 									// edges
 
 #define P_NO_TRANSFER           0	//< This policy is ONLY for debugging.
@@ -159,6 +160,10 @@
 									//  anything to TeraCache. This policy
 									//  should be used in combination with
 									//  P_POLICY and P_DISTINCT
+
+#define P_SD_EXCLUDE_CLOSURE	 1	//< Exclude objects from the closure
+
+#define P_SD_REF_EXCLUDE_CLOSURE 1  //< Exclude reference objects from the closure
 
 /**********************************
  * States of TeraFlag  
@@ -187,4 +192,17 @@
 
 #define PREFETCHING				  0  //< Enable read ahead in TeraCache
 
+#define BACK_REF_STAT             0  //< Collect statistics for backward refenrences
+
+#define FWD_REF_STAT              0  //< Collect statistics for class object
+
+#define DISABLE_TRAVERSE_OLD_GEN  1  //< Disable backward reference traversal
+									 // from H2 to old generation (H1) during
+									 // minor GC
+
+/************************************
+ * Source code that we need to remove after testing
+ ************************************/
+#define CHECK_TERA_CARDS		 0  //< Check if we need this. At this time we
+									// do not need it
 #endif  // _SHARE_DEFINES_H_

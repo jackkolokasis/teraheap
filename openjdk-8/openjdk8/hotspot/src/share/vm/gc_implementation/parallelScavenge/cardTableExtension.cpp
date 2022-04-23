@@ -357,6 +357,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 }
 
 #elif REGIONS
+
 void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_array,
 													  HeapWord* space_top,
 													  PSPromotionManager* pm,
@@ -420,52 +421,19 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		HeapWord* slice_start = addr_for(worker_start_card);
 		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
 
-		// if there are not objects starting within the chunk, skip it.
+		// If there are not objects starting within the chunk, skip it.
 		if (!start_array->tc_object_starts_in_range(slice_start, slice_end))
 			continue;
 
 		// Update our beginning addr
-         
-        if (!Universe::teraCache()->check_if_valid_object(slice_start)){
+        if (!Universe::teraCache()->check_if_valid_object(slice_start)) {
             continue;
         }
         HeapWord* first_object = slice_start;
         assertf(oop(first_object)->is_oop_or_null(), "check for header");
-        /*
-        if (Universe::teraCache()->is_start_of_region(slice_start)){
-            first_object = slice_start;
-        } else {
-            first_object = start_array->tc_object_start(slice_start);
-        }
-        */
-		oop* first_object_within_slice = (oop*) first_object;
-/*
-		if (first_object < slice_start) {
-			last_scanned = (oop*)(first_object + oop(first_object)->size());
-			first_object_within_slice = last_scanned;
-			worker_start_card = byte_for(last_scanned);
-		}
-		// Update the ending card
-		//if (slice_end < (HeapWord*)sp_top && slice_end != slice_start) 
-		if (slice_end < (HeapWord*)sp_top) {
-			// The substaction is important! An object may start precisely at
-			// slice end
-            if (!Universe::teraCache()->check_if_valid_object(slice_end - 1)){
-                slice_end = Universe::teraCache()->get_last_object_end(slice_end - 1);
-            } else {
-                HeapWord* last_object = start_array->tc_object_start(slice_end - 1);
-                assertf(oop(last_object)->is_oop_or_null(), "last_object invalid");
-                slice_end = last_object + oop(last_object)->size();
-            }
-			// worker_end_card is exclusive, so bumb it one past the end of
-			// last_object's covered span.
-			worker_end_card = byte_for(slice_end) + 1;
 
-			if (worker_end_card > end_card)
-				worker_end_card = end_card;
-		}
-		
-        */
+		oop* first_object_within_slice = (oop*) first_object;
+
 		assertf(slice_end <= (HeapWord*)sp_top, "Last object in slice crosses space boundary");
 		assertf(is_valid_card_address(worker_start_card), "Invalid worker start card");
 		assertf(is_valid_card_address(worker_end_card), "Invalid worker end card");
@@ -473,20 +441,18 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 		// an object spans an entire slice.
 		assertf(worker_start_card <= end_card, "worker start card beyond end card");
 		assertf(worker_end_card <= end_card, "worker end card beyond end card");
-	
+
 		jbyte* current_card = worker_start_card;
 		while (current_card < worker_end_card) {
-			// Find a dirty card
-			while (current_card < worker_end_card && card_is_clean(*current_card)) {
+			while (current_card < worker_end_card && tc_card_is_clean(*current_card, is_scavenge_done)) {
 				current_card++;
 			}
 
 			jbyte* first_unclean_card = current_card;
 
-
 			// Find the end of a run of contiguous dirty cards
-			while (current_card < worker_end_card && !card_is_clean(*current_card)) {
-				while (current_card < worker_end_card && !card_is_clean(*current_card)) {
+			while (current_card < worker_end_card && !tc_card_is_clean(*current_card, is_scavenge_done)) {
+				while (current_card < worker_end_card && !tc_card_is_clean(*current_card, is_scavenge_done)) {
 					current_card++;
 				}
 				if (current_card < worker_end_card) {
@@ -535,10 +501,9 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				// If this code is removed, deal with the first time through the
 				// loop when the last_scanned is the object starting in the
 				// previous slices.
-				//assertf((p >= last_scanned) ||
-			    //			(last_scanned == first_object_within_slice),
-				//		"Should no longer be possible");
-				// TODO check
+				assertf((p >= last_scanned) ||
+			    			(last_scanned == first_object_within_slice),
+						"Should no longer be possible");
 				if (p < last_scanned) {
 					// Avoid scanning more than once; this can happen because
 					// newgen cards set by GC may a different set than the
@@ -557,6 +522,8 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
 				}
                 */
                 
+				//assertf((HeapWord *)to < slice_end, "Here we are");
+
                 if (to > sp_top) {
 					to = sp_top;
 				}
@@ -566,81 +533,32 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
                 assertf(following_clean_card <= worker_end_card, 
                         "Following clean card: %p must be less than worker end card %p",
                         following_clean_card, worker_end_card);
-                /*
-				// we know which cards to scan, now clear them
-				if (first_unclean_card <= worker_start_card +1)
-					first_unclean_card = worker_start_card + 1;
-
-				if (following_clean_card >= worker_end_card - 1)
-					following_clean_card = worker_end_card - 1;
-			*/	
-				
 
 				while (first_unclean_card < following_clean_card) {
 					*first_unclean_card++ = clean_card;
 				}
 
-				//const int interval = PrefetchScanIntervalInBytes;
-                
-				// scan all objects in the range
-                /*
-				if (interval != 0) {
-					while (p < to) {
-						Prefetch::write(p, interval);
-						oop m = oop(p);
-						assertf(m->is_oop_or_null(), "check for header");
-						if (is_scavenge_done)
-							m->tc_push_contents(pm);
-						else
-							m->tc_trace_contents(pm);
-                         
-                        if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size() ))
-                            break;
-                        
-						p += m->size();
+				while (p < to) {
+					oop m = oop(p);
+					assertf(m->is_oop_or_null(), "check for header");
+					if (is_scavenge_done) {
+#if BACK_REF_STAT
+						Universe::teraCache()->tc_enable_back_ref_traversal(p);
+#endif
+						m->tc_push_contents(pm);
 					}
+					else
+						m->tc_trace_contents(pm);
 
-					pm->drain_stacks_cond_depth();
+					if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size()))
+						break;
 
-				} else {
+					p += m->size();
 
-					while (p < to) {
-						oop m = oop(p);
-                        assertf(m->is_oop_or_null(), "check for header");
-						if (is_scavenge_done)
-							m->tc_push_contents(pm);
-						else
-							m->tc_trace_contents(pm);
-                        
-                        if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size() ))
-                            break;
-
-						assertf(m->is_oop_or_null(), "check for header");
-						p += m->size();
-                        
-					}
-					pm->drain_stacks_cond_depth();
 				}
+				pm->drain_stacks_cond_depth();
 				last_scanned = p;
 			}
-            */
-            while (p < to) {
-                    oop m = oop(p);
-                    assertf(m->is_oop_or_null(), "check for header");
-                    if (is_scavenge_done)
-                        m->tc_push_contents(pm);
-                    else
-                        m->tc_trace_contents(pm);
-                    
-                    if (!Universe::teraCache()->check_if_valid_object((HeapWord *)p + m->size()))
-                        break;
-
-                    p += m->size();
-                        
-            }
-            pm->drain_stacks_cond_depth();
-            last_scanned = p;
-        }
 			// "current_card" is still the "following_clean_card" or
 			// the current_card is >= the worker_end_card so the
 			// loop will not execute again.

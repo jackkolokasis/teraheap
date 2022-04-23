@@ -211,21 +211,26 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
 	// Initialize TeraCache statistics counters to 0
 #if !DISABLE_TERACACHE
-	if (EnableTeraCache && TeraCacheStatistics)
-		Universe::teraCache()->tc_init_counters();
+	if (EnableTeraCache) {
+		// We scavenge only the dirty objects in TeraCache and prepare the backward
+		// stacks. 
+		if (!Universe::teraCache()->tc_empty())
+			PSScavenge::tc_scavenge();
 
-	if (EnableTeraCache)
+		if (TeraCacheStatistics)
+			Universe::teraCache()->tc_init_counters();
+	
 		// Give advise to kernel to prefetch pages for TeraCache random
 		Universe::teraCache()->tc_enable_rand();
+#if REGIONS
+		// Reset the used field of all regions
+		Universe::teraCache()->reset_used_field();
+#endif
+	}
 #endif
     // Print Region Groups
     //Universe::teraCache()->print_region_groups();
 
-#if REGIONS
-	if (EnableTeraCache)
-		// Reset the used field of all regions
-		Universe::teraCache()->reset_used_field();
-#endif
     // Recursive mark all the live objects
     mark_sweep_phase1(clear_all_softrefs);
 
@@ -246,16 +251,16 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 #if REGIONS
 	if (EnableTeraCache) {
 #if STATISTICS
-    // Print Region Groups
-    Universe::teraCache()->print_region_groups();
+		// Print Region Groups
+		Universe::teraCache()->print_region_groups();
 #endif
 
 #if DEBUG_PLACEMENT
 		Universe::teraCache()->tc_print_objects_per_region();
 #endif
 
-    // Free all the regions that are unused after marking
-    Universe::teraCache()->free_unused_regions();
+		// Free all the regions that are unused after marking
+		Universe::teraCache()->free_unused_regions();
 	}
 #endif   
     restore_marks();
@@ -601,7 +606,12 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // General strong roots.
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
-    
+
+#if !DISABLE_TERACACHE
+	// Traverse TeraCache
+	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
+		Universe::teraCache()->scavenge();
+#endif
 
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
@@ -634,11 +644,6 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
 
-#if !DISABLE_TERACACHE
-	// Traverse TeraCache
-	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
-		Universe::teraCache()->scavenge();
-#endif
   }
 
   // Next, mark all objects that can be recursively traced from the marked object.

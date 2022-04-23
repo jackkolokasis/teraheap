@@ -1,13 +1,13 @@
 #ifndef SHARE_VM_GC_IMPLEMENTATION_TERACACHE_TERACACHE_HPP
 #define SHARE_VM_GC_IMPLEMENTATION_TERACACHE_TERACACHE_HPP
-#include <vector>
-#include <map>
 #include "gc_implementation/parallelScavenge/objectStartArray.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
 #include "oops/oop.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include <regions.h>
 #include <thpool.h>
+#include <map>
+#include <tr1/tuple>
 
 class TeraCache {
 	private:
@@ -77,16 +77,28 @@ class TeraCache {
 												   // object to promote this id
 												   // to their reference objects
 
-		HeapWord* obj_h1_addr;				   // We need to check this
+		HeapWord* obj_h1_addr;				       // We need to check this
 												   // object that will be moved
 												   // to H2 if it has back ptrs
-												   // to H1									   
+												   // to H1
 
-		HeapWord* obj_h2_addr;				   // We need to check this
+		HeapWord* obj_h2_addr;				       // We need to check this
 												   // object that will be moved
 												   // to H2 if it has back ptrs
-												   // to H1									   
+												   // to H1
+#if BACK_REF_STAT
+		// This histogram keeps internally statistics for the backward
+		// references (H2 to H1)
+		std::map<oop *, std::tr1::tuple<int, int, int> > histogram;
+		oop *back_ref_obj;
+#endif
 
+#if FWD_REF_STAT
+		// This histogram keeps internally statistics for the forward references
+		// (H1 to H2) per object
+		std::map<oop, int> fwd_ref_histo;
+#endif
+		
 #if PREFETCHING
 		threadpool thpool[8];
 #endif
@@ -250,7 +262,6 @@ class TeraCache {
 
 #if ALIGN
 		bool tc_obj_fit_in_region(size_t size);
-
 #endif
 
 		// We save the current object group 'id' for tera-marked object to
@@ -292,6 +303,26 @@ class TeraCache {
 		// field 'p' of the object to identify in which region the object
 		// belongs to.
 		uint64_t tc_get_region_partId(void* p);
+
+#if BACK_REF_STAT
+		// Add a new entry to the histogram for back reference that start from
+		// 'obj' and results in H1 (new or old generation).
+		void tc_add_back_ref_stat(bool is_old, bool is_tera_cache);
+
+		void tc_enable_back_ref_traversal(oop* obj);
+		
+		// Print the histogram
+		void tc_print_back_ref_stat();
+#endif
+
+#if FWD_REF_STAT
+		// Add a new entry to the histogram for forward reference that start from
+		// H1 and results in 'obj' in H2 
+		void tc_add_fwd_ref_stat(oop obj);
+		
+		// Print the histogram
+		void tc_print_fwd_ref_stat();
+#endif
 };
 
 #endif

@@ -759,16 +759,34 @@ bool CardTableModRefBS::tc_num_dirty_cards(HeapWord *start, HeapWord* end,
 	assert((HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
 	jbyte* cur  = byte_for(start);
 	jbyte* last = byte_after(end);
-	unsigned long int counter = 0;
-	while (cur < last) {
-		if (*cur++ != clean_card)
-			counter++;
+
+	int num_dirty_card = 0;
+	int num_clean_card = 0;
+	int num_youngen_card = 0;
+	int num_oldgen_card = 0;
+
+	while (cur < last) { 
+		if (*cur == dirty_card)
+			num_dirty_card++;
+		else if (*cur == (CardTableModRefBS::CT_MR_BS_last_reserved + 1))
+			num_youngen_card++;
+		else if (*cur == (CardTableModRefBS::CT_MR_BS_last_reserved + 2))
+			num_oldgen_card++;
+		else {
+			num_clean_card++;
+		}
+		cur++;
 	}
 
 	if (before)
-		fprintf(stderr, "BEFORE: DIRTY_CARDS = %lu\n", counter);
-	else
-		fprintf(stderr, "AFTER: DIRTY_CARDS = %lu\n", counter);
+		fprintf(stderr, "BEFORE\n");
+	else 
+		fprintf(stderr, "AFTER\n");
+
+	fprintf(stderr, "\t\t DIRTY_CARDS  = %d\n", num_dirty_card);
+	fprintf(stderr, "\t\t YOUNGEN_CARD = %d\n", num_youngen_card);
+	fprintf(stderr, "\t\t OLDGEN_CARD  = %d\n", num_oldgen_card);
+	fprintf(stderr, "\t\t CLEAN_CARD   = %d\n", num_clean_card);
 
 	return true;
 }

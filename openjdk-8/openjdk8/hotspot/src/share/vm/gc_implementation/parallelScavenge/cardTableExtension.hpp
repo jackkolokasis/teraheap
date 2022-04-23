@@ -51,6 +51,9 @@ class CardTableExtension : public CardTableModRefBS {
  public:
   enum ExtendedCardValue {
     youngergen_card   = CardTableModRefBS::CT_MR_BS_last_reserved + 1,
+#if TERA_CARDS
+	oldergen_card     = CardTableModRefBS::CT_MR_BS_last_reserved + 2,
+#endif
     verify_card       = CardTableModRefBS::CT_MR_BS_last_reserved + 5
   };
 
@@ -100,11 +103,36 @@ class CardTableExtension : public CardTableModRefBS {
   static bool card_is_newgen(int value)     {return value == youngergen_card; }
   static bool card_is_clean(int value)      {return value == clean_card; }
   static bool card_is_verify(int value)     {return value == verify_card; }
+#if TERA_CARDS
+  static bool card_is_oldgen(int value)     {return value == oldergen_card; }
+
+  static bool tc_card_is_clean(int value, bool is_scavenge_done) {
+#if DISABLE_TRAVERSE_OLD_GEN
+	  if (!is_scavenge_done)
+		  return card_is_clean(value); 
+
+	  return (card_is_clean(value) || card_is_oldgen(value));
+#else
+	  return card_is_clean(value);
+#endif
+  }
+#endif
 
   // Card marking
-  void inline_write_ref_field_gc(void* field, oop new_val) {
+  void inline_write_ref_field_gc(void* field, oop new_val, bool promote_to_oldgen=false) {
     jbyte* byte = byte_for(field);
+#if TERA_CARDS
+	if (EnableTeraCache && is_field_in_tera_heap(field)) {
+		if (promote_to_oldgen) {
+			Atomic::cmpxchg((jbyte)oldergen_card, byte, (jbyte)clean_card);
+			Atomic::cmpxchg((jbyte)oldergen_card, byte, (jbyte)dirty_card);
+			return;
+		}
+	}
+	*byte = youngergen_card;
+#else
     *byte = youngergen_card;
+#endif
   }
 
   // Adaptive size policy support

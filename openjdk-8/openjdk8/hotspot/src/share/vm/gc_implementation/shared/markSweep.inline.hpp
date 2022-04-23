@@ -175,7 +175,9 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 #endif
 			if (TeraCacheStatistics)
 				Universe::teraCache()->tc_increase_forward_ptrs();
-
+#if FWD_REF_STAT
+			Universe::teraCache()->tc_add_fwd_ref_stat(obj);
+#endif
 			return;
 		}
 #endif
@@ -187,24 +189,8 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 					"Non valid teraflag value %p | %lu | %s", 
 					obj, obj->get_obj_state(), obj->klass()->internal_name());
 #endif
-
 		if (!obj->mark()->is_marked()) {
 			mark_object(obj);
-
-#if DEBUG_TERACACHE
-			if (EnableTeraCache)
-			{
-				std::cerr <<"[MARK_AND_PUSH]" 
-					<< " | P = " << p
-					<< " | OBJECT = " 
-					<< (HeapWord*)obj
-					<< " | MARKED = "
-					<< obj->mark()
-					<< " | TERA = "
-					<< obj->get_obj_state()
-					<< std::endl;
-			}
-#endif
 
 			_marking_stack.push(obj);
 		}
@@ -227,10 +213,12 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
-            //TODO: MARK ACTIVE REGION
             Universe::teraCache()->mark_used_region((HeapWord*)obj);
 			if (TeraCacheStatistics)
 				Universe::teraCache()->tc_increase_forward_ptrs();
+#if FWD_REF_STAT
+			Universe::teraCache()->tc_add_fwd_ref_stat(obj);
+#endif
 			return;
 		}
 
@@ -259,15 +247,15 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 #endif
 
 #if P_DISTINCT
-			if (obj->is_tc_to_old()) {
-				if (!obj->mark()->is_marked()) {
-					mark_object(obj); 
+		if (obj->is_tc_to_old()) {
+			if (!obj->mark()->is_marked()) {
+				mark_object(obj); 
 
-					_marking_stack.push(obj);
-				}
-
-				return;
+				_marking_stack.push(obj);
 			}
+
+			return;
+		}
 
 			if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
 				if (!obj->mark()->is_marked())
@@ -276,17 +264,6 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 				if (!obj->is_tera_cache())
 					obj->set_tera_cache(Universe::teraCache()->get_cur_obj_group_id(),
 							Universe::teraCache()->get_cur_obj_part_id());
-#endif
-
-#if DEBUG_TERACACHE
-			if (EnableTeraCache) {
-				std::cerr <<"[TERA_MARK_AND_PUSH]" 
-					<< " | P = " << p
-					<< " | OBJECT = " << (HeapWord*)obj
-					<< " | MARKED = " << obj->mark()
-					<< " | TERA = "   << obj->get_obj_state()
-					<< std::endl;
-			}
 #endif
 			_marking_stack.push(obj);
 		}

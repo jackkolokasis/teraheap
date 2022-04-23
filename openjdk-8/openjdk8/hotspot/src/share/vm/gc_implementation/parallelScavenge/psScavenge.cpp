@@ -277,6 +277,12 @@ bool PSScavenge::invoke() {
 // this function we identify backward pointers (from TC to the heap) to use
 // them during major gc.
 void PSScavenge::tc_scavenge() {
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (TeraCacheStatistics) 
+		gettimeofday(&start_time, NULL);
+
     // Release all previously held resources
     gc_task_manager()->release_all_resources();
 
@@ -314,6 +320,14 @@ void PSScavenge::tc_scavenge() {
 	gc_task_manager()->execute_and_wait(q);
 
 	gc_task_manager()->release_idle_workers();
+
+	if (TeraCacheStatistics) {
+		gettimeofday(&end_time, NULL);
+
+		tclog_or_tty->print_cr("[STATISTICS] | PHASE0 = %llu\n",
+				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+	}
 }
 #endif
 
@@ -898,7 +912,7 @@ bool PSScavenge::should_attempt_scavenge() {
       if (UsePerfData) {
         counters->update_scavenge_skipped(to_space_not_empty);
       }
-#if TERA_CARDS
+#if CHECK_TERA_CARDS
 	  if (EnableTeraCache && !Universe::teraCache()->tc_empty()) {
 		  tc_scavenge();
 	  }
@@ -916,7 +930,7 @@ bool PSScavenge::should_attempt_scavenge() {
   size_t promotion_estimate = MIN2(avg_promoted, young_gen->used_in_bytes());
   bool result = promotion_estimate < old_gen->free_in_bytes();
 
-#if TERA_CARDS
+#if CHECK_TERA_CARDS
   // If the 'result' is false, then we scavenge only the dirty objects in
   // TeraCache. We addresss the case where we perform directly major gc without
   // performing minor gc. So, we identify the backward pointers (from TC to the
