@@ -1263,10 +1263,10 @@ class StubGenerator: public StubCodeGenerator {
 			  __ leaq(end, Address(start, count, TIMES_OOP, 0));  // end == start+count*oop_size
 			  __ subptr(end, BytesPerHeapOop); // end - 1 to make inclusive
 
-			  int64_t tc_start_addr = (int64_t)Universe::teraCache()->tc_get_addr_region();
-			  __ mov64(scratch, tc_start_addr);
+			  AddressLiteral tc_start_addr((address)Universe::teraCache()->tc_get_addr_region(), relocInfo::none);
+			  __ lea(scratch, tc_start_addr);
 
-			  __ cmpl(start, scratch);
+			  __ cmpptr(start, scratch);
 			  __ jcc(Assembler::greaterEqual, L_in_tera_cache);
 
 			  __ shrptr(start, CardTableModRefBS::card_shift);
