@@ -22,16 +22,16 @@
 ############################################
 
 ############## 128GB #######################
-#NUM_OF_EXAMPLES=10000
-#NUM_OF_FEATURES=700000
-#NUM_OF_PARTITIONS=256
+NUM_OF_EXAMPLES=10000
+NUM_OF_FEATURES=700000
+NUM_OF_PARTITIONS=256
 ###########################################
 
-############### 256GB #######################
-NUM_OF_EXAMPLES=20000
-NUM_OF_FEATURES=711108
-NUM_OF_PARTITIONS=256
-############################################
+################ 256GB #######################
+#NUM_OF_EXAMPLES=20000
+#NUM_OF_FEATURES=711108
+#NUM_OF_PARTITIONS=256
+#############################################
 
 # for running
 MAX_ITERATION=100

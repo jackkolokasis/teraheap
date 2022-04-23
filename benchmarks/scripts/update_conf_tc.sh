@@ -32,7 +32,7 @@ usage() {
 }
 
 # Check for the input arguments
-while getopts ":m:f:s:r:t:n:c:h" opt
+while getopts ":m:f:s:r:t:n:c:b:h" opt
 do
     case "${opt}" in
         m)
@@ -56,6 +56,9 @@ do
 		c)
 			CORES=${OPTARG}
             ;;
+        b)
+            CUSTOM_BENCHMARK=${OPTARG}
+            ;;
         h)
             usage
             ;;
@@ -66,7 +69,7 @@ do
 done
 
 # Enter to spark configuration
-cd /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/conf
+cd /opt/spark/spark-2.3.0-kolokasis/conf
 
 # Change the worker cores
 sed -i '/SPARK_WORKER_CORES/c\SPARK_WORKER_CORES='"${CORES}" spark-env.sh
@@ -102,19 +105,22 @@ sed -i '/storageFraction/c\spark.memory.storageFraction '"${FRACTION}" spark-def
 
 cd -
 
-# Enter the spark-bechmarks
-cd ../spark-bench/conf/
+if [ ${CUSTOM_BENCHMARK} == "false" ]
+then
+	# Enter the spark-bechmarks
+	cd ../spark-bench/conf/
 
-# Change spark benchmarks configuration
-sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${TERACACHE}"'g' env.sh
+	# Change spark benchmarks configuration
+	sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${TERACACHE}"'g' env.sh
 
-# Change spark benchmarks configuration executor core
-sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
+	# Change spark benchmarks configuration executor core
+	sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
 
-# Change storage level
-sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
+	# Change storage level
+	sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
 
-cd -
+	cd -
+fi
 
 if [ ${RAMDISK} -ne 0 ]
 then
