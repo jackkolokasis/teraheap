@@ -7,10 +7,22 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.util.LinkedList;
 
+import java.lang.reflect.Field;
+
 public class MultiList {
-	
-	public static void mem_info(String str)
-	{
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
+
+	public static void mem_info(String str) {
 		System.out.println("=========================================");
 		System.out.println(str + "\n");
 		System.out.println("=========================================");
@@ -20,73 +32,78 @@ public class MultiList {
 		}
 	}
 
-	public static void gc()
-	{
+	public static void gc() {
 		System.out.println("=========================================");
 		System.out.println("Call GC");
 		System.gc();
 		System.out.println("=========================================");
 	}
+	
+	public static void calcHashCodeInteger(LinkedList<Integer> list, int num_elements) {
+		long sum = 0;
 
+		for (int i = 0; i < num_elements; i++)
+			sum += list.get(i).hashCode();
+
+		System.out.println("Hashcode Element = " + sum);
+	}
+	
+	public static void calcHashCodeString(LinkedList<String> list, int num_elements) {
+		long sum = 0;
+
+		for (int i = 0; i < num_elements; i++)
+			sum += list.get(i).hashCode();
+
+		System.out.println("Hashcode Element = " + sum);
+	}
 
     public static void main(String[] args) {
-        //int num_elements = 10000000;
-        int num_elements = 2000000;
+        int num_elements = 100000;
 
 		mem_info("Memory Before");
 
-        System.out.println("=========================================");
-        System.out.println("Create List 1");
-        System.out.println("=========================================");
-        LinkedList<Integer> linkedList = new @Cache LinkedList<Integer>(); 
+        LinkedList<Integer> list = new LinkedList<Integer>(); 
+        LinkedList<String> list2 = new LinkedList<String>(); 
+        LinkedList<Integer> list3 = new LinkedList<Integer>(); 
 
-        System.out.println("=========================================");
-        System.out.println("Add Elements to the  List1");
-        System.out.println("=========================================");
-        for (int i = 0; i < num_elements; i++)
-          linkedList.add(i);
+		_UNSAFE.tcMarkObjectWithId(list, 0, 0);
+		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
+		_UNSAFE.tcMarkObjectWithId(list3, 2, 0);
+
+		for (int i = 0; i < num_elements; i++)
+			list.add(i);
+
+		gc();
+
+        System.out.println("First Element = " + list.getFirst());
+        System.out.println("Last Element = " + list.getLast());
         
-
-        System.out.println("=========================================");
-        System.out.println("Create List2");
-        System.out.println("=========================================");
-        LinkedList<Integer> linkedList2 = new @Cache LinkedList<Integer>(); 
-
-        System.out.println("=========================================");
-        System.out.println("Add Elements to the  List2");
-        System.out.println("=========================================");
         for (int i = 0; i < num_elements; i++)
-          linkedList2.add(i);
-        
-        
-        System.out.println("=========================================");
-        System.out.println("Create List3");
-        System.out.println("=========================================");
-        LinkedList<Integer> linkedList3 = new @Cache LinkedList<Integer>(); 
+			list2.add(new String("Hello TeraHeap " + i));
 
-        System.out.println("=========================================");
-        System.out.println("Add Elements to the  List3");
-        System.out.println("=========================================");
-        for (int i = 0; i < num_elements; i++)
-          linkedList3.add(i);
+		calcHashCodeString(list2, num_elements);
+		calcHashCodeInteger(list, num_elements);
+        
+		System.out.println("First Element = " + list2.getFirst());
+        System.out.println("Last Element = " + list2.getLast());
+
+		list2 = null;
+
+		gc();
 
         
-        System.out.println("=========================================");
-        System.out.println("First Element = " + linkedList.getFirst());
-        System.out.println("Last Element = " + linkedList.getLast());
-        System.out.println("=========================================");
-        
-		System.out.println("=========================================");
-        System.out.println("Add Elements to the  List1");
-        System.out.println("=========================================");
-        for (int i = 0; i < num_elements; i++)
-          linkedList.add(i);
-        
-		System.out.println("=========================================");
-        System.out.println("Add Elements to the  List3");
-        System.out.println("=========================================");
-        for (int i = 0; i < num_elements; i++)
-          linkedList3.add(i);
+		for (int i = 0; i < num_elements; i++)
+			list3.add(i);
+		
+		gc();
+		
+		System.out.println("First Element = " + list3.getFirst());
+        System.out.println("Last Element = " + list3.getLast());
+
+		calcHashCodeInteger(list, num_elements);
+		calcHashCodeInteger(list3, num_elements);
+
+		gc();
 
 		mem_info("Memory After");
     }

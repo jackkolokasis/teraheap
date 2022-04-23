@@ -1,14 +1,16 @@
-// Test migration of an object and all the objects that points out
-//
 import java.io.*; 
 import java.lang.*; 
 import java.util.Scanner;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.HashMap;
+
 import java.lang.reflect.Field;
 
-public class List_Large {
+public class MultiHashMap {
+	static long num = 0;
 	private static final sun.misc.Unsafe _UNSAFE;
 
 	static {
@@ -20,7 +22,7 @@ public class List_Large {
 			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
 		}
 	}
-	
+
 	public static void mem_info(String str)
 	{
 		System.out.println("=========================================");
@@ -39,54 +41,38 @@ public class List_Large {
 		System.gc();
 		System.out.println("=========================================");
 	}
-	
-	public static void calcHashCode(LinkedList<Integer> list, int num_elements) {
-		long sum = 0;
-
-		for (int i = 0; i < num_elements; i++)
-			sum += list.get(i).hashCode();
-
-		System.out.println("Total Hashcode = " + sum);
-	}
 
 	public static void main(String[] args) {
-		int num_elements = 100000;
+		int num_elements = 10000;
 
-		mem_info("Memory Before");
+		HashMap<String, ArrayList<Integer>> h_map = new HashMap<String, ArrayList<Integer>>();
+		_UNSAFE.tcMarkObjectWithId(h_map, 0, 0);
 
-		LinkedList<Integer> list1 = new LinkedList<Integer>(); 
-		_UNSAFE.tcMarkObjectWithId(list1, 0, 0);
-		
-		LinkedList<Integer> list2 = new LinkedList<Integer>(); 
-		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
+		for (int i = 0; i < num_elements/2; i++)
+		{
+			String str = new @Cache String("Iacovos Kolokasis " + i);
+			_UNSAFE.tcMarkObjectWithId(str, 1, 0);
 
-		for (int i = 0; i < num_elements; i++)
-			list1.add(i);
+			ArrayList<Integer> array = new ArrayList<Integer>();
+			for (int j = 0; j < 5000; j++) {
+				Integer number = new Integer(j * 10);
+				array.add(number);
+			}
 
-		mem_info("Memory After");
+			h_map.put(str, array);
+		}
+
 		gc();
 
-		calcHashCode(list1, num_elements);
+		h_map.entrySet().forEach(entry -> {
+			num += entry.getKey().hashCode();
+			ArrayList<Integer> arr = entry.getValue();
 
-		System.out.println("First Element = " + list1.getFirst());
-		System.out.println("Last Element = " + list1.getLast());
-		
-		gc();
-
-		list1 = null;
-
-		mem_info("Memory After");
-		gc();
-		
-		for (int i = 0; i < num_elements; i++)
-			list2.add(i);
-
-		calcHashCode(list2, num_elements);
-		gc();
-		
-		calcHashCode(list2, num_elements);
-		gc();
-
-		mem_info("Memory After");
+			gc();
+			for (int i = 0; i < 5000; i++)
+			{
+				num += arr.get(i).hashCode();
+			}
+		});
 	}
 }
