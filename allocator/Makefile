@@ -12,7 +12,7 @@ include ./Makefile_common.mk
 include ./makefile.colors
 
 #rules
-.PHONY: all lib tc_allocate tc_group tc_free tc_sync tc_async clean distclean test
+.PHONY: all lib tc_allocate tc_group tc_free tc_sync tc_async clean distclean test depedencies
 
 all: tc_allocate tc_group tc_free tc_sync tc_async
 
@@ -97,3 +97,6 @@ test:
 		./$$t 2> out; \
 	done 
 	@rm out
+
+dependencies:
+	@test ! -d "C-Thread-Pool" && git clone git@github.com:Pithikos/C-Thread-Pool.git

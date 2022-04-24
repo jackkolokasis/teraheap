@@ -1169,6 +1169,9 @@ void ostream_exit() {
   if (gclog_or_tty != tty) {
       delete gclog_or_tty;
   }
+  if (tclog_or_tty != tty) {
+	  delete tclog_or_tty;
+  }
   {
       // we temporaly disable PrintMallocFree here
       // as otherwise it'll lead to using of almost deleted
@@ -1185,6 +1188,7 @@ void ostream_exit() {
   tty = NULL;
   xtty = NULL;
   gclog_or_tty = NULL;
+  tclog_or_tty = NULL;
   defaultStream::instance = NULL;
 }
 
@@ -1192,6 +1196,7 @@ void ostream_exit() {
 void ostream_abort() {
   // Here we can't delete gclog_or_tty and tty, just flush their output
   if (gclog_or_tty) gclog_or_tty->flush();
+  if (tclog_or_tty) tclog_or_tty->flush();
   if (tty) tty->flush();
 
   if (defaultStream::instance != NULL) {

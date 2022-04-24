@@ -9,9 +9,22 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.lang.reflect.Field;
 
 public class Groupping 
 { 
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
+
 	public static void mem_info(String str)
 	{
 		System.out.println("=========================================");
@@ -30,81 +43,54 @@ public class Groupping
 		System.gc();
 		System.out.println("=========================================");
 	}
+	
+	public static void calcHashCode(LinkedList<String> list, int num_elements) {
+		long sum = 0;
+
+		for (int i = 0; i < num_elements; i++)
+			sum += list.get(i).hashCode();
+
+		System.out.println("Hashcode Element = " + sum);
+	}
 
 	public static void main (String[] args) 
 	{		 
-		// declares an Array of integers. 
-		// allocating memory for 5 integers. 
-		//
 		int num_elements = 20000;
 		int num_elements_2 = 10000000;
 
 		mem_info("Memory Before");
 
-		// Create the array list
-		LinkedList<Integer> arl = new LinkedList<Integer>();
-		// Add data to the list
-		
-        /*
+		LinkedList<Integer> list = new LinkedList<Integer>();
+		_UNSAFE.tcMarkObjectWithId(list, 0, 0);
+
 		gc();
         
-		gc();
-        */
 		long x = 0;
 		// Traverse all the data of the list
 		for (int i = 0; i < num_elements; i++)
-		{
-            Integer int1 = new @Cache Integer(5);
-            arl.add(int1);
-		}
+			list.add(new Integer(i));
+
         gc();
-        gc();
+
         for (int i = 0; i < num_elements; i++)
-		{
-            arl.remove();
-		}
+            list.remove();
+
         gc();
-        gc();
-		LinkedList<String> arl2 = new LinkedList<String>();
+		LinkedList<String> list2 = new LinkedList<String>();
+		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
         
         for (int i = 0; i < num_elements_2; i++)
-		{
-            String int1 = new @Cache String("ttt");
-            arl2.add(int1);
-		}
+            list2.add(new String("Hello World " + i));
+
         gc();
-        gc();
-       /* 
-		x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
-
+		calcHashCode(list2, num_elements);
 
 		gc();
-
-		x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
+		calcHashCode(list2, num_elements);
 
 		gc();
+		calcHashCode(list2, num_elements);
 
-		x = 0;
-		System.gc();
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-
-		System.out.println("Hashcode Element = " + x);
-
-		gc();
-	*/	
 		mem_info("Memory After");
 	} 
 } 

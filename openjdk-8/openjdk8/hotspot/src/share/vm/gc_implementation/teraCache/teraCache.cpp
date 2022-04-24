@@ -11,13 +11,12 @@
 #include "runtime/mutexLocker.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
-#include <map>
 
 char*        TeraCache::_start_addr = NULL;
 char*        TeraCache::_stop_addr = NULL;
 
 ObjectStartArray TeraCache::_start_array;
-Stack<oop, mtGC> TeraCache::_tc_stack;
+Stack<oop *, mtGC> TeraCache::_tc_stack;
 Stack<oop *, mtGC> TeraCache::_tc_adjust_stack;
 
 uint64_t TeraCache::total_active_regions;
@@ -37,9 +36,6 @@ uint64_t TeraCache::intra_ptrs_per_mgc;
 uint64_t TeraCache::obj_distr_size[3];	
 long int TeraCache::cur_obj_group_id;
 long int TeraCache::cur_obj_part_id;
-#if NEW_FEAT
-std::vector<HeapWord *> TeraCache::_mk_dirty;    //< These objects should make their cards dirty
-#endif
 
 // Constructor of TeraCache
 TeraCache::TeraCache() {
@@ -78,6 +74,16 @@ TeraCache::TeraCache() {
 	}
 
 	cur_obj_group_id = 0;
+
+#if PREFETCHING
+	// 8 thread pools
+	// wait se kathe thesi tou pinaka
+	for (int i = 0; i < 8; i++) 
+		thpool[i] = thpool_init(4);
+#endif
+
+	obj_h1_addr = NULL;
+	obj_h2_addr = NULL;
 }
 		
 void TeraCache::tc_shutdown() {
@@ -181,7 +187,6 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 	pos = allocate(size,(uint64_t)obj->get_obj_group_id(),(uint64_t)obj->get_obj_part_id());
 #endif
 
-
 #if VERBOSE_TC
 	if (TeraCacheStatistics)
 		tclog_or_tty->print_cr("[STATISTICS] | OBJECT: %p | SIZE = %lu | ID = %d | NAME = %s",
@@ -208,15 +213,17 @@ void TeraCache::scavenge()
 
 	gettimeofday(&start_time, NULL);
 
-	static int i = 0;
-
 	while (!_tc_stack.is_empty()) {
-		oop obj = _tc_stack.pop();
+		oop* obj = _tc_stack.pop();
 
 		if (TeraCacheStatistics)
 			back_ptrs_per_fgc++;
 
-		MarkSweep::mark_and_push(&obj);
+#if P_SD_BACK_REF_CLOSURE
+		MarkSweep::tera_back_ref_mark_and_push(obj);
+#else
+		MarkSweep::mark_and_push(obj);
+#endif
 	}
 	
 	gettimeofday(&end_time, NULL);
@@ -232,7 +239,8 @@ void TeraCache::tc_push_object(void *p, oop o) {
 #if MT_STACK
 	MutexLocker x(tera_cache_lock);
 #endif
-	_tc_stack.push(o);
+	//_tc_stack.push(o);
+	_tc_stack.push((oop *)p);
 	_tc_adjust_stack.push((oop *)p);
 	
 	back_ptrs_per_mgc++;
@@ -250,7 +258,7 @@ void TeraCache::tc_adjust() {
 
 	while (!_tc_adjust_stack.is_empty()) {
 		oop* obj = _tc_adjust_stack.pop();
-        Universe::teraCache()->enable_groups((HeapWord*) obj);
+        Universe::teraCache()->enable_groups(NULL, (HeapWord*) obj);
 		MarkSweep::adjust_pointer(obj);
         Universe::teraCache()->disable_groups();
 	}
@@ -283,6 +291,11 @@ void TeraCache::tc_clear_stacks() {
 	_tc_stack.clear(true);
 }
 
+// Check if backward adjust stack is empty
+bool TeraCache::tc_is_empty_back_stack() {
+	return _tc_adjust_stack.is_empty();
+}
+
 // Init the statistics counters of TeraCache to zero when a Full GC
 // starts
 void TeraCache::tc_init_counters() {
@@ -307,6 +320,10 @@ void TeraCache::tc_print_statistics() {
 	tclog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
 	tclog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
 			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
+
+#if FWD_REF_STAT
+	tc_print_fwd_ref_stat();
+#endif
 }
 		
 // Keep for each thread the time that need to traverse the TeraCache
@@ -353,6 +370,10 @@ void TeraCache::tc_print_mgc_statistics() {
 	tclog_or_tty->print_cr("[STATISTICS] | BACK_PTRS_PER_MGC = %lu\n", back_ptrs_per_mgc);
 #if !MT_STACK
 	tclog_or_tty->print_cr("[STATISTICS] | INTRA_PTRS_PER_MGC = %lu\n", intra_ptrs_per_mgc);
+#endif
+
+#if BACK_REF_STAT
+	tc_print_back_ref_stat();
 #endif
 	
 	// Initialize arrays for the next minor collection
@@ -448,8 +469,46 @@ void TeraCache::print_active_regions(void){
 
 // If obj is in a different tc region than the region enabled, they
 // are grouped 
-void TeraCache::group_region_enabled(HeapWord* obj){
-    check_for_group((char*) obj);
+void TeraCache::group_region_enabled(HeapWord* obj, void *obj_field) {
+	// Object is not going to be moved to TeraCache
+	if (obj_h2_addr == NULL) 
+		return;
+
+	if (tc_check(oop(obj))) {
+		check_for_group((char*) obj);
+		return;
+	}
+
+	// If it is an already backward pointer popped from tc_adjust_stack then do
+	// not mark the card as dirty because it is already marked from minor gc.
+	if (obj_h1_addr == NULL) 
+		return;
+	
+	// Mark the H2 card table as dirty if obj is in H1 (backward reference)
+	BarrierSet* bs = Universe::heap()->barrier_set();
+
+	if (bs->is_a(BarrierSet::ModRef)) {
+		ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+
+		size_t diff =  (HeapWord *)obj_field - obj_h1_addr;
+		assertf(diff > 0 && (diff <= (uint64_t) oop(obj_h1_addr)->size()), 
+				"Diff out of range: %lu", diff);
+		HeapWord *h2_obj_field = obj_h2_addr + diff;
+		assertf(tc_is_in((void *) h2_obj_field), "Shoud be in H2");
+
+		modBS->tc_write_ref_field(h2_obj_field);
+
+#if DEBUG_TERACACHE
+		fprintf(stderr, "[CARD TABLE] DIFF = %lu\n", diff);
+		fprintf(stderr, "[CARD TABLE] H1: Start Obj = %p | Field = %p\n",
+				obj_h1_addr, obj_field);
+		fprintf(stderr, "[CARD TABLE] H2: Start Obj = %p | Field = %p\n",
+				obj_h2_addr, h2_obj_field);
+		fprintf(stderr, "[CARD TABLE] H2: Obj = %p | SIZE = %d | NAME = %s\n",
+				obj_h1_addr, oop(obj_h1_addr)->size(), 
+				oop(obj_h1_addr)->klass()->internal_name());
+#endif
+	}
 }
 
 // Frees all unused regions
@@ -470,40 +529,32 @@ void TeraCache::print_region_groups(void){
 }
 
 // Enables groupping with region of obj
-void TeraCache::enable_groups(HeapWord* obj){
-    enable_region_groups((char*) obj);
+void TeraCache::enable_groups(HeapWord *old_addr, HeapWord* new_addr){
+    enable_region_groups((char*) new_addr);
+
+	obj_h1_addr = old_addr;
+	obj_h2_addr = new_addr;
 }
 
 // Disables region groupping
 void TeraCache::disable_groups(void){
     disable_region_groups();
+
+	obj_h1_addr = NULL;
+	obj_h2_addr = NULL;
 }
 
 
 // Groups the region of obj1 with the region of obj2
 void TeraCache::group_regions(HeapWord *obj1, HeapWord *obj2){
+	if (is_in_the_same_group((char *) obj1, (char *) obj2)) 
+		return;
+
+#if MT_STACK
+	MutexLocker x(tera_cache_group_lock);
+#endif
     references( (char*) obj1, (char*) obj2 );
 }
-
-#if NEW_FEAT
-// New feature
-void TeraCache::tc_mk_dirty(oop obj) {
-	_mk_dirty.push_back((HeapWord *)obj);
-
-}
-
-// New feature
-bool TeraCache::tc_should_mk_dirty(HeapWord* obj) {
-	for (unsigned long int i = 0; i < _mk_dirty.size(); i++) {
-		if (_mk_dirty[i] == obj) {
-			_mk_dirty.erase(_mk_dirty.begin() + i);
-			std::cout << "BKPTR | SIZE = " << _mk_dirty.size() << std::endl;
-			return true;
-		}
-	}
-	return false;
-}
-#endif
 
 #if PR_BUFFER
 // Add an object 'q' with size 'size' to the promotion buffer. We use
@@ -640,6 +691,7 @@ void TeraCache::tc_print_objects_per_region() {
 	}
 }
 
+
 HeapWord *TeraCache::get_first_object_in_region(HeapWord *addr){
     return (HeapWord*) get_first_object((char*)addr);
 }
@@ -729,3 +781,164 @@ void TeraCache::tc_mark_live_objects_per_region() {
     tc_count_marked_objects();
     tc_reset_marked_objects();
 }
+
+#if PREFETCHING
+
+void print_timestamp(HeapWord* obj, bool start) {
+	time_t timer;
+    char buffer[26];
+    struct tm* tm_info;
+
+    timer = time(NULL);
+    tm_info = localtime(&timer);
+
+    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+
+	if (start)
+		fprintf(stderr, "[START PREFETCHING] OBJ = %p | TIMESTAMP = %s\n", obj, buffer);
+	else
+		fprintf(stderr, "[STOP PREFETCHING] OBJ = %p | TIMESTAMP = %s\n", obj, buffer);
+}
+/**
+ * MT to prefetch data
+ */
+void prefetch_data(void *obj) {
+	HeapWord *obj_addr = (HeapWord *) obj;
+
+	int step = (2 * 1024 * 1024);
+	volatile int sum = 0;
+	volatile int *prefetch_me;
+
+	while(1) {
+		prefetch_me = (int *) obj_addr;
+		sum += *prefetch_me;
+
+		if (!is_before_last_object((char *)(obj_addr + step)))
+			break;
+			
+		obj_addr += step;
+	}
+
+	return;
+}
+
+void TeraCache::tc_prefetch_data(HeapWord *obj, long rdd_id, long part_id) {
+
+	HeapWord *reg_start_address = 
+		(HeapWord *) get_region_start_addr((char *) obj, rdd_id, part_id);
+
+	thpool_add_work(thpool[rdd_id % 8], prefetch_data, (void *)reg_start_address);
+	return;
+}
+
+void TeraCache::tc_wait() {
+	//thpool_wait(thpool);
+}
+#endif
+
+// Get the group Id of the objects that belongs to this region. We
+// locate the objects of the same group to the same region. We use the
+// field 'p' of the object to identify in which region the object
+// belongs to.
+uint64_t TeraCache::tc_get_region_groupId(void* p) {
+	assertf((char *) p != NULL, "Sanity check");
+	return get_obj_group_id((char *) p);
+}
+
+// Get the partition Id of the objects that belongs to this region. We
+// locate the objects of the same group to the same region. We use the
+// field 'p' of the object to identify in which region the object
+// belongs to.
+uint64_t TeraCache::tc_get_region_partId(void* p) {
+	assertf((char *) p != NULL, "Sanity check");
+	return get_obj_part_id((char *) p);
+}
+
+#if BACK_REF_STAT
+// Add a new entry to the histogram for 'obj'
+void TeraCache::tc_add_back_ref_stat(bool is_old, bool is_tera_cache) {
+	std::tr1::tuple<int, int, int> val;
+	std::tr1::tuple<int, int, int> new_val;
+
+	val = histogram[back_ref_obj];
+	
+	if (is_old) {                         // Reference is in the old generation  
+		new_val = std::tr1::make_tuple(
+				std::tr1::get<0>(val),
+				std::tr1::get<1>(val) + 1,
+				std::tr1::get<2>(val));
+	}
+	else if (is_tera_cache) {             // Reference is in the tera cache
+		new_val = std::tr1::make_tuple(
+				std::tr1::get<0>(val),
+				std::tr1::get<1>(val),
+				std::tr1::get<2>(val) + 1);
+	} else {                              // Reference is in the new generation
+		new_val = std::tr1::make_tuple(
+				std::tr1::get<0>(val) + 1,
+				std::tr1::get<1>(val),
+				std::tr1::get<2>(val));
+	}
+	
+	histogram[back_ref_obj] = new_val;
+}
+		
+// Enable traversal class object
+void TeraCache::tc_enable_back_ref_traversal(oop* obj) {
+	std::tr1::tuple<int, int, int> val;
+
+	val = std::tr1::make_tuple(0, 0, 0);
+
+	back_ref_obj = obj;
+	histogram[obj] = val;
+
+}
+
+// Print the histogram
+void TeraCache::tc_print_back_ref_stat() {
+	std::map<oop *, std::tr1::tuple<int, int, int> >::const_iterator it;
+
+	
+	tclog_or_tty->print_cr("Start_Back_Ref_Statistics\n");
+
+	for(it = histogram.begin(); it != histogram.end(); ++it) {
+		if (std::tr1::get<0>(it->second) > 1000 || std::tr1::get<1>(it->second) > 1000) {
+			tclog_or_tty->print_cr("[HISTOGRAM] ADDR = %p | NAME = %s | NEW = %d | OLD = %d | TC = %d\n",
+					it->first, oop(it->first)->klass()->internal_name(), std::tr1::get<0>(it->second),
+					std::tr1::get<1>(it->second), std::tr1::get<2>(it->second));
+		}
+	}
+	
+	tclog_or_tty->print_cr("End_Back_Ref_Statistics\n");
+
+	// Empty the histogram at the end of each minor gc
+	histogram.clear();
+}
+#endif
+
+#if FWD_REF_STAT
+// Add a new entry to the histogram for forward reference that start from
+// H1 and results in 'obj' in H2 
+void TeraCache::tc_add_fwd_ref_stat(oop obj) {
+	fwd_ref_histo[obj] ++;
+}
+
+// Print the histogram
+void TeraCache::tc_print_fwd_ref_stat() {
+	std::map<oop,int>::const_iterator it;
+
+	tclog_or_tty->print_cr("Start_Fwd_Ref_Statistics\n");
+
+	for(it = fwd_ref_histo.begin(); it != fwd_ref_histo.end(); ++it) {
+		tclog_or_tty->print_cr("[FWD HISTOGRAM] ADDR = %p | NAME = %s | REF = %d\n",
+				it->first, oop(it->first)->klass()->internal_name(), it->second);
+	}
+	
+	tclog_or_tty->print_cr("End_Fwd_Ref_Statistics\n");
+
+	// Empty the histogram at the end of each major gc
+	fwd_ref_histo.clear();
+}
+
+#endif
+

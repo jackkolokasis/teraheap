@@ -48,37 +48,34 @@ template <class T> inline bool PSScavenge::should_scavenge(T* p) {
 #if TERA_CARDS
 template <class T> inline bool PSScavenge::tc_should_scavenge(T* p) {
 	T heap_oop = oopDesc::load_heap_oop(p);
-	
+
 	if (oopDesc::is_null(heap_oop))
 		return false;
 
 	oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 	if (Universe::teraCache()->tc_check(obj)) {
-#if !MT_STACK
-		if (EnableTeraCache && TeraCacheStatistics)
-			Universe::teraCache()->incr_intra_ptrs_per_mgc();
-#endif
 #if REGIONS
-        //Grouping
-#if MT_STACK
-        MutexLocker x(tera_cache_group_lock);
+		// Check if we have references between two different individual regions
+        Universe::teraCache()->group_regions((HeapWord *)p, (HeapWord*)obj);
 #endif
-        Universe::teraCache()->group_regions((HeapWord *)p,(HeapWord*)obj);
+#if BACK_REF_STAT
+		Universe::teraCache()->tc_add_back_ref_stat(false, true);
 #endif
 		return false;
 	}
 	else if (PSScavenge::is_obj_in_young(heap_oop)) {
+#if BACK_REF_STAT
+		Universe::teraCache()->tc_add_back_ref_stat(false, false);
+#endif
 		return true;
 	}
 	else {
-#if P_DISTINCT && !P_SD
-		obj->set_tera_cache(0);
+		assertf(Universe::teraCache()->tc_is_in((void *)p), "Sanity check");
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj, true);
+#if BACK_REF_STAT
+		Universe::teraCache()->tc_add_back_ref_stat(true, false);
 #endif
-		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
-
-		Universe::teraCache()->tc_push_object((void *)p, obj);
-		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
 		return false;
 	}
 }
@@ -92,25 +89,21 @@ template <class T> inline bool PSScavenge::tc_should_trace(T* p) {
 	oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 	if (Universe::teraCache()->tc_check(obj)) {
-#if !MT_STACK
-		if (EnableTeraCache && TeraCacheStatistics)
-			Universe::teraCache()->incr_intra_ptrs_per_mgc();
+#if REGIONS
+		// Group regions if the references belong to two individual groups
+		Universe::teraCache()->group_regions((HeapWord *)p, (HeapWord*)obj);
 #endif
 		return false;
 	}
 	else if (PSScavenge::is_obj_in_young(heap_oop)) {
 		Universe::teraCache()->tc_push_object((void *)p, obj);
-		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj, false);
 		return false;
 	}
 	else {
-#if P_DISTINCT && !P_SD
-		obj->set_tera_cache(0);
-#endif
 		assertf(Universe::teraCache()->tc_is_in((void *)p), "Error");
-
 		Universe::teraCache()->tc_push_object((void *)p, obj);
-		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj, true);
 		return false;
 	}
 }
@@ -132,6 +125,7 @@ inline bool PSScavenge::should_scavenge(T* p, MutableSpace* to_space) {
 #if TERA_CARDS
 template <class T>
 inline bool PSScavenge::tc_should_scavenge(T* p, MutableSpace* to_space) {
+	assertf(false, "HERE we are!!!");
 	if (tc_should_scavenge(p)) {
 		oop obj = oopDesc::load_decode_heap_oop_not_null(p);
 
@@ -144,6 +138,7 @@ inline bool PSScavenge::tc_should_scavenge(T* p, MutableSpace* to_space) {
 
 template <class T>
 inline bool PSScavenge::tc_should_trace(T* p, MutableSpace* to_space) {
+	assertf(false, "HERE we are!!!");
 	if (tc_should_trace(p)) {
 		oop obj = oopDesc::load_decode_heap_oop_not_null(p);
 
@@ -168,15 +163,19 @@ inline bool PSScavenge::should_scavenge(T* p, bool check_to_space) {
 
 template <class T>
 inline bool PSScavenge::tc_should_scavenge(T* p, bool check_to_space) {
-	if (check_to_space) {
-		ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
-		return should_scavenge(p, heap->young_gen()->to_space());
-	}
+	assertf(false, "HERE!!!");
+	//if (check_to_space) {
+	//	ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
+	//	return tc_should_scavenge(p, heap->young_gen()->to_space());
+	//}
+	//fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
 	return tc_should_scavenge(p);
 }
 
 template <class T>
 inline bool PSScavenge::tc_should_trace(T* p, bool check_to_space) {
+	assertf(false, "HERE!!!");
+	//fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
 	if (check_to_space) {
 		ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
 		return should_scavenge(p, heap->young_gen()->to_space());
@@ -195,7 +194,7 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 	oop o = oopDesc::load_decode_heap_oop_not_null(p);
 
 	assertf(Universe::heap()->is_in_reserved(o) ||  Universe::teraCache()->tc_check(o), 
-			"Object should be in object space or in TeraCache");
+			"Object should be in object space or in TeraCache. O = %p | P = %p", o, p);
 
 	// If `o` has been copied to the new address, then forwardee of o is not
 	// empty, and is_forwarded is true, At this point, just take out the new
@@ -238,14 +237,13 @@ inline void PSScavenge::copy_and_push_safe_barrier(PSPromotionManager* pm, T* p)
 		assertf(!Universe::teraCache()->tc_check(new_obj), "Sanity");
 		assertf(!Universe::teraCache()->tc_is_in((void*) p), "Sanity");
 		if (PSScavenge::is_obj_in_young(new_obj))
-			card_table()->inline_write_ref_field_gc(p, new_obj);
+			card_table()->inline_write_ref_field_gc(p, new_obj, false);
 	}
 
 #if TERA_CARDS
 	if (Universe::teraCache()->tc_is_in((void *)p)) {
 		assertf(!Universe::teraCache()->tc_check(new_obj), "Sanity");
-		Universe::teraCache()->tc_push_object((void *)p, new_obj);
-		card_table()->inline_write_ref_field_gc(p, new_obj);
+		card_table()->inline_write_ref_field_gc(p, new_obj, !PSScavenge::is_obj_in_young(new_obj));
 	}
 #endif
 }
@@ -257,6 +255,8 @@ class PSRootsClosure: public OopClosure {
 
  protected:
   template <class T> void do_oop_work(T *p) {
+
+	  assertf(!Universe::teraCache()->tc_is_in((void *)p), "Error");
     if (PSScavenge::should_scavenge(p)) {
       // We never card mark roots, maybe call a func without test?
       PSScavenge::copy_and_push_safe_barrier<T, promote_immediately>(_promotion_manager, p);

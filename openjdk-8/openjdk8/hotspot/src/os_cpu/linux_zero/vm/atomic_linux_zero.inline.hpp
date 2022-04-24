@@ -255,6 +255,20 @@ inline void* Atomic::xchg_ptr(void* exchange_value, volatile void* dest) {
                            (volatile intptr_t*) dest);
 }
 
+inline jbyte Atomic::cmpxchg(jbyte exchange_value,
+                            volatile jbyte* dest,
+                            jbyte compare_value) {
+#ifdef ARM
+  return arm_compare_and_swap(dest, compare_value, exchange_value);
+#else
+#ifdef M68K
+  return m68k_compare_and_swap(dest, compare_value, exchange_value);
+#else
+  return __sync_val_compare_and_swap(dest, compare_value, exchange_value);
+#endif // M68K
+#endif // ARM
+}
+
 inline jint Atomic::cmpxchg(jint exchange_value,
                             volatile jint* dest,
                             jint compare_value) {

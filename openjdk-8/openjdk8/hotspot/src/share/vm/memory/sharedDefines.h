@@ -45,6 +45,7 @@
 
 #define TERA_CARDS				 1  //< Disable teraCache, TODO Set to 1
 
+
 #define TERA_FLAG				 1  //< Define teraFlag word, TODO Set to 1
 
 #define TERA_C1				     1  //< Enable C1 to support TeraCache, TODO Set to 1
@@ -111,7 +112,7 @@
 									// employ huge pages for mutator threads and
 									// regular pages for GC 
 
-#define TERA_CARD_SIZE			25 // This is the size of each card in
+#define TERA_CARD_SIZE			 13 // This is the size of each card in
 									// TeraCache card table. The size is in bit
 									// e.g 9 = 512bytes
 
@@ -148,14 +149,21 @@
 									//  should be used in combination with
 									//  P_DISTINCT 
 
-#define P_SD_BITMAP				0	//< Bitmap to optimize the search in tree
+#define P_SD_BITMAP				1	//< Bitmap to optimize the search in tree
 									//  
+
+#define P_SD_BACK_REF_CLOSURE	1	//< Find the transitive closure of backward
+									// edges
 
 #define P_NO_TRANSFER           0	//< This policy is ONLY for debugging.
 									//  Calculate the closure but do not move
 									//  anything to TeraCache. This policy
 									//  should be used in combination with
 									//  P_POLICY and P_DISTINCT
+
+#define P_SD_EXCLUDE_CLOSURE	 1	//< Exclude objects from the closure
+
+#define P_SD_REF_EXCLUDE_CLOSURE 1  //< Exclude reference objects from the closure
 
 /**********************************
  * States of TeraFlag  
@@ -173,20 +181,35 @@
 
 #define VISITED_TERA_OBJ           203 //< Object visited during GC Analysis
 
+#define TRANSIENT_FIELD		   428	//< Objects is pointed by transient field
+
 
 /***********************************
  * Statistics
  **********************************/
 #define STATISTICS			      0  //< Enable statistics for
                                      // TeraCache Allocator. Do NOT
-                                     // use this flug in performance
+                                     // use this flag in performance
                                      // measurements
 
-#define VERBOSE_TC				  0  //< Print objects in T
+#define VERBOSE_TC				  0  //< Print objects in TeraCache during
+									 // allocation
 
-// TODO: This define must be removed
-#define NEW_FEAT				  1  //< Enable when you add new feature
+#define PREFETCHING				  0  //< Enable read ahead in TeraCache
+
+#define BACK_REF_STAT             0  //< Collect statistics for backward refenrences
+
+#define FWD_REF_STAT              0  //< Collect statistics for class object
+
+#define DISABLE_TRAVERSE_OLD_GEN  1  //< Disable backward reference traversal
+									 // from H2 to old generation (H1) during
+									 // minor GC
 
 #define GC_ANALYSIS               1
 
+/************************************
+ * Source code that we need to remove after testing
+ ************************************/
+#define CHECK_TERA_CARDS		 0  //< Check if we need this. At this time we
+									// do not need it
 #endif  // _SHARE_DEFINES_H_

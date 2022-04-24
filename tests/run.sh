@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 
-XMS=5
-MAX=6
+XMS=2
+MAX=100
 TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 PARALLEL_GC_THREADS=16
-PLATFORM="nextgenio"
+PLATFORM=""
+STRIPE_SIZE=32768
 
 if [ $PLATFORM == "nextgenio" ] 
 then
     JAVA="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
     JDB="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-   EXEC=("Array_List" "Simple_Array" "List_Small" "List_Large" "MultiList" \
-    	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_String" "HashMap" \
-     	"Clone" "Rehashing" "Groupping")
-
    # EXEC=( "Groupping" )
 else 
     JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
     JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-    EXEC=( "Array" "Array_List_Float" "Array_List_Int" "Array_List" "Array_List_Scalar" "Clone" \
-        "Extend_Lambda" "HashMap" "List_Large" "List_Small" "MultiList" \
-        "Rehashing" "Simple_Array" "Simple_Lambda" "Test_Reference" "Test_Reflection" )
-    #EXEC=( "Clone" )
+
+	EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
+		"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
+		"HashMap" "Rehashing" "Clone" "Groupping" "MultiHashMap" \
+		"Test_WeakHashMap" "ClassInstance")
+
+	EXEC=( "HashMap" )
 fi
 V_JAVA="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.292.b10-1.el7_9.x86_64/bin/java"
 
@@ -95,11 +95,11 @@ function run_tests() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${XMS}m \
+		-Xms${XMS}g \
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
-		-XX:TeraStripeSize=16 \
+		-XX:TeraStripeSize=${STRIPE_SIZE} \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 
@@ -107,16 +107,18 @@ function run_tests() {
 function run_tests_debug() {
 	gdb --args ${JAVA} \
 		-server \
+		-XX:+ShowMessageBoxOnError \
 		-XX:+UseParallelGC \
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${XMS}m \
+		-Xms${XMS}g \
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
+		-XX:TeraStripeSize=${STRIPE_SIZE} \
 		-Xlogtc:llarge_teraCache.txt $1
 }
 

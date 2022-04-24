@@ -168,6 +168,8 @@ class MarkSweep : AllStatic {
   template <class T> static void mark_and_push(T* p);
   template <class T> static void tera_mark_and_push(T* p);
   template <class T> static void trace_tera_cache(T* p, bool assert_on);
+  template <class T> static void mark_and_push_transient(T* p);
+  template <class T> static void tera_back_ref_mark_and_push(T* p);
 
   static inline void push_objarray(oop obj, size_t index);
 

@@ -89,12 +89,13 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   GCCause::Cause gc_cause = heap->gc_cause();
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
+  bool full_gc_done = false;
 
   // Scavenge youngest generation before each full GC used with
   // UseParallelGC.
   // ScavengeBeforeFullGC by default is true
   if (ScavengeBeforeFullGC) {
-    PSScavenge::invoke_no_policy();
+	  PSScavenge::invoke_no_policy();
   }
 
   const bool clear_all_soft_refs =
@@ -102,7 +103,12 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 
   uint count = maximum_heap_compaction ? 1 : MarkSweepAlwaysCompactCount;
   UIntFlagSetting flag_setting(MarkSweepAlwaysCompactCount, count);
-  PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+  full_gc_done = PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+
+#if TERA_CARDS
+  // If the major GC fails then we need to clear the backward stacks
+  Universe::teraCache()->tc_clear_stacks();
+#endif
 }
 
 // This method contains no policy. You should probably
@@ -205,21 +211,26 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
 	// Initialize TeraCache statistics counters to 0
 #if !DISABLE_TERACACHE
-	if (EnableTeraCache && TeraCacheStatistics)
-		Universe::teraCache()->tc_init_counters();
+	if (EnableTeraCache) {
+		// We scavenge only the dirty objects in TeraCache and prepare the backward
+		// stacks. 
+		if (!Universe::teraCache()->tc_empty())
+			PSScavenge::tc_scavenge();
 
-	if (EnableTeraCache)
+		if (TeraCacheStatistics)
+			Universe::teraCache()->tc_init_counters();
+	
 		// Give advise to kernel to prefetch pages for TeraCache random
 		Universe::teraCache()->tc_enable_rand();
+#if REGIONS
+		// Reset the used field of all regions
+		Universe::teraCache()->reset_used_field();
+#endif
+	}
 #endif
     // Print Region Groups
     //Universe::teraCache()->print_region_groups();
 
-#if REGIONS
-	if (EnableTeraCache)
-		// Reset the used field of all regions
-		Universe::teraCache()->reset_used_field();
-#endif
     // Recursive mark all the live objects
     mark_sweep_phase1(clear_all_softrefs);
 
@@ -240,8 +251,8 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 #if REGIONS
 	if (EnableTeraCache) {
 #if STATISTICS
-        // Print Region Groups
-        Universe::teraCache()->print_region_groups();
+		// Print Region Groups
+		Universe::teraCache()->print_region_groups();
 #endif
 
 #if DEBUG_PLACEMENT
@@ -597,7 +608,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // General strong roots.
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
-    
+
 #if !DISABLE_TERACACHE
 	// Traverse TeraCache
 	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
@@ -634,6 +645,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
+
   }
 
   // Next, mark all objects that can be recursively traced from the marked object.

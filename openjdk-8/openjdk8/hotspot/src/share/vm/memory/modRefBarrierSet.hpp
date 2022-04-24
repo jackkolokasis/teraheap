@@ -99,11 +99,9 @@ public:
   // which may admit an optimized implementation for some barriers.
 #if TERA_CARDS
   virtual void tc_invalidate(HeapWord *start, HeapWord *end) = 0;
-#endif
-
-#if NEW_FEAT
-  virtual void tc_write_ref_field(HeapWord *obj) = 0;
-
+  
+  virtual void tc_write_ref_field(void *obj) = 0;
+  
   virtual bool tc_num_dirty_cards(HeapWord *start, HeapWord* end, bool before) = 0;
 
   virtual void tc_clean_cards(HeapWord *start, HeapWord* end) = 0;

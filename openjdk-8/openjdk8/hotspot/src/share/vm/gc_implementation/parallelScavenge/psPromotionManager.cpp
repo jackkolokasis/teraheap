@@ -263,6 +263,9 @@ template <class T> void PSPromotionManager::process_array_chunk_work(
   T* p               = base + start;
   T* const chunk_end = base + end;
   while (p < chunk_end) {
+	if (EnableTeraCache && !Universe::teraCache()->tc_empty() 
+			&& Universe::teraCache()->tc_is_in((void *)p))
+		assertf(false, "Implement this case");
     if (PSScavenge::should_scavenge(p)) {
       claim_or_forward_depth(p);
     }

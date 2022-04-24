@@ -4,6 +4,8 @@ import java.lang.reflect.Constructor;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 
+import java.lang.reflect.Field;
+
 // class whose object is to be created 
 class Test 
 { 
@@ -31,6 +33,17 @@ class Test
 
 class Test_Reflection
 { 
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
 
 	public static void mem_info(String str)
 	{
@@ -53,15 +66,9 @@ class Test_Reflection
 
 	public static void main(String args[]) throws Exception 
 	{ 
-		for (int i = 0; i < 50000; i++)
-		{
-			mem_info("Memory Information");
-		}
-		gc();
-		mem_info("Memory Information");
-
 		// Creating object whose property is to be checked 
-		Test obj = new @Cache Test(); 
+		Test obj = new Test(); 
+		_UNSAFE.tcMarkObjectWithId(obj, 0, 0);
 
 		// Creating class object from the object using 
 		// getclass method 
@@ -79,7 +86,6 @@ class Test_Reflection
 		// of the class by using getMethods 
 		Method[] methods = cls.getMethods(); 
 		
-		
 		// Printing method names 
 		for (Method method:methods) 
 			System.out.println(method.getName()); 
@@ -91,6 +97,8 @@ class Test_Reflection
 
 		// invokes the method at runtime 
 		methodcall1.invoke(obj, 19); 
+		
+		gc();
 
 		// creates object of the desired field by providing 
 		// the name of field as argument to the 
@@ -100,19 +108,15 @@ class Test_Reflection
 		// allows the object to access the field irrespective 
 		// of the access specifier used with the field 
 		field.setAccessible(true); 
+		
+		gc();
 
 		// takes object and the new value to be assigned 
 		// to the field as arguments 
 
 		field.set(obj, "JAVA"); 
 		
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
-		
-		mem_info("Memory Information");
-		gc();
-		mem_info("Memory Information");
 
 		// Creates object of desired method by providing the 
 		// method name as argument to the getDeclaredMethod 
@@ -121,26 +125,16 @@ class Test_Reflection
 		// invokes the method at runtime 
 		methodcall2.invoke(obj); 
 		
-		field.set(obj, "JAVA"); 
+		field.set(obj, "Jack Kolokasis 1991"); 
 
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
-		mem_info("Memory Information");
-		gc();
-		mem_info("Memory Information");
-		mem_info("Memory Information");
-		gc();
-		mem_info("Memory Information");
-
-		mem_info("Memory Information");
-		gc();
-		mem_info("Memory Information");
 
 		// invokes the method at runtime 
 		methodcall2.invoke(obj); 
+
+		gc();
+		
+		mem_info("Memory End");
 	} 
 } 

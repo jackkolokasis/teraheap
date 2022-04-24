@@ -29,6 +29,7 @@ usage() {
     echo "      -f  Enable profiler tool"
     echo "      -f  Enable profiler tool"
     echo "      -a  Run experiments with high bench"
+    echo "      -b  Run experiments with custom benchmark"
     echo "      -j  Enable metrics for JIT compiler"
     echo "      -h  Show usage"
     echo
@@ -41,7 +42,7 @@ usage() {
 #   Start Spark
 ##
 start_spark() {
-    /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/sbin/start-all.sh
+    /opt/spark/spark-2.3.0-kolokasis/sbin/start-all.sh
 }
 
 ##
@@ -49,7 +50,7 @@ start_spark() {
 #   Stop Spark
 ##
 stop_spark() {
-    /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/sbin/stop-all.sh
+    /opt/spark/spark-2.3.0-kolokasis/sbin/stop-all.sh
 }
 
 ##
@@ -111,7 +112,7 @@ kill_back_process() {
 ##
 cleanWorkDirs() {
 
-    cd /home/nx05/nx05/kolokasis/TeraCache-2.3.0/spark-2.3.0-kolokasis/work/
+    cd /opt/spark/spark-2.3.0-kolokasis/work
 
     for f in $(ls)
     do
@@ -165,6 +166,8 @@ printEndMsg() {
     echo "====================================================================="
     echo
 }
+
+CUSTOM_BENCHMARK=false
 
 # Check for the input arguments
 while getopts ":n:t:o:cspkajfdbh" opt
@@ -265,10 +268,10 @@ do
 				if [ $HIGH_BENCH ]
 				then
 					./update_conf_hibench.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
-						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -c $EXEC_CORES
+						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -c ${EXEC_CORES[$j]}
 				else
 					./update_conf.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
-						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -c $EXEC_CORES
+						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -c ${EXEC_CORES[$j]} -b ${CUSTOM_BENCHMARK}
 				fi
 			elif [ $TC ]
 			then
@@ -276,11 +279,11 @@ do
 				then
 					./update_conf_hibench_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
 						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} \
-						-n ${NEW_GEN[$j]} -c $EXEC_CORES
+						-n ${NEW_GEN[$j]} -c ${EXEC_CORES[$j]}
 				else
 					./update_conf_tc.sh -m ${HEAP[$j]} -f ${MEM_FRACTON[$j]} \
 						-s ${S_LEVEL[$j]} -r ${RAMDISK[$j]} -t ${TERACACHE[$j]} \
-						-n ${NEW_GEN[$j]} -c $EXEC_CORES -b ${CUSTOM_BENCHMARK}
+						-n ${NEW_GEN[$j]} -c ${EXEC_CORES[$j]} -b ${CUSTOM_BENCHMARK}
 				fi
 			fi
 
@@ -310,32 +313,34 @@ do
 			fi
 
 			# Drop caches
-			#sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
+			sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
 
 		    # Pmem stats before
-            sudo ipmctl show -performance >> ${RUN_DIR}/pmem_before.txt
+            #sudo ipmctl show -performance >> ${RUN_DIR}/pmem_before.txt
 
             # System statistics start
 			~/system_util/start_statistics.sh -d ${RUN_DIR}
 
-            if [ -z ${CUSTOM_BENCHMARK} ]
-            then
-                if [ $HIGH_BENCH ]
-                then
-                    cd ~/HiBench
-                    ./bin/workloads/ml/${benchmark}/spark/run.sh
-                    cd -
-                else
-                    # Run benchmark and save output to tmp_out.txt
-                    ../spark-bench/${benchmark}/bin/run.sh \
-                        > ${RUN_DIR}/tmp_out.txt
-                fi
-            else
-                ./custom_benchmark.sh ${RUN_DIR} $EXEC_CORES ${TERACACHE[$j]} ${S_LEVEL[$j]}
-            fi
-            
+			if [ $HIGH_BENCH ]
+			then
+				cd ~/HiBench
+				./bin/workloads/ml/${benchmark}/spark/run.sh
+				cd -
+			elif [ $CUSTOM_BENCHMARK == "true" ]
+			then
+				if [ $SERDES ]
+				then
+					./custom_benchmarks.sh ${RUN_DIR} ${EXEC_CORES[$j]} ${HEAP[$j]} ${S_LEVEL[$j]}
+				else
+					./custom_benchmarks.sh ${RUN_DIR} ${EXEC_CORES[$j]} ${TERACACHE[$j]} ${S_LEVEL[$j]}
+				fi
+			else
+				# Run benchmark and save output to tmp_out.txt
+				../spark-bench/${benchmark}/bin/run.sh \
+					> ${RUN_DIR}/tmp_out.txt
+			fi            
             # Pmem stats after
-            sudo ipmctl show -performance >> ${RUN_DIR}/pmem_after.txt
+            #sudo ipmctl show -performance >> ${RUN_DIR}/pmem_after.txt
 			
             # System statistics stop
 			~/system_util/stop_statistics.sh -d ${RUN_DIR}
@@ -343,7 +348,7 @@ do
 			if [ $SERDES ]
 			then
 				# Parse cpu and disk statistics results
-				~/system_util/extract-data.sh -r ${RUN_DIR} -d ${DEV_SHFL}
+				~/system_util/extract-data.sh -r ${RUN_DIR} -d ${DEV_SHFL} -d ${DEV_FMAP}
 			elif [ $TC ]
 			then
 				if [ $FASTMAP ]
@@ -355,18 +360,21 @@ do
 				fi
 			fi
 
-            if [ -z ${CUSTOM_BENCHMARK} ]
-            then
-                if [ $HIGH_BENCH ]
-                then
-                    # Save the total duration of the benchmark execution
-                    tail -n 1 ~/HiBench/report/hibench.report >> ${RUN_DIR}/total_time.txt
-                else
-                    # Save the total duration of the benchmark execution
-                    tail -n 1 ../spark-bench/num/bench-report.dat >> ${RUN_DIR}/total_time.txt
-                fi
-            fi
-				
+			# Copy the confifuration to the directory with the results
+			cp ./conf.sh ${RUN_DIR}/
+
+			if [ $CUSTOM_BENCHMARK == "false" ]
+			then
+				if [ $HIGH_BENCH ]
+				then
+					# Save the total duration of the benchmark execution
+					tail -n 1 ~/HiBench/report/hibench.report >> ${RUN_DIR}/total_time.txt
+				else
+					# Save the total duration of the benchmark execution
+					tail -n 1 ../spark-bench/num/bench-report.dat >> ${RUN_DIR}/total_time.txt
+				fi
+			fi
+      
 			if [ $PERF_TOOL ]
 			then
 				# Stop perf monitor
@@ -378,11 +386,11 @@ do
 			then
 				if [ $HIGH_BENCH ]
 				then
-					TC_METRICS=$(ls -td /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/work/* | head -n 1)
+					TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
 					cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
 					./parse_results.sh -d ${RUN_DIR} -t -a
 				else
-					TC_METRICS=$(ls -td /home/nx05/nx05/kolokasis/TeraCacheSpark-2.3.0/spark-2.3.0-kolokasis/work/* | head -n 1)
+					TC_METRICS=$(ls -td /opt/spark/spark-2.3.0-kolokasis/work/* | head -n 1)
 					cp ${TC_METRICS}/0/teraCache.txt ${RUN_DIR}/
 					./parse_results.sh -d ${RUN_DIR} -t
 				fi

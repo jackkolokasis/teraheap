@@ -1,0 +1,48 @@
+
+################################################################################
+#
+# File: makefile.colors
+#
+# Author: Zakkak Foivos <zakkak@ics.forth.gr>
+#
+################################################################################
+
+#Define some variables for pretty printing
+ESC=\033[
+#attributes
+NORMAL    = 0
+BOLD      = 1
+UNDERLINE = 4
+BLINK     = 5
+REVERSE_V = 7
+INVISIBLE = 8
+
+#foreground colors
+BLACK_FG   = 30
+RED_FG     = 31
+GREEN_FG   = 32
+YELLOW_FG  = 33
+BLUE_FG    = 34
+MAGENTA_FG = 35
+CYAN_FG    = 36
+WHITE_FG   = 37
+
+#background colors
+BLACK_BG   = 40
+RED_BG     = 41
+GREEN_BG   = 42
+YELLOW_BG  = 43
+BLUE_BG    = 44
+MAGENTA_BG = 45
+CYAN_BG    = 46
+WHITE_BG   = 47
+
+#presets
+BRED      = $(ESC)$(BOLD);$(RED_FG)m
+BGREEN    = $(ESC)$(BOLD);$(GREEN_FG)m
+BYELLOW   = $(ESC)$(BOLD);$(YELLOW_FG)m
+BBLUE     = $(ESC)$(BOLD);$(BLUE_FG)m
+BMAGENTA  = $(ESC)$(BOLD);$(MAGENTA_FG)m
+BCYAN     = $(ESC)$(BOLD);$(CYAN_FG)m
+BWHITE    = $(ESC)$(BOLD);$(WHITE_BG)m
+RESET     = $(ESC)m

@@ -30,47 +30,47 @@ int main() {
     init(CARD_SIZE * PAGE_SIZE);
 
     //obj1 should be in region 0
-    obj1 = allocate(1, 0);
+    obj1 = allocate(1, 0, 0);
     fprintf(stderr, "Allocate: %p\n", obj1);
     assertf((obj1 - start_addr_mem_pool()) == 0, "Object start position");
 
     //obj2 should be in region 1 
-    obj2 = allocate(200, 1);
+    obj2 = allocate(200, 1, 0);
     fprintf(stderr, "Allocate: %p\n", obj2);
-    assertf((obj2 - obj1)/8 == 67108864, "Object start position"); 
+    assertf((obj2 - obj1)/8 == 33554432, "Object start position %zu", (obj2 - obj1) / 8); 
 
     //obj3 should be in region 0
-    obj3 = allocate(12020, 0);
+    obj3 = allocate(12020, 0, 0);
     fprintf(stderr, "Allocate: %p\n", obj3);
     assertf((obj3 - obj1)/8 == 1, "Object start position");
 
     //obj4 should be in region 2 
-    obj4 = allocate(262140, 2);
+    obj4 = allocate(262140, 2, 0);
     fprintf(stderr, "Allocate: %p\n", obj4);
-    assertf((obj4 - obj2)/8 == 67108864, "Object start position");
+    assertf((obj4 - obj2)/8 == 33554432, "Object start position %zu", (obj4 - obj2) / 8);
 
     //obj5 should be in region 1
-    obj5 = allocate(4, 1);
+    obj5 = allocate(4, 1, 0);
     fprintf(stderr, "Allocate: %p\n", obj5);
     assertf((obj5 - obj2)/8 == 200, "Object start position");
 
     //obj6 should be in region 0 
-    obj6 = allocate(200, 0);
+    obj6 = allocate(200, 0, 0);
     fprintf(stderr, "Allocate: %p\n", obj6);
     assertf((obj6 - obj3)/8 == 12020, "Object start position");
 
     //obj7 should be in region 3 
-    obj7 = allocate(262140,1);
+    obj7 = allocate(262140, 1, 1);
     fprintf(stderr, "Allocate: %p\n", obj7);
-    assertf((obj7 - obj4)/8 == 18446744073642442956LU, "Object start position");
+    assertf((obj7 - obj4)/8 == 33554432, "Object start position %zu", (obj4 - obj2) / 8);
 
     //obj8 should be in region 4 
-    obj8 = allocate(500,3);
+    obj8 = allocate(500, 3, 0);
     fprintf(stderr, "Allocate: %p\n", obj8);
-    assertf((obj8 - obj7)/8 == 134217524, "Object start position");
+    assertf((obj8 - obj7)/8 == 33554432, "Object start position");
 
     //obj9 should be in region 5 
-    obj9 = allocate(500,2);
+    obj9 = allocate(500, 2, 0);
     fprintf(stderr, "Allocate: %p\n", obj9);
     assertf((obj9 - obj8)/8 == -66846724, "Object start position");
 	

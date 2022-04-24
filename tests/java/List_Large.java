@@ -6,8 +6,20 @@ import java.util.Scanner;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.util.LinkedList;
+import java.lang.reflect.Field;
 
 public class List_Large {
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
 	
 	public static void mem_info(String str)
 	{
@@ -27,52 +39,52 @@ public class List_Large {
 		System.gc();
 		System.out.println("=========================================");
 	}
+	
+	public static void calcHashCode(LinkedList<Integer> list, int num_elements) {
+		long sum = 0;
+
+		for (int i = 0; i < num_elements; i++)
+			sum += list.get(i).hashCode();
+
+		System.out.println("Total Hashcode = " + sum);
+	}
 
 	public static void main(String[] args) {
-		int num_elements = 400000;
+		int num_elements = 100000;
 
 		mem_info("Memory Before");
 
-		System.out.println("=========================================");
-		System.out.println("Create List");
-		System.out.println("=========================================");
-		LinkedList<Integer> linkedList = new @Cache LinkedList<Integer>(); 
-		System.out.println("=========================================");
-
-		System.out.println("=========================================");
-		System.out.println("Create String");
-		System.out.println("=========================================");
-		String str = new @Cache String("lala");
-
-		System.out.println("=========================================");
-		System.out.println("Add Elements to the  List");
-		System.out.println("=========================================");
+		LinkedList<Integer> list1 = new LinkedList<Integer>(); 
+		_UNSAFE.tcMarkObjectWithId(list1, 0, 0);
+		
+		LinkedList<Integer> list2 = new LinkedList<Integer>(); 
+		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
 
 		for (int i = 0; i < num_elements; i++)
-		{
-			linkedList.add(i);
-		}
+			list1.add(i);
 
 		mem_info("Memory After");
-
 		gc();
 
-		int x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += linkedList.get(i).hashCode();
-		}
+		calcHashCode(list1, num_elements);
 
-		System.out.println("=========================================");
-		System.out.println("Access Cached Data");
-		System.out.println("First Element = " + linkedList.getFirst());
-		System.out.println("String = " + str);
-		System.out.println("Hashcode Element = " + x);
+		System.out.println("First Element = " + list1.getFirst());
+		System.out.println("Last Element = " + list1.getLast());
 		
 		gc();
 
-		mem_info("Memory After");
+		list1 = null;
 
+		mem_info("Memory After");
+		gc();
+		
+		for (int i = 0; i < num_elements; i++)
+			list2.add(i);
+
+		calcHashCode(list2, num_elements);
+		gc();
+		
+		calcHashCode(list2, num_elements);
 		gc();
 
 		mem_info("Memory After");

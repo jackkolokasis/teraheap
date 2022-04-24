@@ -89,8 +89,10 @@ size_t mem_pool_size() {
 }
 
 #if SPARK_HINT
+
 char* allocate(size_t size, uint64_t rdd_id, uint64_t partition_id) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
+	char* prev_alloc_ptr = tc_mem_pool.cur_alloc_ptr;
 
 	//assertf(alloc_ptr >= tc_mem_pool.start_address &&
 	//		alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
@@ -103,6 +105,13 @@ char* allocate(size_t size, uint64_t rdd_id, uint64_t partition_id) {
     #endif
     tc_mem_pool.size += size;
     tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);
+
+	if (prev_alloc_ptr > tc_mem_pool.cur_alloc_ptr)
+		tc_mem_pool.cur_alloc_ptr = prev_alloc_ptr;
+
+	// TODO Check
+	assertf(prev_alloc_ptr <= tc_mem_pool.cur_alloc_ptr, 
+			"Error alloc ptr: Prev = %p, Cur = %p", prev_alloc_ptr, tc_mem_pool.cur_alloc_ptr);
 
 	// Alighn to 8 words the pointer (TODO: CHANGE TO ASSERTION)
 	if ((uint64_t) tc_mem_pool.cur_alloc_ptr % HEAPWORD != 0)

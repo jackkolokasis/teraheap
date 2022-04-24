@@ -77,7 +77,7 @@ template <class T> inline void MarkSweep::follow_root(T* p) {
 	follow_stack();
 }
 
-template <class T> inline void MarkSweep::mark_and_push(T* p) {
+template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 	//assertf(Universe::heap()->is_in_reserved(p), "should be in object space");
 	T heap_oop = oopDesc::load_heap_oop(p);
 	if (!oopDesc::is_null(heap_oop)) {
@@ -87,7 +87,7 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
 		{
 #if REGIONS
-            //Mark active region
+            // Mark active region
             Universe::teraCache()->mark_used_region((HeapWord*)obj);
 #if GC_ANALYSIS
             obj->set_live();
@@ -111,20 +111,89 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		if (!obj->mark()->is_marked()) {
 			mark_object(obj);
 
-#if DEBUG_TERACACHE
-			if (EnableTeraCache)
-			{
-				std::cerr <<"[MARK_AND_PUSH]" 
-					<< " | P = " << p
-					<< " | OBJECT = " 
-					<< (HeapWord*)obj
-					<< " | MARKED = "
-					<< obj->mark()
-					<< " | TERA = "
-					<< obj->get_obj_state()
-					<< std::endl;
+			if (obj->get_obj_state() != TRANSIENT_FIELD) {
+				uint64_t groupId = Universe::teraCache()->tc_get_region_groupId((void *) p);
+				uint64_t partId = Universe::teraCache()->tc_get_region_partId((void *) p);
+				obj->set_tera_cache(groupId, partId);
 			}
+
+			_marking_stack.push(obj);
+		}
+	}
+}
+
+template <class T> inline void MarkSweep::mark_and_push_transient(T* p) {
+	//assertf(Universe::heap()->is_in_reserved(p), "should be in object space");
+	T heap_oop = oopDesc::load_heap_oop(p);
+	if (!oopDesc::is_null(heap_oop)) {
+		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+#if !DISABLE_TERACACHE
+		if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
+		{
+#if REGIONS
+            // Mark active region
+            Universe::teraCache()->mark_used_region((HeapWord*)obj);
 #endif
+			if (TeraCacheStatistics)
+				Universe::teraCache()->tc_increase_forward_ptrs();
+
+			return;
+		}
+#endif
+
+#if TEST_CLONE
+		if (EnableTeraCache && !Universe::teraCache()->tc_check(obj))
+			assertf(obj->get_obj_state() == MOVE_TO_TERA  // Object will move to TC
+					|| obj->get_obj_state() == INIT_TF,      // TF init value
+					"Non valid teraflag value %p | %lu | %s", 
+					obj, obj->get_obj_state(), obj->klass()->internal_name());
+#endif
+
+		if (!obj->mark()->is_marked()) {
+			mark_object(obj);
+
+			// Change object state to transient. We use this extra state in
+			// teraflag to avoid in the next major gc to mark and move transient
+			// objects to H2.
+			obj->set_obj_transient();
+
+			_marking_stack.push(obj);
+		}
+	}
+}
+
+template <class T> inline void MarkSweep::mark_and_push(T* p) {
+	//assertf(Universe::heap()->is_in_reserved(p), "should be in object space");
+	T heap_oop = oopDesc::load_heap_oop(p);
+	if (!oopDesc::is_null(heap_oop)) {
+		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+#if !DISABLE_TERACACHE
+		if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
+		{
+#if REGIONS
+            //Mark active region
+            Universe::teraCache()->mark_used_region((HeapWord*)obj);
+#endif
+			if (TeraCacheStatistics)
+				Universe::teraCache()->tc_increase_forward_ptrs();
+#if FWD_REF_STAT
+			Universe::teraCache()->tc_add_fwd_ref_stat(obj);
+#endif
+			return;
+		}
+#endif
+
+#if TEST_CLONE
+		if (EnableTeraCache && !Universe::teraCache()->tc_check(obj))
+			assertf(obj->get_obj_state() == MOVE_TO_TERA  // Object will move to TC
+					|| obj->get_obj_state() == INIT_TF,      // TF init value
+					"Non valid teraflag value %p | %lu | %s", 
+					obj, obj->get_obj_state(), obj->klass()->internal_name());
+#endif
+		if (!obj->mark()->is_marked()) {
+			mark_object(obj);
 
 			_marking_stack.push(obj);
 		}
@@ -153,7 +222,7 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 
 	if (!oopDesc::is_null(heap_oop)) {
 		oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
-
+		
 #if CLOSURE
 
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
@@ -164,6 +233,9 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 #endif
 			if (TeraCacheStatistics)
 				Universe::teraCache()->tc_increase_forward_ptrs();
+#if FWD_REF_STAT
+			Universe::teraCache()->tc_add_fwd_ref_stat(obj);
+#endif
 			return;
 		}
 
@@ -192,15 +264,15 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 #endif
 
 #if P_DISTINCT
-			if (obj->is_tc_to_old()) {
-				if (!obj->mark()->is_marked()) {
-					mark_object(obj); 
+		if (obj->is_tc_to_old()) {
+			if (!obj->mark()->is_marked()) {
+				mark_object(obj); 
 
-					_marking_stack.push(obj);
-				}
-
-				return;
+				_marking_stack.push(obj);
 			}
+
+			return;
+		}
 
 			if (!(obj->mark()->is_marked() && obj->is_tera_cache())) {
 				if (!obj->mark()->is_marked())
@@ -209,17 +281,6 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 				if (!obj->is_tera_cache())
 					obj->set_tera_cache(Universe::teraCache()->get_cur_obj_group_id(),
 							Universe::teraCache()->get_cur_obj_part_id());
-#endif
-
-#if DEBUG_TERACACHE
-			if (EnableTeraCache) {
-				std::cerr <<"[TERA_MARK_AND_PUSH]" 
-					<< " | P = " << p
-					<< " | OBJECT = " << (HeapWord*)obj
-					<< " | MARKED = " << obj->mark()
-					<< " | TERA = "   << obj->get_obj_state()
-					<< std::endl;
-			}
 #endif
 			_marking_stack.push(obj);
 		}
@@ -251,7 +312,8 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
 			new_obj = oop(obj->mark()->decode_pointer());
 		}
 #if REGIONS
-            Universe::teraCache()->group_region_enabled((HeapWord*) new_obj);
+		if (EnableTeraCache)
+			Universe::teraCache()->group_region_enabled((HeapWord*) new_obj, (void *) p);
 #endif
 #else
 		oop new_obj = oop(obj->mark()->decode_pointer());

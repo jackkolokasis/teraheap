@@ -6,9 +6,22 @@ import java.lang.management.MemoryPoolMXBean;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
 
+import java.lang.reflect.Field;
+
 public class Array {
-	public static void mem_info(String str)
-	{
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
+
+	public static void mem_info(String str) {
 		System.out.println("=========================================");
 		System.out.println(str + "\n");
 		System.out.println("=========================================");
@@ -28,49 +41,42 @@ public class Array {
 
 	public static void main(String args[]) throws Exception {
 	  int num_elements = 2000000;
+	  long sum;
 
-	  int[] array1 = new @Cache int[2000000];
-	  int[] array2 = new @Cache int[2000000];
+	  int[] array1 = new int[2000000];
+	  _UNSAFE.tcMarkObjectWithId(array1, 0, 0);
+
+	  int[] array2 = new int[2000000];
+	  _UNSAFE.tcMarkObjectWithId(array2, 1, 0);
 
 	  gc();
-	      
+
 	  for (int i = 0; i < num_elements; i++)
-	  {
 	      array1[i] = i*2;
-	  }
 	  
 	  gc();
 	  
 	  for (int i = 0; i < num_elements; i++)
-	  {
 	      array1[i] = i;
-	  }
 	  
 	  gc();
 	  
+	  sum = 0;
 	  for (int i = 0; i < num_elements; i++)
-	  {
-	      array1[i] = i*2;
-	  }
+	      sum += array1[i];
 	  
 	  for (int i = 0; i < num_elements; i++)
-	  {
 	      array2[i] = i*4;
-	  }
 	  
 	  gc();
 	  
 	  for (int i = 0; i < num_elements; i++)
-	  {
 	      array2[i] = 333;
-	  }
 	  
 	  gc();
 	  
+	  sum = 0;
 	  for (int i = 0; i < num_elements; i++)
-	  {
-	      array1[i] = i*2;
-	  }
+	      sum += array1[i];
   }
-
 }

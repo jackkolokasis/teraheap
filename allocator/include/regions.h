@@ -22,12 +22,12 @@ extern "C" {
 #define TC_ALIGN_ON 1
 
 	struct _mem_pool{
-		char *mmap_start;					//< Memory mapped allocation start addresss
+		char *mmap_start;					  //< Memory mapped allocation start addresss
 		char* start_address;				//< Aligned start address of TeraCache
 		char* cur_alloc_ptr;				//< Current allocation pointer of TeraCache
 		char* stop_address;					//< Last address of TeraCache
 
-		uint64_t size;						//< Current allocated bytes in TeraCache
+		uint64_t size;						  //< Current allocated bytes in TeraCache
 #if TC_ALIGN_ON
 		uint64_t region_free_space;
 #endif

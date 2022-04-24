@@ -27,6 +27,7 @@ struct region{
     struct group *dependency_list;
     uint64_t rdd_id;
     struct offset *offset_list;
+    uint64_t part_id;
 };
 #else
 struct region{
@@ -38,6 +39,7 @@ struct region{
     struct region *next_in_group;
     int group_id;
     uint64_t rdd_id;
+    uint64_t part_id;
 };
 #endif
 
@@ -73,6 +75,7 @@ char* new_region(size_t size);
  * Returns the address of the allocated object
  * Arguments: size: the size of the object in Bytes
  * rdd_id: The id of the rdd which the object belongs
+ * part_id: The id of the partition that the object belongs
  */
 char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t partition_id);
 
@@ -198,5 +201,40 @@ void start_iterate_regions(void);
 char* get_next_region(void);
 
 char *get_first_object(char *addr);
+
+/*
+ * Get objects 'obj' region start address
+ */
+char* get_region_start_addr(char *obj, long rdd_id, long part_id);
+
+/*
+ * Get object 'groupId' (RDD Id). Each object is allocated based on a group Id
+ * and the partition Id that locates in teraflag.
+ *
+ * @obj: address of the object
+ *
+ * Return: the object partition Id
+ */
+uint64_t get_obj_group_id(char *obj);
+
+/*
+ * Get object 'groupId'. Each object is allocated based on a group Id
+ * and the partition Id that locates in teraflag.
+ *
+ * obj: address of the object
+ *
+ * returns: the object partition Id
+ */
+uint64_t get_obj_part_id(char *obj);
+
+/*
+ * Check if these two objects belong to the same group
+ *
+ * obj1: address of the object
+ * obj2: address of the object
+ *
+ * returns: 1 if objects are in the same group, 0 otherwise
+ */
+uint64_t is_in_the_same_group(char *obj1, char *obj2);
 
 #endif

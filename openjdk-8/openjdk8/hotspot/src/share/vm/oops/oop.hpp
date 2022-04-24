@@ -126,11 +126,7 @@ class oopDesc {
 #if TERA_FLAG
   // Mark this object that is pointed be TeraCache and is in old generation.
   // This object should be moved to TeraCache in next full GC.
-  void set_tc_to_old()  { 
-	  uint64_t part_id = _tera_flag >> 48;
-	  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
-	  uint64_t state = _tera_flag & 0xffffffff;
-
+  void set_tc_to_old(uint64_t rdd_id, uint64_t part_id)  { 
 	  _tera_flag = (part_id << 48);
 	  _tera_flag |= (rdd_id << 32);
 	  _tera_flag |= TERA_TO_OLD;
@@ -150,6 +146,12 @@ class oopDesc {
 	  _tera_flag = (part_id << 48);
 	  _tera_flag |= (rdd_id << 32);
 	  _tera_flag |= MOVE_TO_TERA;
+  }
+
+  // Mark object state as transient. These objects are pointed by transient
+  // fields of objects tha belongs to H2. We should keep these objects in H1.
+  void set_obj_transient() { 
+	  _tera_flag = TRANSIENT_FIELD;
   }
 
   // Check if an object is marked to be moved in TeraCache
