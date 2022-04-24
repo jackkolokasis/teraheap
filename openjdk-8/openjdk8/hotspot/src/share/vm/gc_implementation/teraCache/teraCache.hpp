@@ -259,7 +259,8 @@ class TeraCache {
 
         // Groups the region of obj1 with the region of obj2
         void group_regions(HeapWord *obj1, HeapWord *obj2);
-
+  
+        HeapWord *get_first_object_in_region(HeapWord *addr);
 #if ALIGN
 		bool tc_obj_fit_in_region(size_t size);
 #endif
@@ -282,6 +283,14 @@ class TeraCache {
 		// This function is for debugging purposes to understand and fix the
 		// locality in regions
 		void tc_print_objects_per_region(void);
+
+        void mark_live(HeapWord *p);
+
+        void tc_mark_live_objects_per_region();
+		
+        void tc_count_marked_objects();
+
+        void tc_reset_marked_objects();
 
 		// Check if backward adjust stack is empty
 		bool tc_is_empty_back_stack();

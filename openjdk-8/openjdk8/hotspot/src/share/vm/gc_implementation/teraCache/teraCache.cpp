@@ -102,7 +102,6 @@ bool TeraCache::tc_check(oop ptr) {
 // TeraCache then the function returns true, either it returns false.
 bool TeraCache::tc_is_in(void *p) {
 	char* const cp = (char *)p;
-
 	return cp >= _start_addr && cp < _stop_addr;
 }
 
@@ -185,7 +184,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 		pos = allocate(size);
 	}
 #else
-	pos = allocate(size, (uint64_t)obj->get_obj_group_id(), (uint64_t)obj->get_obj_part_id());
+	pos = allocate(size,(uint64_t)obj->get_obj_group_id(),(uint64_t)obj->get_obj_part_id());
 #endif
 
 #if VERBOSE_TC
@@ -692,6 +691,97 @@ void TeraCache::tc_print_objects_per_region() {
 	}
 }
 
+
+HeapWord *TeraCache::get_first_object_in_region(HeapWord *addr){
+    return (HeapWord*) get_first_object((char*)addr);
+}
+
+void TeraCache::tc_count_marked_objects(){
+	HeapWord *next_region;
+	HeapWord *obj_addr;
+	oop obj;
+
+	start_iterate_regions();
+
+	next_region = (HeapWord *) get_next_region();
+    int region_num = 0;
+    unsigned int live_objects = 0;
+    unsigned int total_objects = 0;
+	while(next_region != NULL) {
+        int r_live_objects = 0;
+        int r_total_objects = 0;
+
+		obj_addr = next_region;
+        
+		while (1) {
+			obj = oop(obj_addr);
+            r_total_objects++;
+            total_objects++;
+            if (obj->is_live()){
+                r_live_objects++;
+                live_objects++;
+            }
+			if (!check_if_valid_object(obj_addr + obj->size()))
+				break;
+			obj_addr += obj->size();
+		}
+        printf("Region %d has %d live objects out of a total of %d\n",region_num,r_live_objects,r_total_objects);
+        region_num++;
+		next_region = (HeapWord *) get_next_region();
+	}
+    printf("GLOBAL: %d live objects out of a total of %d\n",live_objects,total_objects);
+    fflush(stdout);
+}
+
+void TeraCache::tc_reset_marked_objects() {
+	HeapWord *next_region;
+	HeapWord *obj_addr;
+	oop obj;
+
+	start_iterate_regions();
+
+	next_region = (HeapWord *) get_next_region();
+
+	while(next_region != NULL) {
+		obj_addr = next_region;
+
+		while (1) {
+			obj = oop(obj_addr);
+            obj->reset_live();
+			if (!check_if_valid_object(obj_addr + obj->size()))
+				break;
+			obj_addr += obj->size();
+		}
+		next_region = (HeapWord *) get_next_region();
+	}
+}
+
+void TeraCache::tc_mark_live_objects_per_region() {
+	HeapWord *next_region;
+	HeapWord *obj_addr;
+	oop obj;
+
+	start_iterate_regions();
+
+	next_region = (HeapWord *) get_next_region();
+	while(next_region != NULL) {
+		obj_addr = next_region;
+
+		while (1) {
+			obj = oop(obj_addr);
+            if (obj->is_live()){
+                obj->klass()->oop_follow_contents_tera_cache(obj,true);
+            }
+			if (!check_if_valid_object(obj_addr + obj->size()))
+				break;
+			obj_addr += obj->size();
+		}
+		next_region = (HeapWord *) get_next_region();
+	}
+    tc_count_marked_objects();
+    tc_reset_marked_objects();
+}
+
 #if PREFETCHING
 
 void print_timestamp(HeapWord* obj, bool start) {
@@ -851,3 +941,4 @@ void TeraCache::tc_print_fwd_ref_stat() {
 }
 
 #endif
+

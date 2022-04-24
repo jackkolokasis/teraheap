@@ -156,7 +156,7 @@ class oopDesc {
 
   // Check if an object is marked to be moved in TeraCache
   bool is_tera_cache() { 
-	  return (_tera_flag & 0xffffffff) == MOVE_TO_TERA;
+	  return (_tera_flag & 0xffffffff) == MOVE_TO_TERA ;
   }
 
   // Mark this object that is located in TeraCache
@@ -189,6 +189,38 @@ class oopDesc {
   // Get object partition Id
   uint64_t get_obj_part_id() {
 	  return _tera_flag >> 48;
+  }
+
+  bool is_live(){
+	  return ((_tera_flag & 0xffffffff) == LIVE_TERA_OBJ || (_tera_flag & 0xffffffff) == VISITED_TERA_OBJ || (_tera_flag & 0xffffffff) == MOVE_TO_TERA );
+  }
+
+  void reset_live(){
+      set_obj_in_tc();
+  }
+
+  void set_live(){
+	  uint64_t part_id = (_tera_flag >> 48);
+	  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
+	  uint64_t state = _tera_flag & 0xffffffff;
+
+	  _tera_flag = (part_id << 48);
+	  _tera_flag |= (rdd_id << 32);
+	  _tera_flag |= LIVE_TERA_OBJ;
+  }
+
+  void set_visited(){
+	  uint64_t part_id = (_tera_flag >> 48);
+	  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
+	  uint64_t state = _tera_flag & 0xffffffff;
+
+	  _tera_flag = (part_id << 48);
+	  _tera_flag |= (rdd_id << 32);
+	  _tera_flag |= VISITED_TERA_OBJ;
+  }
+
+  bool is_visited(){
+	  return (_tera_flag & 0xffffffff) == VISITED_TERA_OBJ;
   }
 
 #endif

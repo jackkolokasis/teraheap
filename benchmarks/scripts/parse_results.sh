@@ -77,7 +77,6 @@ then
 fi
 
 # Caclulate the serialziation/deserialization overhead
-# TODO: Make Kryo to Java for SQL
 ~/sparkPersistentMemory/benchmarks/profiler/perf-map-agent/FlameGraph/flamegraph.pl ${RESULT_DIR}/serdes.txt > ${RESULT_DIR}/profile.svg
 SER_SAMPLES=$(grep "org/apache/spark/serializer/KryoSerializationStream.writeObject" ${RESULT_DIR}/profile.svg \
 	| awk '{print $2}' \

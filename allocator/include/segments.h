@@ -4,8 +4,15 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#define SPARK_HINT 1 
-#define ONE_WAY 0
+
+#define SPARK_HINT 1
+#define ONE_WAY 1
+
+struct offset{
+    uint64_t offset;
+    struct offset *next;
+};
+
 /*
  * the struct for regions
  */
@@ -15,8 +22,11 @@ struct region{
     uint64_t used;
     char *last_allocated_end;
     char *last_allocated_start;
+    char *first_allocated_start;
+    size_t size_mapped;
     struct group *dependency_list;
     uint64_t rdd_id;
+    struct offset *offset_list;
     uint64_t part_id;
 };
 #else
@@ -25,6 +35,7 @@ struct region{
     uint64_t used;
     char *last_allocated_end;
     char *last_allocated_start;
+    char *first_allocated_start;
     struct region *next_in_group;
     int group_id;
     uint64_t rdd_id;
@@ -66,7 +77,9 @@ char* new_region(size_t size);
  * rdd_id: The id of the rdd which the object belongs
  * part_id: The id of the partition that the object belongs
  */
-char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t part_id);
+char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t partition_id);
+
+uint64_t get_id(uint64_t rdd_id, uint64_t partition_id);
 #else
 /*
  * Returns the address of the allocated object 
@@ -186,6 +199,8 @@ void start_iterate_regions(void);
  * Get the next active region
  */
 char* get_next_region(void);
+
+char *get_first_object(char *addr);
 
 /*
  * Get objects 'obj' region start address

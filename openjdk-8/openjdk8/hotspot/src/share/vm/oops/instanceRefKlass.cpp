@@ -70,8 +70,12 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 #if CLOSURE
-		if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
+		if (EnableTeraCache && Universe::teraCache()->tc_check(referent)) {
 			Universe::teraCache()->mark_used_region((HeapWord*)referent);
+#if GC_ANALYSIS
+      obj->set_live();
+#endif
+    }
 #endif
 		if (!referent->is_gc_marked() && 
 				MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {

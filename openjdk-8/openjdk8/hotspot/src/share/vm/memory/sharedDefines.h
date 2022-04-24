@@ -177,7 +177,12 @@
 
 #define INIT_TF				   2035	//< Initial object state
 
+#define LIVE_TERA_OBJ           202 //< Object marked as live during GC Analysis
+
+#define VISITED_TERA_OBJ           203 //< Object visited during GC Analysis
+
 #define TRANSIENT_FIELD		   428	//< Objects is pointed by transient field
+
 
 /***********************************
  * Statistics
@@ -199,6 +204,8 @@
 #define DISABLE_TRAVERSE_OLD_GEN  1  //< Disable backward reference traversal
 									 // from H2 to old generation (H1) during
 									 // minor GC
+
+#define GC_ANALYSIS               1
 
 /************************************
  * Source code that we need to remove after testing

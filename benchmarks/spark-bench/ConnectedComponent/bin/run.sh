@@ -15,7 +15,8 @@ DU ${INPUT_HDFS} SIZE
 
 JAR="${DIR}/target/ConnectedComponentApp-1.0.jar"
 CLASS="src.main.scala.ConnectedComponentApp"
-OPTION="${INOUT_SCHEME}${INPUT_HDFS} ${INOUT_SCHEME}${OUTPUT_HDFS} ${NUM_OF_PARTITIONS} ${STORAGE_LEVEL}"
+#OPTION="${INOUT_SCHEME}${INPUT_HDFS} ${INOUT_SCHEME}${OUTPUT_HDFS} ${NUM_OF_PARTITIONS} ${STORAGE_LEVEL}"
+OPTION="/mnt/pmem_fsdax1/SparkBench/ConnectedComponent/Input/web-cc12-PayLevelDomain.edges ${INOUT_SCHEME}${OUTPUT_HDFS} ${NUM_OF_PARTITIONS} ${STORAGE_LEVEL}"
 
 echo "opt ${OPTION}"
 

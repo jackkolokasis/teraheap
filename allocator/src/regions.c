@@ -35,7 +35,8 @@ void init(uint64_t align) {
 
 #if ANONYMOUS
 	// Anonymous mmap
-	tc_mem_pool.mmap_start = mmap(0, DEV_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, fd, 0);
+    fd = open(DEV, O_RDWR);
+	tc_mem_pool.mmap_start = mmap(0, V_SPACE, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0);
 #else
     fd = open(DEV, O_RDWR);
 	// Memory-mapped a file over a storage device
@@ -49,7 +50,13 @@ void init(uint64_t align) {
 
 	tc_mem_pool.cur_alloc_ptr = tc_mem_pool.start_address;
 	tc_mem_pool.size = 0;
+#if ANONYMOUS
+	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + V_SPACE;
+    printf("Start address:%p\n",tc_mem_pool.start_address);
+    printf("Stop address:%p\n",tc_mem_pool.stop_address);
+#else
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
+#endif
     init_regions();
 	req_init();
 
@@ -74,11 +81,16 @@ char* stop_addr_mem_pool() {
 // Return the `size` of the memory allocation pool
 size_t mem_pool_size() {
 	assertf(tc_mem_pool.start_address != NULL, "Start address is NULL");
+#if ANONYMOUS
+    return V_SPACE;
+#else
 	return DEV_SIZE;
+#endif
 }
 
 #if SPARK_HINT
-char* allocate(size_t size, uint64_t rdd_id, uint64_t part_id) {
+
+char* allocate(size_t size, uint64_t rdd_id, uint64_t partition_id) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
 	char* prev_alloc_ptr = tc_mem_pool.cur_alloc_ptr;
 
@@ -86,7 +98,7 @@ char* allocate(size_t size, uint64_t rdd_id, uint64_t part_id) {
 	//		alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
 	assertf(size > 0, "Object should be > 0");
     #if REGIONS
-    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id, part_id);
+    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id, partition_id);
     if (alloc_ptr == NULL)
         printf("Total cached data:%zu\n",tc_mem_pool.size);
     assertf(alloc_ptr != NULL, "alloc_ptr is NULL");

@@ -429,7 +429,7 @@ void CardTableExtension::tc_scavenge_contents_parallel(ObjectStartArray* start_a
         if (!Universe::teraCache()->check_if_valid_object(slice_start)) {
             continue;
         }
-        HeapWord* first_object = slice_start;
+        HeapWord* first_object = Universe::teraCache()->get_first_object_in_region(slice_start);
         assertf(oop(first_object)->is_oop_or_null(), "check for header");
 
 		oop* first_object_within_slice = (oop*) first_object;

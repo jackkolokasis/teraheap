@@ -89,6 +89,9 @@ template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 #if REGIONS
             // Mark active region
             Universe::teraCache()->mark_used_region((HeapWord*)obj);
+#if GC_ANALYSIS
+            obj->set_live();
+#endif
 #endif
 			if (TeraCacheStatistics)
 				Universe::teraCache()->tc_increase_forward_ptrs();
@@ -199,7 +202,18 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 
 // Debug Trace TeraCache objects to check if they point back to heap
 template <class T> inline void MarkSweep::trace_tera_cache(T* p, bool assert_on) {
-	assertf(false, "HERE");
+    //oop obj = oop(p);
+	T heap_oop = oopDesc::load_heap_oop(p);
+	if (oopDesc::is_null(heap_oop))
+        return;
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+    if (!Universe::teraCache()->tc_check(obj))
+        return;
+    if (obj->is_visited())
+        return;
+    obj->set_visited();
+    obj->klass()->oop_follow_contents_tera_cache(obj, true);
+	//assertf(false, "HERE");
 }
 
 template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
@@ -214,6 +228,9 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 		if (EnableTeraCache && (Universe::teraCache()->tc_check(obj)))
 		{
             Universe::teraCache()->mark_used_region((HeapWord*)obj);
+#if GC_ANALYSIS
+            obj->set_live();
+#endif
 			if (TeraCacheStatistics)
 				Universe::teraCache()->tc_increase_forward_ptrs();
 #if FWD_REF_STAT

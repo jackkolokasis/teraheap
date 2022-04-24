@@ -625,8 +625,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 #endif
 #else
 					memcpy(compaction_top, q, size * 8);
+#if !GC_ANALYSIS
 					// Change the value of teraflag in the new location of the object
 					oop(compaction_top)->set_obj_in_tc();
+#endif
 					/* Initialize mark word of the destination */
 					oop(compaction_top)->init_mark();
 #endif

@@ -11,8 +11,7 @@ if [ $PLATFORM == "nextgenio" ]
 then
     JAVA="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
     JDB="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-
-    EXEC=( "Groupping" )
+   # EXEC=( "Groupping" )
 else 
     JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
     JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"

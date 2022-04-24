@@ -258,9 +258,11 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 #if DEBUG_PLACEMENT
 		Universe::teraCache()->tc_print_objects_per_region();
 #endif
-
-		// Free all the regions that are unused after marking
-		Universe::teraCache()->free_unused_regions();
+#if GC_ANALYSIS
+        Universe::teraCache()->tc_mark_live_objects_per_region();
+#endif
+        // Free all the regions that are unused after marking
+        Universe::teraCache()->free_unused_regions();
 	}
 #endif   
     restore_marks();
