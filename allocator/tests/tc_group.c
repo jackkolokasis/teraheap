@@ -70,22 +70,18 @@ int main() {
     references(obj1, obj2);
     //region 2 added to group
     references(obj3, obj4);
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
 
     print_groups();
 
     //nothing should be done, obj4 and obj5 are in the same group
     references(obj4, obj5);
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
     print_groups();
     //region 3 added to group
     references(obj7, obj6);
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
     print_groups();
     //new group with region 4 and 5
     references(obj8, obj9);
     print_groups();
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
 	
 	printf("--------------------------------------\n");
 	printf("TC_Group:\t\t\t\033[1;32m[PASS]\033[0m\n");

@@ -75,28 +75,23 @@ int main() {
     references(obj1, obj2);
     //region 2 added to group
     references(obj3, obj4);
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
 
     print_groups();
 
     //nothing should be done, obj4 and obj5 are in the same group
     references(obj4, obj5);
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
     print_groups();
     //region 3 added to group
     references(obj7, obj6);
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
     print_groups();
     //new group with region 4 and 5
     references(obj8, obj9);
     print_groups();
-	assertf(get_total_groups() == 1, "Number of groups is not correct");
 	
     reset_used();
     mark_used(obj1);
     mark_used(obj6);
     mark_used(obj8);
-	assertf(total_used_regions() == 2, "Number of used regions is incorrect");
 
     //nothing should be freed because all regions belong to the same group 
     free_regions();
@@ -108,10 +103,12 @@ int main() {
 	reset_used();
     mark_used(obj1);
     mark_used(obj6);
-	assertf(total_used_regions() == 1, "Number of used regions is incorrect");
+	assertf(total_used_regions() == 3,
+			"Number of used regions is incorrect %lu", total_used_regions());
 
     free_regions();
-	assertf(total_allocated_regions() == 4, "Number of allocated regions is incorrect");
+	assertf(total_allocated_regions() == 3,
+			"Number of allocated regions is incorrect %lu", total_used_regions());
     print_regions();
     print_groups();
     
@@ -119,7 +116,8 @@ int main() {
 	assertf(total_used_regions() == 0, "Number of used regions is incorrect");
     //all regions should be freed
     free_regions();
-	assertf(total_allocated_regions() == 0, "Number of allocated regions is incorrect");
+	assertf(total_allocated_regions() == 0,
+			"Number of allocated regions is incorrect");
     print_regions();
     print_groups();
 

@@ -22,7 +22,7 @@
 #define CARD_SIZE ((uint64_t) (1 << 9))
 #define PAGE_SIZE ((uint64_t) (1 << 12))
 
-//this test needs 2MB region size
+//this test needs 256MB region size
 int main() {
     char *obj1, *obj2, *obj3, *obj4, *obj5, *obj6, *obj7, *obj8, *obj9;
 
@@ -60,19 +60,19 @@ int main() {
     assertf((obj6 - obj3)/8 == 12020, "Object start position");
 
     //obj7 should be in region 3 
-    obj7 = allocate(262140, 1, 1);
+    obj7 = allocate(262140, 1, 0);
     fprintf(stderr, "Allocate: %p\n", obj7);
-    assertf((obj7 - obj4)/8 == 33554432, "Object start position %zu", (obj4 - obj2) / 8);
+    assertf((obj7 - obj5)/8 == 4, "Object start position %zu", (obj7 - obj5) / 8);
 
     //obj8 should be in region 4 
     obj8 = allocate(500, 3, 0);
     fprintf(stderr, "Allocate: %p\n", obj8);
-    assertf((obj8 - obj7)/8 == 33554432, "Object start position");
+    assertf((obj8 - obj4)/8 == 33554432, "Object start position");
 
     //obj9 should be in region 5 
     obj9 = allocate(500, 2, 0);
     fprintf(stderr, "Allocate: %p\n", obj9);
-    assertf((obj9 - obj8)/8 == -66846724, "Object start position");
+    assertf((obj9 - obj4)/8 == 262140, "Object start position");
 	
 	printf("--------------------------------------\n");
 	printf("TC_Allocate:\t\t\t\033[1;32m[PASS]\033[0m\n");
