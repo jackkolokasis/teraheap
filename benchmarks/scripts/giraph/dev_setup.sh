@@ -50,34 +50,34 @@ usage() {
 ##
 
 destroy_th() {
-		rm -rf /mnt/fmap/file.txt
+		rm -rf ${TH_DIR}/file.txt
 		retValue=$?
 		message="Remove TeraCache file" 
 		check ${retValue} "${message}"
 		
-		rm -rf /mnt/spark/*
+		rm -rf ${ZOOKEEPER_DIR}/*
 		retValue=$?
 		message="Remove Zookeeper files" 
 		check ${retValue} "${message}"
 		
-		sudo umount /mnt/fmap
+		sudo umount ${TH_DIR}
 		retValue=$?
 		message="Unmount $DEV_TH" 
 		check ${retValue} "${message}"
 		
-		sudo umount /mnt/spark
+		sudo umount ${ZOOKEEPER_DIR}
 		retValue=$?
 		message="Unmount $DEV_ZK" 
 		check ${retValue} "${message}"
 }
 
 destroy_ser() {
-	rm -rf /mnt/spark/*
+	rm -rf ${ZOOKEEPER_DIR}/*
 	retValue=$?
 	message="Remove Zookeeper files" 
 	check ${retValue} "${message}"
 
-	sudo umount /mnt/spark
+	sudo umount ${ZOOKEEPER_DIR}
 	retValue=$?
 	message="Unmount $DEVICE_ZK" 
 	check ${retValue} "${message}"
@@ -117,41 +117,41 @@ fi
 # Setup TeraCache device
 if [ $TC ]
 then
-	if ! mountpoint -q /mnt/spark
+	if ! mountpoint -q ${ZOOKEEPER_DIR}
 	then
 		# Setup disk for zookeeper
-		sudo mount /dev/${DEV_ZK} /mnt/spark
+		sudo mount /dev/${DEV_ZK} ${ZOOKEEPER_DIR}
 		# Check if the command executed succesfully
 		retValue=$?
 		message="Mount ${DEV_ZK} for zookeeper" 
 		check ${retValue} "${message}"
 
-		sudo chown kolokasis /mnt/spark
+		sudo chown kolokasis ${ZOOKEEPER_DIR}
 		# Check if the command executed succesfully
 		retValue=$?
 		message="Change ownerships /mnt/spark" 
 		check ${retValue} "${message}"
 	fi
 
-	rm -rf /mnt/spark/*
+	rm -rf ${ZOOKEEPER_DIR}/*
 
-	if ! mountpoint -q /mnt/fmap
+	if ! mountpoint -q ${TH_DIR}
 	then
 		# Setup disk for zookeeper
-		sudo mount /dev/${DEV_TH} /mnt/fmap
+		sudo mount /dev/${DEV_TH} ${TH_DIR}
 		# Check if the command executed succesfully
 		retValue=$?
 		message="Mount ${DEV_TH} for TeraHeap" 
 		check ${retValue} "${message}"
 
-		sudo chown kolokasis /mnt/fmap
+		sudo chown kolokasis ${TH_DIR}
 		# Check if the command executed succesfully
 		retValue=$?
 		message="Change ownerships /mnt/fmap" 
 		check ${retValue} "${message}"
 	fi
 
-	cd /mnt/fmap
+	cd ${TH_DIR}
 
 	# if the file does not exist then create it
 	if [ ! -f file.txt ]
@@ -168,24 +168,24 @@ then
 		message="Create ${TC_FILE_SZ}G file for TeraHeap" 
 		check ${retValue} "${message}"
 	fi
-	cd -
+	cd - >> ${LOG} 2>&1
 else
-	if ! mountpoint -q /mnt/spark
+	if ! mountpoint -q ${ZOOKEEPER_DIR}
 	then
 		# Setup disk for zookeeper
-		sudo mount /dev/${DEV_ZK} /mnt/spark
+		sudo mount /dev/${DEV_ZK} ${ZOOKEEPER_DIR}
 		# Check if the command executed succesfully
 		retValue=$?
 		message="Mount ${DEV_ZK} for zookeeper" 
 		check ${retValue} "${message}"
 
-		sudo chown kolokasis /mnt/spark
+		sudo chown kolokasis ${ZOOKEEPER_DIR}
 		# Check if the command executed succesfully
 		retValue=$?
 		message="Change ownerships /mnt/spark" 
 		check ${retValue} "${message}"
 	fi
 
-	rm -rf /mnt/spark/*
+	rm -rf ${ZOOKEEPER_DIR}/*
 fi
 exit

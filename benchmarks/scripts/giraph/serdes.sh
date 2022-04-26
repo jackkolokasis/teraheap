@@ -16,7 +16,7 @@
 OUTPUT=$1        
 NUM_OF_EXECUTORS=$2
 
-ASYNC_PROF=/home1/public/kolokasis/sparkPersistentMemory/benchmarks/profiler/async-profiler
+ASYNC_PROF="$(pwd)/../../profiler/async-profiler"
 
 # Get the proccess id from the running
 processId=""

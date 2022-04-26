@@ -268,25 +268,31 @@ create_ramdisk() {
 		return
 	fi
 
-	cd /tmp
+	# Check if ramdisk_create_and_mount.sh exists
+	if [ ! -f "${RAMDISK_SCRIPT_DIR}/ramdisk_create_and_mount.sh" ]
+	then
+		cp ramdisk_create_and_mount.sh ${RAMDISK_SCRIPT_DIR}/
+	fi
+	
+	cd ${RAMDISK_SCRIPT_DIR}
 
-	# Remove the previous ramdisk
-	sudo ./ramdisk_create_and_mount.sh -d >> ${LOG} 2>&1
+	# If a previous ramdisk exist then remove it
+	if [ ! -z "$(lsmod | grep "brd")"]
+	then
+		sudo ./ramdisk_create_and_mount.sh -d >> ${LOG} 2>&1
+	fi
 
 	# Create the new ramdisk
 	local MEM=$(( ${RAMDISK} * 1024 * 1024 ))
-	sudo ./ramdisk_create_and_mount.sh -m ${MEM} -c
-	retValue=$?
-	message="Create Ramdisk" 
-	check ${retValue} "${message}"
+	sudo ./ramdisk_create_and_mount.sh -m ${MEM} -c >> ${LOG} 2>&1
 
 	cd - >> ${LOG} 2>&1
 
-	cd /mnt/ramdisk
+	cd ${RAMDISK_DIR}
 
 	# Fill the ramdisk
 	MEM=$(( ${RAMDISK} * 1024 ))
-	dd if=/dev/zero of=file.txt bs=1M count=${MEM}
+	dd if=/dev/zero of=file.txt bs=1M count=${MEM} >> ${LOG} 2>&1
 
 	cd - >> ${LOG} 2>&1
 }
@@ -302,7 +308,7 @@ create_ramdisk() {
 ##
 printStartMsg() {
     echo
-    echo "====================================================================="
+    echo "============================================="
     echo 
     echo "EXPERIMENTS"
     echo
@@ -411,7 +417,7 @@ printEndMsg() {
     echo
     echo "    Benchmark Time Elapsed: $FORMATED"
     echo
-    echo "====================================================================="
+    echo "============================================="
     echo
 }
 
@@ -579,7 +585,7 @@ do
 		done
 
 		# Calculate Average
-		calculate_avg "${OUT}/${benchmark}/conf${i}" ${ITER}
+		#calculate_avg "${OUT}/${benchmark}/conf${i}" ${ITER}
 	done
 
 	ENDTIME=$(date +%s)

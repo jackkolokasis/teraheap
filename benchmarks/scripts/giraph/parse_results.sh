@@ -82,7 +82,8 @@ PHASE4=$(grep "PHASE4" ${RESULT_DIR}/teraCache.txt \
 
 # Caclulate the serialziation/deserialization overhead
 # Make Kryo to Java for SQL
-~/sparkPersistentMemory/benchmarks/profiler/perf-map-agent/FlameGraph/flamegraph.pl ${RESULT_DIR}/serdes.txt > ${RESULT_DIR}/profile.svg
+FLAMEGRAPH="$(pwd)/../../profiler/perf-map-agent/FlameGraph"
+${FlameGraph}/flamegraph.pl ${RESULT_DIR}/serdes.txt > ${RESULT_DIR}/profile.svg
 SER_SAMPLES=$(grep "com/esotericsoftware/kryo/io/KryoDataOutput" ${RESULT_DIR}/profile.svg \
 	| awk '{print $2}' \
 	| sed 's/,//g' | sed 's/(//g' \
