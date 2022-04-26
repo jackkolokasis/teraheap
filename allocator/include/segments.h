@@ -5,9 +5,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define SPARK_HINT 1
-#define ONE_WAY 1
-
 struct offset{
     uint64_t offset;
     struct offset *next;
@@ -16,7 +13,6 @@ struct offset{
 /*
  * the struct for regions
  */
-#if ONE_WAY
 struct region{
     char *start_address;
     uint64_t used;
@@ -29,34 +25,14 @@ struct region{
     struct offset *offset_list;
     uint64_t part_id;
 };
-#else
-struct region{
-    char *start_address;
-    uint64_t used;
-    char *last_allocated_end;
-    char *last_allocated_start;
-    char *first_allocated_start;
-    struct region *next_in_group;
-    int group_id;
-    uint64_t rdd_id;
-    uint64_t part_id;
-};
-#endif
 
 /*
  * the struct for group array
  */
-#if ONE_WAY
 struct group{
     struct region *region;
     struct group *next;
 };
-#else
-struct group{
-    struct region *region;
-    int num_of_references;
-};
-#endif
 
 /*
  * Initialize region array, group array and their fields
@@ -70,7 +46,6 @@ void init_regions();
  */
 char* new_region(size_t size);
 
-#if SPARK_HINT
 /*
  * Returns the address of the allocated object
  * Arguments: size: the size of the object in Bytes
@@ -80,13 +55,6 @@ char* new_region(size_t size);
 char* allocate_to_region(size_t size, uint64_t rdd_id, uint64_t partition_id);
 
 uint64_t get_id(uint64_t rdd_id, uint64_t partition_id);
-#else
-/*
- * Returns the address of the allocated object 
- * Arguments: size: the size of the object in Bytes
- */
-char* allocate_to_region(size_t size);
-#endif
 
 /*
  * Returns an empty position of the group_array
@@ -106,12 +74,6 @@ void merge_groups(int group1, int group2);
  * obj2: the object that is referenced (order does not matter)
  */
 void references(char *obj1, char *obj2);
-
-/**
- * Get the total number of groups
- * Return number of groups that exist, or zero otherwise
- */
-long get_total_groups();
 
 /*
  * Prints all the region groups that contain something
@@ -205,7 +167,7 @@ char *get_first_object(char *addr);
 /*
  * Get objects 'obj' region start address
  */
-char* get_region_start_addr(char *obj, long rdd_id, long part_id);
+char* get_region_start_addr(char *obj, uint64_t rdd_id, uint64_t part_id);
 
 /*
  * Get object 'groupId' (RDD Id). Each object is allocated based on a group Id
@@ -235,6 +197,6 @@ uint64_t get_obj_part_id(char *obj);
  *
  * returns: 1 if objects are in the same group, 0 otherwise
  */
-uint64_t is_in_the_same_group(char *obj1, char *obj2);
+int is_in_the_same_group(char *obj1, char *obj2);
 
 #endif
