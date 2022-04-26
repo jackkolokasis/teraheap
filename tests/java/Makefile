@@ -11,7 +11,7 @@
 #
 ####################################################
 
-JAVA_REPO="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8"
+JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../openjdk-8/openjdk8/
 JAVAC=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javac
 JAVAP=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javap
 JAVA=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/java

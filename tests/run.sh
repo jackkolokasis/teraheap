@@ -1,29 +1,38 @@
 #!/usr/bin/env bash
 
-XMS=2
+XMS=1
 MAX=100
 TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 PARALLEL_GC_THREADS=16
 PLATFORM=""
 STRIPE_SIZE=32768
 
-if [ $PLATFORM == "nextgenio" ] 
-then
-    JAVA="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
-    JDB="/home/nx05/nx05/kolokasis/teracache/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-   # EXEC=( "Groupping" )
-else 
-    JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
-    JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
+JAVA="$(pwd)/../openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
+JDB="$(pwd)/../openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
 
-	EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
-		"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
-		"HashMap" "Rehashing" "Clone" "Groupping" "MultiHashMap" \
-		"Test_WeakHashMap" "ClassInstance")
+EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
+	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
+	"HashMap" "Rehashing" "Clone" "Groupping" "MultiHashMap" \
+	"Test_WeakHashMap" "ClassInstance")
 
-	EXEC=( "HashMap" )
-fi
-V_JAVA="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.292.b10-1.el7_9.x86_64/bin/java"
+#EXEC=( "ClassInstance" )
+
+# Export Enviroment Variables
+export_env_vars() {
+	PROJECT_DIR="$(pwd)/../.."
+
+	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LD_LIBRARY_PATH
+	export PATH=${PROJECT_DIR}/allocator/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$C_INCLUDE_PATH
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$CPLUS_INCLUDE_PATH
+
+	export LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LD_LIBRARY_PATH
+	export PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$C_INCLUDE_PATH
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$CPLUS_INCLUDE_PATH
+}
 
 # Run tests using only interpreter mode
 function interpreter_mode() {
@@ -136,18 +145,23 @@ for exec_file in "${EXEC[@]}"
 do
 	case $1 in
 		1)
+			export_env_vars
 			interpreter_mode $exec_file
 			;;
 		2)
+			export_env_vars
 			c1_mode $exec_file
 			;;
 		3)
+			export_env_vars
 			c2_mode $exec_file
 			;;
 		4)
+			export_env_vars
 			run_tests_debug $exec_file
 			;;
 		*)
+			export_env_vars
 			run_tests $exec_file
 			;;
 	esac
