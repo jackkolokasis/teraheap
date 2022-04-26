@@ -55,11 +55,7 @@
 #define C2_ONLY_LEAF_CALL		 0  //< C2 Compiler version - Comparisons and
 									// card marking are all implemented in the
 									// make_leaf_call()
-
 #define TERA_INT			     1  //< Enable Interpreter to support TeraCache, TODO Set to 1
-
-#define MT_STACK				 1  //< Enable multi threaded stack in Minor GC 
-								    //  for TeraCache, TODO Set to 1
 
 #define CLOSURE					 1  //< Closure Calculation TEST  !!!!!
 
@@ -81,10 +77,6 @@
 									// Keep this here until testing a lot and
 									// then remove it.
 									
-#define ALIGN					 0  //< Allocate in TeraCache using allignment
-									// to avoid unnecessary pagefaults due to
-									// the traversal of card tables
-
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
@@ -179,9 +171,9 @@
 
 #define LIVE_TERA_OBJ           202 //< Object marked as live during GC Analysis
 
-#define VISITED_TERA_OBJ           203 //< Object visited during GC Analysis
+#define VISITED_TERA_OBJ        203 //< Object visited during GC Analysis
 
-#define TRANSIENT_FIELD		   428	//< Objects is pointed by transient field
+#define TRANSIENT_FIELD		    428	//< Objects is pointed by transient field
 
 
 /***********************************
@@ -205,11 +197,11 @@
 									 // from H2 to old generation (H1) during
 									 // minor GC
 
-#define GC_ANALYSIS               1
+#define GC_ANALYSIS               0
 
 /************************************
  * Source code that we need to remove after testing
  ************************************/
-#define CHECK_TERA_CARDS		 0  //< Check if we need this. At this time we
-									// do not need it
+#define CHECK_TERA_CARDS		  0  //< Check if we need this. At this time we
+									 // do not need it
 #endif  // _SHARE_DEFINES_H_

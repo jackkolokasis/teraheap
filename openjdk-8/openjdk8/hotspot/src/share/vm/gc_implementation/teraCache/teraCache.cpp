@@ -31,7 +31,6 @@ uint64_t TeraCache::tc_ct_trav_time[16];
 uint64_t TeraCache::heap_ct_trav_time[16];
 		
 uint64_t TeraCache::back_ptrs_per_mgc;
-uint64_t TeraCache::intra_ptrs_per_mgc;
 
 uint64_t TeraCache::obj_distr_size[3];	
 long int TeraCache::cur_obj_group_id;
@@ -61,7 +60,6 @@ TeraCache::TeraCache() {
 	}
 
 	back_ptrs_per_mgc = 0;
-	intra_ptrs_per_mgc = 0;
 
 #if PR_BUFFER
 	_pr_buffer.size = 0;
@@ -130,17 +128,10 @@ size_t TeraCache::tc_get_size_region(void) {
 char* TeraCache::tc_region_top(oop obj, size_t size) {
 	char *pos;			// Allocation position
 
-	//MutexLocker x(tera_cache_lock);
-
 	// Update Statistics
 	total_objects_size += size;
 	total_objects++;
 	trans_per_fgc++;
-
-#if DEBUG_TERACACHE
-	printf("[BEFORE TC_REGION_TOP] | OOP(PTR) = %p | NEXT_POS = %p | SIZE = %lu | NAME %s\n",
-			(HeapWord *)obj, cur_alloc_ptr(), size, obj->klass()->internal_name());
-#endif
 
 	if (TeraCacheStatistics) {
 		size_t obj_size = (size * HeapWordSize) / 1024;
@@ -156,36 +147,7 @@ char* TeraCache::tc_region_top(oop obj, size_t size) {
 		obj_distr_size[count]++;
 	}
 
-#if ALIGN
-	if (r_is_obj_fits_in_region(size))
-		pos = allocate(size);
-	else {
-		HeapWord *cur = (HeapWord *) cur_alloc_ptr();
-		HeapWord *region_end = (HeapWord *) r_region_top_addr();
-
-		typeArrayOop filler_oop = (typeArrayOop) cur;
-		filler_oop->set_mark(markOopDesc::prototype());
-		filler_oop->set_klass(Universe::intArrayKlassObj());
-  
-		const size_t array_length =
-			pointer_delta(region_end, cur) - typeArrayOopDesc::header_size(T_INT);
-
-		assertf( (array_length * (HeapWordSize/sizeof(jint))) < (size_t)max_jint, 
-				"array too big in PSPromotionLAB");
-
-		filler_oop->set_length((int)(array_length * (HeapWordSize/sizeof(jint))));
-	
-		//_start_array.tc_allocate_block((HeapWord *)cur);
-		if (TeraCacheStatistics)
-			tclog_or_tty->print_cr("[STATISTICS] | DUMMY_OBJECT SIZE = %d\n", filler_oop->size());
-	
-		_start_array.tc_allocate_block(cur);
-		
-		pos = allocate(size);
-	}
-#else
 	pos = allocate(size,(uint64_t)obj->get_obj_group_id(),(uint64_t)obj->get_obj_part_id());
-#endif
 
 #if VERBOSE_TC
 	if (TeraCacheStatistics)
@@ -235,11 +197,7 @@ void TeraCache::scavenge()
 }
 		
 void TeraCache::tc_push_object(void *p, oop o) {
-
-#if MT_STACK
 	MutexLocker x(tera_cache_lock);
-#endif
-	//_tc_stack.push(o);
 	_tc_stack.push((oop *)p);
 	_tc_adjust_stack.push((oop *)p);
 	
@@ -282,10 +240,8 @@ bool TeraCache::tc_empty() {
 }
 		
 void TeraCache::tc_clear_stacks() {
-	if (TeraCacheStatistics) {
+	if (TeraCacheStatistics)
 		back_ptrs_per_mgc = 0;
-		intra_ptrs_per_mgc = 0;
-	}
 		
 	_tc_adjust_stack.clear(true);
 	_tc_stack.clear(true);
@@ -368,9 +324,6 @@ void TeraCache::tc_print_mgc_statistics() {
 	tclog_or_tty->print_cr("[STATISTICS] | TC_CT_TIME = %lu\n", max_tc_ct_trav_time);
 	tclog_or_tty->print_cr("[STATISTICS] | HEAP_CT_TIME = %lu\n", max_heap_ct_trav_time);
 	tclog_or_tty->print_cr("[STATISTICS] | BACK_PTRS_PER_MGC = %lu\n", back_ptrs_per_mgc);
-#if !MT_STACK
-	tclog_or_tty->print_cr("[STATISTICS] | INTRA_PTRS_PER_MGC = %lu\n", intra_ptrs_per_mgc);
-#endif
 
 #if BACK_REF_STAT
 	tc_print_back_ref_stat();
@@ -427,13 +380,6 @@ int TeraCache::tc_areq_completed() {
 // We need to make an fsync when we use fastmap
 void TeraCache::tc_fsync() {
 	r_fsync();
-}
-
-// Count the number of references between objects that are located in
-// TC.
-// This function works only when ParallelGCThreads = 1
-void TeraCache::incr_intra_ptrs_per_mgc(void) {
-	intra_ptrs_per_mgc++;
 }
 
 // Checks if the address of obj is before the empty part of the region
@@ -549,11 +495,8 @@ void TeraCache::disable_groups(void){
 void TeraCache::group_regions(HeapWord *obj1, HeapWord *obj2){
 	if (is_in_the_same_group((char *) obj1, (char *) obj2)) 
 		return;
-
-#if MT_STACK
 	MutexLocker x(tera_cache_group_lock);
-#endif
-    references( (char*) obj1, (char*) obj2 );
+    references((char*) obj1, (char*) obj2);
 }
 
 #if PR_BUFFER
@@ -629,12 +572,6 @@ void TeraCache::tc_flush_buffer() {
 	}
 }
 
-#endif
-
-#if ALIGN
-bool TeraCache::tc_obj_fit_in_region(size_t size) {
-	return r_is_obj_fits_in_region(size);
-}
 #endif
 
 // We save the current object group 'id' for tera-marked object to

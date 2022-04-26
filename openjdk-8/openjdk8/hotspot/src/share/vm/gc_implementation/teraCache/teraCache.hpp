@@ -64,7 +64,6 @@ class TeraCache {
 		static uint64_t heap_ct_trav_time[16];	   //< Time to traverse heap card tables
 
 		static uint64_t back_ptrs_per_mgc;		   //< Total number of back ptrs per MGC
-		static uint64_t intra_ptrs_per_mgc;		   //< Total number of intra ptrs between objects in TC per MGC
 
 		static uint64_t obj_distr_size[3];         //< Object size distribution between B, KB, MB
 
@@ -215,11 +214,6 @@ class TeraCache {
 		void tc_flush_buffer();
 #endif
 
-		// Count the number of references between objects that are located in
-		// TC.
-		// This function works only when ParallelGCThreads = 1
-		void incr_intra_ptrs_per_mgc(void);
-
         // Check if the object that the card is trying to reference is
         // valid. 
         bool check_if_valid_object(HeapWord *obj);
@@ -261,9 +255,6 @@ class TeraCache {
         void group_regions(HeapWord *obj1, HeapWord *obj2);
   
         HeapWord *get_first_object_in_region(HeapWord *addr);
-#if ALIGN
-		bool tc_obj_fit_in_region(size_t size);
-#endif
 
 		// We save the current object group 'id' for tera-marked object to
 		// promote this 'id' to its reference objects

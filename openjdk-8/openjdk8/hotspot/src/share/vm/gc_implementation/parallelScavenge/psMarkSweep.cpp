@@ -228,8 +228,6 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 #endif
 	}
 #endif
-    // Print Region Groups
-    //Universe::teraCache()->print_region_groups();
 
     // Recursive mark all the live objects
     mark_sweep_phase1(clear_all_softrefs);
