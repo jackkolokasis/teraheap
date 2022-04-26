@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-XMS=1
-MAX=100
-TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 PARALLEL_GC_THREADS=16
 PLATFORM=""
 STRIPE_SIZE=32768
@@ -14,8 +11,6 @@ EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
 	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
 	"HashMap" "Rehashing" "Clone" "Groupping" "MultiHashMap" \
 	"Test_WeakHashMap" "ClassInstance")
-
-#EXEC=( "ClassInstance" )
 
 # Export Enviroment Variables
 export_env_vars() {
@@ -143,6 +138,15 @@ echo
 
 for exec_file in "${EXEC[@]}"
 do
+	if [ "${exec_file}" == "ClassInstance" ]
+	then
+		XMS=2
+	else
+		XMS=1
+	fi
+
+	MAX=100
+	TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 	case $1 in
 		1)
 			export_env_vars
