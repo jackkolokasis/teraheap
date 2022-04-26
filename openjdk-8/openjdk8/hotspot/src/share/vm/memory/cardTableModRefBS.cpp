@@ -783,10 +783,15 @@ bool CardTableModRefBS::tc_num_dirty_cards(HeapWord *start, HeapWord* end,
 	else 
 		fprintf(stderr, "AFTER\n");
 
+
 	fprintf(stderr, "\t\t DIRTY_CARDS  = %d\n", num_dirty_card);
 	fprintf(stderr, "\t\t YOUNGEN_CARD = %d\n", num_youngen_card);
 	fprintf(stderr, "\t\t OLDGEN_CARD  = %d\n", num_oldgen_card);
 	fprintf(stderr, "\t\t CLEAN_CARD   = %d\n", num_clean_card);
+	
+    // After minor gc the number of dirty cards should be zero
+	if (!before && num_dirty_card != 0)
+		return false;
 
 	return true;
 }
