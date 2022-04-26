@@ -30,7 +30,7 @@ CC = gcc
 BINFLAG = -c
 DEBUGFLAG = -ggdb3
 OFLAG = -o
-WALLFLAG = -Wall -Werror
+WALLFLAG = -Wall -Werror -pedantic
 OPTIMZEFLAG = -O3
 PTHREADFLAG = -pthread
 
