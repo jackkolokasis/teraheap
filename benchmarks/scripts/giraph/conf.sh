@@ -25,7 +25,7 @@ GC_THREADS=16
 # Giraph number of compute threads
 COMPUTE_THREADS=8
 # Benchmarks to run
-BENCHMARKS=( "bfs" "cdlp" "wcc" "sssp" )
+BENCHMARKS=( "pr" )
 # Number of executors
 EXECUTORS=1
 # Number of executors

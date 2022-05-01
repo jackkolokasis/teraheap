@@ -277,7 +277,7 @@ create_ramdisk() {
 	cd ${RAMDISK_SCRIPT_DIR}
 
 	# If a previous ramdisk exist then remove it
-	if [ ! -z "$(lsmod | grep "brd")"]
+	if [ ! -z "$(lsmod | grep "brd")" ]
 	then
 		sudo ./ramdisk_create_and_mount.sh -d >> ${LOG} 2>&1
 	fi
@@ -386,7 +386,7 @@ calculate_avg() {
 	
 	sum=$(echo "scale=2; ${serdes[@]/%/ +} 0" | bc -l)
 	avg_sd_time=$(echo 'scale=2; x='$sum'/('$iter' - 2); if(x<1){"0"}; x' | bc -l)
-	other=$(echo "scale=2; ${avg_exec_time} - ${avg_major_gc_time} - ${avg_major_gc_time} - ${avg_sd_time}" | bc -l)
+	other=$(echo "scale=2; ${avg_exec_time} - ${avg_major_gc_time} - ${avg_minor_gc_time} - ${avg_sd_time}" | bc -l)
 
 	echo "---------,-------"				   > time.csv
 	echo "COMPONENT,TIME(s)"				  >> time.csv
@@ -564,7 +564,9 @@ do
 			# Copy the confifuration to the directory with the results
 			cp ./conf.sh ${RUN_DIR}/
 
-			cp -r $BENCHMARK_SUITE/report/* ${RUN_DIR}/
+			cp -r $BENCHMARK_SUITE/report/*-*-*-report-*/log/benchmark-summary.log ${RUN_DIR}/
+			cp -r $BENCHMARK_SUITE/report/bench.log ${RUN_DIR}/
+			cp -r $BENCHMARK_SUITE/report/teraCache.txt ${RUN_DIR}/
 
 			rm -rf $BENCHMARK_SUITE/report/*
 
@@ -584,8 +586,11 @@ do
 			fi
 		done
 
-		# Calculate Average
-		#calculate_avg "${OUT}/${benchmark}/conf${i}" ${ITER}
+		if [ $ITER -ge 3 ]
+		then
+			# Calculate Average
+			calculate_avg "${OUT}/${benchmark}/conf${i}" ${ITER}
+		fi
 	done
 
 	ENDTIME=$(date +%s)

@@ -48,10 +48,10 @@ done
 BENCH_FILE=$(find ${RESULT_DIR}/ -name "benchmark-summary.log")
 TOTAL_TIME=$(grep "execution process finished within" ${BENCH_FILE} | awk '{print $9}')
 
-NUM_MGC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{print $7}')
-MINOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{printf("%.2f",$8)}')
-NUM_FGC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{print $9}')
-MAJOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt        | awk '{printf("%.2f", $10)}')
+NUM_MGC=$(tail -n 1 ${RESULT_DIR}/jstat.txt       | awk '{print $7}')
+MINOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt      | awk '{printf("%.2f",$8)}')
+NUM_FGC=$(tail -n 1 ${RESULT_DIR}/jstat.txt       | awk '{print $9}')
+MAJOR_GC=$(tail -n 1 ${RESULT_DIR}/jstat.txt      | awk '{printf("%.2f", $10)}')
 
 # Caclulate the overheads in TC card table traversal, marking and adjust phases
 if [ $TC ]
@@ -98,8 +98,8 @@ APP_THREAD_SAMPLES=$(grep -w "java/lang/Thread.run" ${RESULT_DIR}/profile.svg \
 	| sed 's/(//g' \
 	| head -n 1)
 
-NET_TIME=$(echo "${TOTAL_TIME} - ${MINOR_GC} - ${MAJOR_GC}" | bc -l)
-SD_SAMPLES=$(echo "${SER_SAMPLES} + ${DESER_SAMPLES}" | bc -l)
+NET_TIME=$(echo "scale=2; ${TOTAL_TIME} - ${MINOR_GC} - ${MAJOR_GC}" | bc -l)
+SD_SAMPLES=$(echo "scale=2; ${SER_SAMPLES} + ${DESER_SAMPLES}" | bc -l)
 SERDES=$(echo "scale=2; ${SD_SAMPLES} * ${NET_TIME} / ${APP_THREAD_SAMPLES}" | bc -l)
 
 # Remove flamegraph
