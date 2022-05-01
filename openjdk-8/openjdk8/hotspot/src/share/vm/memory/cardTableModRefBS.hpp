@@ -221,6 +221,18 @@ class CardTableModRefBS: public ModRefBarrierSet {
   }
 #endif
 
+#if TERA_CARDS
+  bool is_field_in_tera_heap(const void *p) const {
+	  assertf(_whole_heap.contains(p) || _tc_whole_heap.contains(p), 
+			  "Attempt to access p = %p out of bounds of card marking \
+			  arrays _whole_heap = [%p, %p] and _tc_whole_heap = [%p, %p]", 
+			  p, _whole_heap.start(), _whole_heap.end(), _tc_whole_heap.start(),
+			  _tc_whole_heap.end());
+
+	  return !_whole_heap.contains(p);
+  }
+#endif
+
   // The card table byte one after the card marking array
   // entry for argument address. Typically used for higher bounds
   // for loops iterating through the card table.
@@ -458,15 +470,14 @@ public:
 
   // ModRefBS functions.
   virtual void invalidate(MemRegion mr, bool whole_heap = false);
+
 #if TERA_CARDS
   virtual void tc_invalidate(HeapWord *start, HeapWord *end);
+  virtual void tc_write_ref_field(void *obj);
+  virtual void tc_clean_cards(HeapWord *start, HeapWord* end);
+  virtual bool tc_num_dirty_cards(HeapWord *start, HeapWord* end, bool before);
 #endif
 
-#if NEW_FEAT
-  virtual void tc_write_ref_field(HeapWord *obj);
-  virtual bool tc_num_dirty_cards(HeapWord *start, HeapWord* end, bool before);
-  virtual void tc_clean_cards(HeapWord *start, HeapWord* end);
-#endif
   void clear(MemRegion mr);
   void dirty(MemRegion mr);
 

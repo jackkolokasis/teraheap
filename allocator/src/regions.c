@@ -12,6 +12,7 @@
 #include "../include/regions.h"
 #include "../include/sharedDefines.h"
 #include "../include/asyncIO.h"
+#include "../include/segments.h"
 
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
 #define HEADER_SIZE (32)                   // Header size of the Dummy object	
@@ -34,7 +35,8 @@ void init(uint64_t align) {
 
 #if ANONYMOUS
 	// Anonymous mmap
-	tc_mem_pool.mmap_start = mmap(0, DEV_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, fd, 0);
+    fd = open(DEV, O_RDWR);
+	tc_mem_pool.mmap_start = mmap(0, V_SPACE, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0);
 #else
     fd = open(DEV, O_RDWR);
 	// Memory-mapped a file over a storage device
@@ -48,13 +50,15 @@ void init(uint64_t align) {
 
 	tc_mem_pool.cur_alloc_ptr = tc_mem_pool.start_address;
 	tc_mem_pool.size = 0;
+#if ANONYMOUS
+	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + V_SPACE;
+    printf("Start address:%p\n",tc_mem_pool.start_address);
+    printf("Stop address:%p\n",tc_mem_pool.stop_address);
+#else
 	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
-
-	req_init();
-
-#if ALIGN_ON
-	tc_mem_pool.region_free_space = REGION_SIZE - HEADER_SIZE;
 #endif
+    init_regions();
+	req_init();
 }
 
 
@@ -73,38 +77,35 @@ char* stop_addr_mem_pool() {
 // Return the `size` of the memory allocation pool
 size_t mem_pool_size() {
 	assertf(tc_mem_pool.start_address != NULL, "Start address is NULL");
+#if ANONYMOUS
+    return V_SPACE;
+#else
 	return DEV_SIZE;
+#endif
 }
 
-// Allocate a new object with `size` and return the `start allocation
-// address`.
-// Args: `size` is in words, each word is 8 byte. Size should be > 0
-char* allocate(size_t size) {
+char* allocate(size_t size, uint64_t rdd_id, uint64_t partition_id) {
 	char* alloc_ptr = tc_mem_pool.cur_alloc_ptr;
-	size_t obj_size = size * HEAPWORD;
-	
-	assertf(obj_size > 0, "Object should be > 0");
-	assertf(alloc_ptr >= tc_mem_pool.start_address &&
-			alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
-#if ALIGN_ON
-	assertf(obj_size <= (REGION_SIZE - HEADER_SIZE), "Oject size: %lu exceeds region size: %lu", 
-			obj_size, REGION_SIZE - HEADER_SIZE);
-#endif
+	char* prev_alloc_ptr = tc_mem_pool.cur_alloc_ptr;
 
-	tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + obj_size);
-	tc_mem_pool.size += size;
+	assertf(size > 0, "Object should be > 0");
 
-#if ALIGN_ON
-	// Decrease the available free space counter for the region
-	tc_mem_pool.region_free_space -= obj_size;
-#endif
-	
-	// Alighn to 8 words the pointer
+    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id, partition_id);
+
+    assertf(alloc_ptr != NULL, "No free space in H2");
+
+    tc_mem_pool.size += size;
+    tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);
+
+	if (prev_alloc_ptr > tc_mem_pool.cur_alloc_ptr)
+		tc_mem_pool.cur_alloc_ptr = prev_alloc_ptr;
+
+	assertf(prev_alloc_ptr <= tc_mem_pool.cur_alloc_ptr, 
+			"Error alloc ptr: Prev = %p, Cur = %p", prev_alloc_ptr, tc_mem_pool.cur_alloc_ptr);
+
+	// Alighn to 8 words the pointer (TODO: CHANGE TO ASSERTION)
 	if ((uint64_t) tc_mem_pool.cur_alloc_ptr % HEAPWORD != 0)
 		tc_mem_pool.cur_alloc_ptr = (char *)((((uint64_t)tc_mem_pool.cur_alloc_ptr) + (HEAPWORD - 1)) & -HEAPWORD);
-
-	assertf(tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address,
-			"TeraCache if full");
 
 	return alloc_ptr;
 }
@@ -148,11 +149,16 @@ void r_enable_rand() {
 // Explicit write 'data' with 'size' in certain 'offset' using system call
 // without memcpy.
 void r_write(char *data, char *offset, size_t size) {
-	ssize_t s_check;
+#ifdef ASSERT
+	ssize_t s_check = 0;
 	uint64_t diff = offset - tc_mem_pool.mmap_start;
 
 	s_check = pwrite(fd, data, size * HEAPWORD, diff);
 	assertf(s_check == size * HEAPWORD, "Sanity check: s_check = %ld", s_check);
+#else
+	uint64_t diff = offset - tc_mem_pool.mmap_start;
+	pwrite(fd, data, size * HEAPWORD, diff);
+#endif
 }
 	
 // Explicit asynchronous write 'data' with 'size' in certain 'offset' using
@@ -174,36 +180,12 @@ int	r_areq_completed() {
 // We need to ensure that all the writes will be flushed from buffer
 // cur_alloc_ptrcur_alloc_ptrhe and they will be written to the device.
 void r_fsync() {
+#ifdef ASSERT
 	int check = fsync(fd);
 	assertf(check == 0, "Error in fsync");
-}
-
-#if ALIGN_ON
-// Check if the current object with 'size' can fit in the available region
-// Return 1 on succesfull, and 0 otherwise
-int	r_is_obj_fits_in_region(size_t size) {
-	size_t obj_size = size * HEAPWORD;
-
-	assertf(obj_size > 0, "Object should be > 0");
-	assertf(obj_size <= REGION_SIZE - HEADER_SIZE, "Oject size: %lu exceeds region size: %lu",
-			obj_size, REGION_SIZE - HEADER_SIZE);
-
-	return (obj_size  <= tc_mem_pool.region_free_space);
-}
-
-// Get the top address of the current region and set the current_ptr to the
-// next region
-char* r_region_top_addr(void) {
-	// Set the current ptr to the next region and initialize next region's free space
-	// We reserve the last HEADE_SIZE bytes in regions for the dummy object
-	tc_mem_pool.cur_alloc_ptr += tc_mem_pool.region_free_space + HEADER_SIZE;
-
-	assertf(tc_mem_pool.cur_alloc_ptr >= tc_mem_pool.start_address &&
-			tc_mem_pool.cur_alloc_ptr < tc_mem_pool.stop_address, "TeraCache out-of-space");
-
-	tc_mem_pool.region_free_space = REGION_SIZE - HEADER_SIZE;
-
-	return tc_mem_pool.cur_alloc_ptr;
+#else
+	fsync(fd);
+#endif
 }
 
 // This function if for the FastMap hybrid version. Give advise to kernel to
@@ -217,5 +199,3 @@ void r_enable_regular_flts(void) {
 void r_enable_huge_flts(void) {
 	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_HUGEPAGE);
 }
-
-#endif

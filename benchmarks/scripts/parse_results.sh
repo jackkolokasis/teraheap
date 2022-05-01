@@ -27,6 +27,7 @@ usage() {
     exit 1
 }
 
+
 # Check for the input arguments
 while getopts "d:tsah" opt
 do
@@ -93,11 +94,7 @@ APP_THREAD_SAMPLES=$(grep -w "java/lang/Thread.run" ${RESULT_DIR}/profile.svg \
 
 NET_TIME=$(echo "${TOTAL_TIME} - ${MINOR_GC} - ${MAJOR_GC}" | bc -l)
 SD_SAMPLES=$(echo "${SER_SAMPLES} + ${DESER_SAMPLES}" | bc -l)
-
 SERDES=$(echo "${SD_SAMPLES} * ${NET_TIME} / ${APP_THREAD_SAMPLES}" | bc -l)
-
-# Remove flamegraph
-rm ${RESULT_DIR}/profile.svg
 
 echo "COMPONENT,TIME(s)"               > ${RESULT_DIR}/result.csv
 echo "TOTAL_TIME,${TOTAL_TIME}"       >> ${RESULT_DIR}/result.csv

@@ -1,18 +1,33 @@
 #!/usr/bin/env bash
 
-XMS=5
-MAX=6
-TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 PARALLEL_GC_THREADS=16
+PLATFORM=""
+STRIPE_SIZE=32768
 
-JAVA="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
-JDB="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
-EXEC=( "Array" "Array_List_Float" "Array_List_Int" "Array_List" "Array_List_Scalar" "Clone" \
-	"Extend_Lambda" "HashMap" "List_Large" "List_Small" "MultiList" \
-	"Rehashing" "Simple_Array" "Simple_Lambda" "Test_Reference" "Test_Reflection" )
-#EXEC=( "Clone" )
+JAVA="$(pwd)/../openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
+JDB="$(pwd)/../openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
 
-V_JAVA="/usr/lib/jvm/java-8-kolokasis/build/linux-x86_64-normal-server-release/jdk/bin/java"
+EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
+	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
+	"HashMap" "Rehashing" "Clone" "Groupping" "MultiHashMap" \
+	"Test_WeakHashMap" "ClassInstance")
+
+# Export Enviroment Variables
+export_env_vars() {
+	PROJECT_DIR="$(pwd)/../.."
+
+	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LD_LIBRARY_PATH
+	export PATH=${PROJECT_DIR}/allocator/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$C_INCLUDE_PATH
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$CPLUS_INCLUDE_PATH
+
+	export LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LD_LIBRARY_PATH
+	export PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$C_INCLUDE_PATH
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$CPLUS_INCLUDE_PATH
+}
 
 # Run tests using only interpreter mode
 function interpreter_mode() {
@@ -27,7 +42,7 @@ function interpreter_mode() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${OLD}m \
+		-Xms${XMS}m \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
@@ -47,7 +62,7 @@ function c1_mode() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${OLD}m \
+		-Xms${XMS}m \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
@@ -66,7 +81,7 @@ function c2_mode() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${OLD}g \
+		-Xms${XMS}g \
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
@@ -84,11 +99,11 @@ function run_tests() {
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${XMS}m \
+		-Xms${XMS}g \
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
-		-XX:TeraStripeSize=16 \
+		-XX:TeraStripeSize=${STRIPE_SIZE} \
 		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 
@@ -96,16 +111,18 @@ function run_tests() {
 function run_tests_debug() {
 	gdb --args ${JAVA} \
 		-server \
+		-XX:+ShowMessageBoxOnError \
 		-XX:+UseParallelGC \
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
 		-XX:+EnableTeraCache \
 		-XX:TeraCacheSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${XMS}m \
+		-Xms${XMS}g \
 		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
 		-XX:+TeraCacheStatistics \
+		-XX:TeraStripeSize=${STRIPE_SIZE} \
 		-Xlogtc:llarge_teraCache.txt $1
 }
 
@@ -121,20 +138,34 @@ echo
 
 for exec_file in "${EXEC[@]}"
 do
+	if [ "${exec_file}" == "ClassInstance" ]
+	then
+		XMS=2
+	else
+		XMS=1
+	fi
+
+	MAX=100
+	TERACACHE_SIZE=$(echo $(( (${MAX}-${XMS})*1024*1024*1024 )))
 	case $1 in
 		1)
+			export_env_vars
 			interpreter_mode $exec_file
 			;;
 		2)
+			export_env_vars
 			c1_mode $exec_file
 			;;
 		3)
+			export_env_vars
 			c2_mode $exec_file
 			;;
 		4)
+			export_env_vars
 			run_tests_debug $exec_file
 			;;
 		*)
+			export_env_vars
 			run_tests $exec_file
 			;;
 	esac

@@ -11,66 +11,66 @@
 #
 ####################################################
 
-JAVA_REPO="/home1/public/kolokasis/sparkPersistentMemory/openjdk-8/openjdk8"
+JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../openjdk-8/openjdk8/
 JAVAC=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javac
 JAVAP=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javap
 JAVA=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/java
 GDB=gdb
 
-TARGET=Array.class Array_List_Float.class Array_List_Int.class Array_List.class \
-	   Array_List_Scalar.class Clone.class Extend_Lambda.class HashMap.class \
-	   List_Large.class List_Small.class MultiList.class Rehashing.class \
-	   Simple_Array.class Simple_Lambda.class Test_Reference.class \
-	   Test_Reflection.class
+TARGET=Array.class Array_List.class Array_List_Int.class List_Large.class \
+	   MultiList.class Simple_Lambda.class Extend_Lambda.class \
+	   Test_Reflection.class Test_Reference.class HashMap.class Rehashing.class \
+	   Clone.class Groupping.class MultiHashMap.class Test_WeakHashMap.class \
+	   ClassInstance.class
 	
 all: $(TARGET)
 
 Array.class: Array.java
 	$(JAVAC) $<
 
-Array_List_Float.class:	Array_List_Float.java 
+Array_List.class: Array_List.java 
 	$(JAVAC) $<
 
 Array_List_Int.class: Array_List_Int.java 
 	$(JAVAC) $<
 
-Array_List.class: Array_List.java 
-	$(JAVAC) $<
-
-Array_List_Scalar.class: Array_List_Scalar.java 
-	$(JAVAC) $<
-
-Clone.class: Clone.java
-	$(JAVAC) $<
-
-Extend_Lambda.class: Extend_Lambda.java 
-	$(JAVAC) $<
-
-HashMap.class: HashMap.java 
-	$(JAVAC) -g $<
-
 List_Large.class: List_Large.java 
-	$(JAVAC) $<
-
-List_Small.class: List_Small.java 
 	$(JAVAC) $<
 
 MultiList.class: MultiList.java 
 	$(JAVAC) $<
 
-Rehashing.class: Rehashing.java
-	$(JAVAC) $<
-
-Simple_Array.class: Simple_Array.java 
-	$(JAVAC) $<
-
 Simple_Lambda.class: Simple_Lambda.java 
+	$(JAVAC) $<
+
+Extend_Lambda.class: Extend_Lambda.java 
+	$(JAVAC) $<
+
+Test_Reflection.class: Test_Reflection.java
 	$(JAVAC) $<
 
 Test_Reference.class: Test_Reference.java 
 	$(JAVAC) $<
 
-Test_Reflection.class: Test_Reflection.java
+HashMap.class: HashMap.java 
+	$(JAVAC) -g $<
+
+Rehashing.class: Rehashing.java
+	$(JAVAC) $<
+
+Clone.class: Clone.java
+	$(JAVAC) $<
+
+Groupping.class: Groupping.java
+	$(JAVAC) $<
+
+MultiHashMap.class: MultiHashMap.java
+	$(JAVAC) $<
+
+Test_WeakHashMap.class: Test_WeakHashMap.java
+	$(JAVAC) $<
+
+ClassInstance.class: ClassInstance.java
 	$(JAVAC) $<
 
 debug:

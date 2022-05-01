@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <aio.h>
+#include <unistd.h>
 #include "../include/asyncIO.h"
 
 struct ioRequest request[MAX_REQS];
@@ -74,7 +75,6 @@ static int find_slot() {
 //	offset - Write the data to the specific offset in the file
 //	
 void req_add(int fd, char *data, size_t size, uint64_t offset) {
-	int check;					// Check status
 	int slot;					// Find available slot for the request
 
 	slot = find_slot();
@@ -108,9 +108,12 @@ void req_add(int fd, char *data, size_t size, uint64_t offset) {
 	request[slot].state = EINPROGRESS;
 	request[slot].aiocbp = obj;
 
-	check = aio_write(&request[slot].aiocbp);
-
+#ifdef ASSERT
+	int check = aio_write(&request[slot].aiocbp);
 	assertf(check == 0, "Write failed");
+#else
+	aio_write(&request[slot].aiocbp);
+#endif
 }
 
 // Traverse tthe array to check if all the i/o requests have been completed.  We

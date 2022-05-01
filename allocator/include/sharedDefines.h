@@ -6,15 +6,20 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEV "/mnt/spark/file.txt"	     //< Device name
-#define DEV_SIZE (200*1024LU*1024*1024)    //< Device size (in bytes)
+#define DEV "/mnt/fmap/file.txt"	     //< Device name
+#define DEV_SIZE (150*1024LU*1024*1024)  //< Device size (in bytes)
 
+//#define ASSERT
+
+#ifdef ASSERT
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A);}
-// #define assertf(A, M, ...) ;
+#else
+#define assertf(A, M, ...) ;
+#endif
 
-#define ANONYMOUS    0
+#define ANONYMOUS    0                //< Set to 1 for small mmaps
 
 #define MAX_REQS	 64				  //< Maximum requests
 
@@ -22,8 +27,34 @@
 
 #define MALLOC_ON	1				  //< Allocate buffers dynamically
 
-#define ALIGN_ON	1				  //< Enable allocation with allignment in TC
+#define REGION_SIZE	(256*1024LU*1024) //< Region size (in bytes) for allignment
+									  // version
 
-#define REGION_SIZE	(512*1024LU*1024) //< Region size (in bytes) for allignment version
+#define V_SPACE (100*1024LU*1024*1024*1024) //< Virtual address space size for 
+											// small mmaps
+
+#if ANONYMOUS
+#define REGION_ARRAY_SIZE ((V_SPACE)/(REGION_SIZE))
+#define MAX_PARTITIONS 256			  // Maximum partitions per RDD, affects 
+									  // id array size
+
+#define MAX_RDD_ID 256				  //< Total different rdds
+
+#else
+#define REGION_ARRAY_SIZE ((DEV_SIZE)/(REGION_SIZE))
+
+#define MAX_PARTITIONS 1			  // Maximum partitions per RDD, affects 
+									  // id array size
+#define MAX_RDD_ID ((REGION_ARRAY_SIZE)/(MAX_PARTITIONS)) //< Total different rdds
+
+#endif
+
+#define GROUP_ARRAY_SIZE ((REGION_ARRAY_SIZE)/2)
+
+#define MMAP_SIZE (4*1024*1024)       //< Size of small mmaps in Anonymous mode
+
+#define STATISTICS 0				  //< Enable allocator to print statistics
+
+#define DEBUG_PRINT 0			      //< Enable debug prints
 
 #endif

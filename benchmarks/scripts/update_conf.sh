@@ -30,7 +30,7 @@ usage() {
 }
 
 # Check for the input arguments
-while getopts ":m:f:s:r:c:h" opt
+while getopts ":m:f:s:r:c:b:h" opt
 do
     case "${opt}" in
         m)
@@ -47,6 +47,9 @@ do
             ;;
         c)
             CORES=${OPTARG}
+            ;;
+        b)
+            CUSTOM_BENCHMARK=${OPTARG}
             ;;
         h)
             usage
@@ -75,19 +78,22 @@ sed -i '/storageFraction/c\spark.memory.storageFraction '"${FRACTION}" spark-def
 
 cd -
 
-# Enter the spark-bechmarks
-cd ../spark-bench/conf/
+if [ $CUSTOM_BENCHMARK == "false" ]
+then
+	# Enter the spark-bechmarks
+	cd ../spark-bench/conf/
 
-# Change spark benchmarks configuration execur memory
-sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${MIN_HEAP}"'g' env.sh
+	# Change spark benchmarks configuration execur memory
+	sed -i '/SPARK_EXECUTOR_MEMORY/c\SPARK_EXECUTOR_MEMORY='"${MIN_HEAP}"'g' env.sh
 
-# Change spark benchmarks configuration executor core
-sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
+	# Change spark benchmarks configuration executor core
+	sed -i '/SPARK_EXECUTOR_CORES/c\SPARK_EXECUTOR_CORES='"${CORES}" env.sh
 
-# Change storage level
-sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
+	# Change storage level
+	sed -i '/STORAGE_LEVEL/c\STORAGE_LEVEL='"${S_LEVEL}" env.sh
 
-cd -
+	cd -
+fi
 
 if [ ${RAMDISK} -ne 0 ]
 then

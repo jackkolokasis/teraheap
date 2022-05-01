@@ -122,6 +122,13 @@ then
 	exit
 fi
 
+# Setup Device 
+if ! mountpoint -q /mnt/datasets
+then
+	sudo mount /dev/sdb /mnt/datasets
+	sudo chown kolokasis /mnt/datasets
+fi
+
 # Setup TeraCache device
 if [ $TC ]
 then

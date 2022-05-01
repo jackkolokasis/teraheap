@@ -74,7 +74,7 @@ function usage()
 function release() 
 {
   make dist-clean
-  bash ./configure --with-jobs=32 --disable-debug-symbols --with-extra-cflags='-O3' --with-extra-cxxflags='-O3'
+  CC=gcc-4.8.5 CXX=g++-4.8.5 bash ./configure --with-jobs=32 --disable-debug-symbols --with-extra-cflags='-O3' --with-extra-cxxflags='-O3'
   intercept-build make
   cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
 }
@@ -83,8 +83,7 @@ function release()
 function debug_symbols_on() 
 {
   make dist-clean
-  bash ./configure --with-debug-level=release --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
-  #bash ./configure --with-debug-level=slowdebug --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
+  CC=gcc-4.8.5 CXX=g++-4.8.5 bash ./configure --with-debug-level=release --with-target-bits=64 --disable-zip-debug-info --with-jobs=32
   intercept-build make
   cd ../ && compdb -p openjdk8 list > compile_commands.json && mv compile_commands.json openjdk8 && cd -
 }
@@ -97,6 +96,7 @@ function clean_make()
 
 function update()
 {
+	export_env_vars
 	make
 
 	if [ $? -ne 0 ]; then
@@ -115,22 +115,51 @@ function update()
 	echo -e "[${BYELLOW}INSTALL${RESET}] JVM"
 }
 
-while getopts ":drchu" opt
+export_env_vars()
+{
+	local PROJECT_DIR="$(pwd)/../.."
+
+	export JAVA_HOME="/usr/lib/jvm/java-1.8.0-openjdk"
+
+	### TeraHeap Allocator
+	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LD_LIBRARY_PATH                                                                                           
+	export PATH=${PROJECT_DIR}/allocator/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$C_INCLUDE_PATH                                                                                         
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$CPLUS_INCLUDE_PATH
+
+	### CThread Pool Library
+	export LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LD_LIBRARY_PATH
+	export PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$C_INCLUDE_PATH
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$CPLUS_INCLUDE_PATH
+}
+
+while getopts ":drcmhu" opt
 do
     case "${opt}" in
         r)
+			export_env_vars
             release
             ;;
         d)
+			export_env_vars
             debug_symbols_on
             ;;
         c)
 			echo "Clean and make"
+			export_env_vars
             clean_make
             ;;
         u)
 			echo "Update JVM in root directory"
 			update
+			;;
+        m)
+			echo "Make"
+			export_env_vars
+			make
             ;;
         h)
             usage

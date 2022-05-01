@@ -61,14 +61,14 @@
         <repository>
             <id>scala-tools.org</id>
             <name>Scala-tools Maven 2 Repository</name>
-            <url>https://oss.sonatype.org/content/groups/scala-tools/</url>
+            <url>https://oss.sonatype.org/service/local/repositories/central-sync/content/org/scala-tools/</url>
         </repository>
     </repositories>
     <pluginRepositories>
         <pluginRepository>
             <id>scala-tools.org</id>
             <name>Scala-tools Maven2 Repository</name>
-            <url>https://oss.sonatype.org/content/groups/scala-tools/</url>
+            <url>https://oss.sonatype.org/service/local/repositories/central-sync/content/org/scala-tools/</url>
         </pluginRepository>
     </pluginRepositories>
 

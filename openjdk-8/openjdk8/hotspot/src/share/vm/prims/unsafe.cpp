@@ -609,21 +609,43 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObject(JNIEnv *env, jobject unsafe, jobject obj)
   if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
 	return;
 
-  o->set_tera_cache(0);
+  o->set_tera_cache(0, 0);
 UNSAFE_END
 
-UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe, jobject obj, jlong id))
+UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong rdd_id, jlong part_id))
   UnsafeWrapper("Unsafe_TcMarkObjectWithId");
+
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  // If the object is already in TeraCache then do not mark its teraflag
+  if (Universe::teraCache()->tc_check(o) || 
+  		strstr(o->klass()->internal_name(), "SerializableConfiguration"))
+  	return;
+
+  // Initialize object's teraflag
+  o->set_tera_cache(rdd_id, part_id);
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_TcPrefetchPartitionData(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong rdd_id, jlong part_id))
+  UnsafeWrapper("Unsafe_TcPrefetchPartitionData");
   
   oop o = JNIHandles::resolve_non_null(obj);
-  int i;
 
-  if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
+  if (!Universe::teraCache()->tc_check(o))
 	return;
 
-  o->set_tera_cache(id);
-UNSAFE_END
+  assertf((int) rdd_id == o->get_obj_group_id(), "Rdd Id is not the same");
+  assertf((uint64_t) part_id == o->get_obj_part_id(), "Part Id is not the same");
 
+#if PREFETCHING
+
+  Universe::teraCache()->tc_prefetch_data((HeapWord *) o, rdd_id, part_id);
+
+#endif
+
+UNSAFE_END
 
 UNSAFE_ENTRY(jlong, Unsafe_ReallocateMemory(JNIEnv *env, jobject unsafe, jlong addr, jlong size))
   UnsafeWrapper("Unsafe_ReallocateMemory");
@@ -1622,7 +1644,9 @@ static JNINativeMethod methods_18[] = {
 	// Mark object to be moved in TeraCache
     {CC"tcMarkObject",       CC"("OBJ")V",               FN_PTR(Unsafe_TcMarkObject)},
 	// Mark object to be moved in TeraCache using Id
-    {CC"tcMarkObjectWithId", CC"("OBJ"J)V",              FN_PTR(Unsafe_TcMarkObjectWithId)},
+    {CC"tcMarkObjectWithId", CC"("OBJ"JJ)V",              FN_PTR(Unsafe_TcMarkObjectWithId)},
+	// Prefetch partition data
+    {CC"tcPrefetchPartitionData", CC"("OBJ"JJ)V",        FN_PTR(Unsafe_TcPrefetchPartitionData)},
 
     {CC"reallocateMemory",   CC"("ADR"J)"ADR,            FN_PTR(Unsafe_ReallocateMemory)},
     {CC"freeMemory",         CC"("ADR")V",               FN_PTR(Unsafe_FreeMemory)},

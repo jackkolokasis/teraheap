@@ -63,68 +63,63 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 
 	debug_only(
 			(TraceReferenceGC && PrintGCDetails) ?  gclog_or_tty->print_cr(
-				"InstanceRefKlass::oop_follow_contents " INTPTR_FORMAT, 
-				(void *)obj);)
+				"InstanceRefKlass::oop_follow_contents " INTPTR_FORMAT, (void *)obj);)
 
 	if (!oopDesc::is_null(heap_oop)) {
 		// Heap oop decription
 		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-#if TEST_CLOSURE
-	if (EnableTeraCache && Universe::teraCache()->tc_check(referent))
-	{
-		// We have to keep it here (CHECK)
-		MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type());
-
-		goto TERACACHE;
-	}
+#if CLOSURE
+		if (EnableTeraCache && Universe::teraCache()->tc_check(referent)) {
+			Universe::teraCache()->mark_used_region((HeapWord*)referent);
+#if GC_ANALYSIS
+      obj->set_live();
 #endif
-	
-    if (!referent->is_gc_marked() && 
-			MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
-		// Reference was discovered and the referent will be traversed later 
-		// If the referent object is not marked and it is successfully added
-		// to the DiscoverList of the corresponding type, call the
-		// oop_follow_contents method of the parent class to process the
-		// reference instance
+    }
+#endif
+		if (!referent->is_gc_marked() && 
+				MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
+			// Reference was discovered and the referent will be traversed later 
+			// If the referent object is not marked and it is successfully added
+			// to the DiscoverList of the corresponding type, call the
+			// oop_follow_contents method of the parent class to process the
+			// reference instance
 		
-#if TEST_CLOSURE
-		// Check if the objects is marked to be moved in TeraCache
-		// Set the referent object to be moved in TeraCache
-		if (EnableTeraCache && obj->is_tera_cache()) {
-			referent->set_tera_cache((long int) obj->get_obj_group_id());
-		}
+#if P_SD_REF_EXCLUDE_CLOSURE
+			if (EnableTeraCache && obj->is_tera_cache())
+				obj->set_obj_state();
 #endif
-		ref->InstanceKlass::oop_follow_contents(obj);
+			if (EnableTeraCache && obj->is_tera_cache() && !Universe::teraCache()->tc_check(referent)) {
+				referent->set_tera_cache(obj->get_obj_group_id(), obj->get_obj_part_id());
+			}
 
-		debug_only(
-				if(TraceReferenceGC && PrintGCDetails) {
-				gclog_or_tty->print_cr("Non NULL enqueued " INTPTR_FORMAT, (void *)obj);
-				}
-			)
+			ref->InstanceKlass::oop_follow_contents(obj);
 
-		return;
-    } 
-	else 
-	{
-#if TEST_CLOSURE
-TERACACHE:
-#endif
-		// treat referent as normal oop
-		debug_only(
-				if(TraceReferenceGC && PrintGCDetails) {
-				gclog_or_tty->print_cr("Non NULL normal " INTPTR_FORMAT, 
-						(void *)obj);})
-#if TEST_CLOSURE
-		  if (EnableTeraCache && obj->is_tera_cache())
+			debug_only(
+					if(TraceReferenceGC && PrintGCDetails) {
+					gclog_or_tty->print_cr("Non NULL enqueued " INTPTR_FORMAT, (void *)obj);})
+
+			return;
+		} 
+		else {
+			// treat referent as normal oop
+			debug_only(
+					if(TraceReferenceGC && PrintGCDetails) {
+					gclog_or_tty->print_cr("Non NULL normal " INTPTR_FORMAT, 
+							(void *)obj);})
+#if CLOSURE && !P_SD_REF_EXCLUDE_CLOSURE
+		  if (EnableTeraCache && obj->is_tera_cache()) {
+			  Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+			  Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 			  MarkSweep::tera_mark_and_push(referent_addr);
+		  }
 		  else 
 			  MarkSweep::mark_and_push(referent_addr);
 #else
 	  MarkSweep::mark_and_push(referent_addr);
 #endif
-    }
-  }
+		}
+	}
 
 	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
 
@@ -146,15 +141,14 @@ TERACACHE:
 					}
 					)
 
-#if TEST_CLOSURE
-				if (EnableTeraCache && obj->is_tera_cache())
-				{
-					printf("SetTeraCache\n");
+#if CLOSURE && !P_SD_REF_EXCLUDE_CLOSURE
+				if (EnableTeraCache && obj->is_tera_cache()) {
+					Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+					Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 					MarkSweep::tera_mark_and_push(discovered_addr);
 				}
-				else {
+				else
 					MarkSweep::mark_and_push(discovered_addr);
-				}
 #else
 			MarkSweep::mark_and_push(discovered_addr);
 #endif
@@ -178,14 +172,22 @@ TERACACHE:
 			gclog_or_tty->print_cr("   Process next as normal " INTPTR_FORMAT, next_addr);
 			}
 			)
-#if TEST_CLOSURE
+#if CLOSURE && !P_SD_REF_EXCLUDE_CLOSURE
 		// Process the next attribute  
-		if (EnableTeraCache && obj->is_tera_cache())
+		if (EnableTeraCache && obj->is_tera_cache()) {
+			Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+			Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 			MarkSweep::tera_mark_and_push(next_addr);
+		}
 		else 
 			MarkSweep::mark_and_push(next_addr);
 #else
 	MarkSweep::mark_and_push(next_addr);
+#endif
+
+#if P_SD_REF_EXCLUDE_CLOSURE
+	if (EnableTeraCache && obj->is_tera_cache())
+		obj->set_obj_state();
 #endif
 
 	ref->InstanceKlass::oop_follow_contents(obj);
@@ -333,17 +335,26 @@ template <class T> void trace_reference_gc(const char *s, oop obj,
 #endif
 
 template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, oop obj) {
-  T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
-  MarkSweep::adjust_pointer(referent_addr);
+#if REGIONS
+	if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer())))
+		Universe::teraCache()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+	MarkSweep::adjust_pointer(referent_addr);
 
-  T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
-  MarkSweep::adjust_pointer(next_addr);
+	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+	MarkSweep::adjust_pointer(next_addr);
 
-  T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
-  MarkSweep::adjust_pointer(discovered_addr);
+	T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+	MarkSweep::adjust_pointer(discovered_addr);
 
-  debug_only(trace_reference_gc("InstanceRefKlass::oop_adjust_pointers", obj,
-                                referent_addr, next_addr, discovered_addr);)
+#if REGIONS
+	if (EnableTeraCache && obj->is_tera_cache())
+		Universe::teraCache()->disable_groups();
+#endif
+
+	debug_only(trace_reference_gc("InstanceRefKlass::oop_adjust_pointers", obj,
+				referent_addr, next_addr, discovered_addr);)
 }
 
 int InstanceRefKlass::oop_adjust_pointers(oop obj) {
@@ -587,11 +598,23 @@ void tc_specialized_oop_push_contents(InstanceRefKlass *ref,
 template <class T>
 void tc_specialized_oop_trace_contents(InstanceRefKlass *ref,
                                    PSPromotionManager* pm, oop obj) {
+	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+	PSScavenge::tc_should_trace(referent_addr);
+
+	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+	if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+		T  next_oop = oopDesc::load_heap_oop(next_addr);
+		if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+			T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+			PSScavenge::tc_should_trace(discovered_addr);
+		}
+	} 
+
+	// Treat next as normal oop;  next is a link in the reference queue.
+	PSScavenge::tc_should_trace(next_addr);
+
 	ref->InstanceKlass::tc_oop_trace_contents(pm, obj);
 }
-
-
-
 
 #endif
 

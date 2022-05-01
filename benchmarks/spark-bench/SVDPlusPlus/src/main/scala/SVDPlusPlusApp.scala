@@ -84,7 +84,6 @@ object SVDPlusPlusApp {
    {
      val graph = GraphLoader.edgeListFile(sc, input, true, minEdge, sl, sl)
        .partitionBy(PartitionStrategy.RandomVertexCut)
-       
      edges = graph.edges.map{ e => {
        var attr = 0.0
        
@@ -112,11 +111,9 @@ object SVDPlusPlusApp {
       }
       
       var (newgraph, u) = SVDPlusPlus.run(edges, conf)
-      
       // newgraph.persist(sl)
       
       var tri_size=newgraph.triplets.count() //collect().size 
-      
       var err = newgraph.vertices.collect().map{ case (vid, vd) =>
         if (vid % 2 == 1) vd._4 else 0.0
       }.reduce(_ + _) / tri_size

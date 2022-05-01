@@ -1249,12 +1249,78 @@ class StubGenerator: public StubCodeGenerator {
         {
           CardTableModRefBS* ct = (CardTableModRefBS*)bs;
           assert(sizeof(*ct->byte_map_base) == sizeof(jbyte), "adjust this code");
+#if DEBUG_INTR
+          assertf(sizeof(*ct->tc_byte_map_base) == sizeof(jbyte), "adjust this code");
+#endif
 
+#if TERA_INT
+		  if (EnableTeraCache) {
+			  Label L_loop;
+			  Label L_in_tera_cache;
+			  Label L_done;
+			  const Register end = count;
+
+			  __ leaq(end, Address(start, count, TIMES_OOP, 0));  // end == start+count*oop_size
+			  __ subptr(end, BytesPerHeapOop); // end - 1 to make inclusive
+
+			  AddressLiteral tc_start_addr((address)Universe::teraCache()->tc_get_addr_region(), relocInfo::none);
+			  __ lea(scratch, tc_start_addr);
+
+			  __ cmpptr(start, scratch);
+			  __ jcc(Assembler::greaterEqual, L_in_tera_cache);
+
+			  __ shrptr(start, CardTableModRefBS::card_shift);
+			  __ shrptr(end,   CardTableModRefBS::card_shift);
+			  __ subptr(end, start); // end --> cards count
+
+			  int64_t disp = (int64_t) ct->byte_map_base;
+			  __ mov64(scratch, disp);
+			  __ addptr(start, scratch);
+			  __ jmp(L_done);
+
+			  __ bind(L_in_tera_cache);
+
+			  __ shrptr(start, CardTableModRefBS::tc_card_shift);
+			  __ shrptr(end,   CardTableModRefBS::tc_card_shift);
+			  __ subptr(end, start); // end --> cards count
+
+			  int64_t tc_disp = (int64_t) ct->tc_byte_map_base;
+			  __ mov64(scratch, tc_disp);
+			  __ addptr(start, scratch);
+
+			  __ BIND(L_done);
+			  __ BIND(L_loop);
+			  __ movb(Address(start, count, Address::times_1), 0);
+			  __ decrement(count);
+			  __ jcc(Assembler::greaterEqual, L_loop);
+		  } 
+		  else {
+			  Label L_loop;
+			  const Register end = count;
+
+			  __ leaq(end, Address(start, count, TIMES_OOP, 0));  // end == start+count*oop_size
+			  __ subptr(end, BytesPerHeapOop); // end - 1 to make inclusive
+
+			  __ shrptr(start, CardTableModRefBS::card_shift);
+			  __ shrptr(end,   CardTableModRefBS::card_shift);
+			  __ subptr(end, start); // end --> cards count
+
+			  int64_t disp = (int64_t) ct->byte_map_base;
+			  __ mov64(scratch, disp);
+			  __ addptr(start, scratch);
+
+			  __ BIND(L_loop);
+			  __ movb(Address(start, count, Address::times_1), 0);
+			  __ decrement(count);
+			  __ jcc(Assembler::greaterEqual, L_loop);
+		  }
+#else
           Label L_loop;
           const Register end = count;
 
           __ leaq(end, Address(start, count, TIMES_OOP, 0));  // end == start+count*oop_size
           __ subptr(end, BytesPerHeapOop); // end - 1 to make inclusive
+		  
           __ shrptr(start, CardTableModRefBS::card_shift);
           __ shrptr(end,   CardTableModRefBS::card_shift);
           __ subptr(end, start); // end --> cards count
@@ -1262,10 +1328,12 @@ class StubGenerator: public StubCodeGenerator {
           int64_t disp = (int64_t) ct->byte_map_base;
           __ mov64(scratch, disp);
           __ addptr(start, scratch);
-        __ BIND(L_loop);
+
+		  __ BIND(L_loop);
           __ movb(Address(start, count, Address::times_1), 0);
           __ decrement(count);
           __ jcc(Assembler::greaterEqual, L_loop);
+#endif
         }
         break;
       default:

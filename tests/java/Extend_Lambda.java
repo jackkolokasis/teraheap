@@ -5,6 +5,8 @@ import java.util.LinkedList;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 
+import java.lang.reflect.Field;
+
 // Java program to demonstrate lambda expressions 
 // to implement a user defined functional interface. 
 
@@ -18,12 +20,24 @@ interface FuncInterface
 	// A non-abstract (or default) function 
 	default void normalFun() 
 	{ 
-	System.out.println("Hello"); 
+		System.out.println("Hello"); 
 	} 
 } 
 
 class Extend_Lambda
 { 
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
+
 	public static void mem_info(String str)
 	{
 		System.out.println("=========================================");
@@ -33,6 +47,15 @@ class Extend_Lambda
 			System.out.println(memoryPoolMXBean.getName());
 			System.out.println(memoryPoolMXBean.getUsage().getUsed());
 		}
+	}
+	
+	public static void calcHashCode(LinkedList<Integer> list, int num_elements) {
+		long sum = 0;
+
+		for (int i = 0; i < num_elements; i++)
+			sum += list.get(i).hashCode();
+
+		System.out.println("Hashcode Element = " + sum);
 	}
 
 	public static void gc()
@@ -49,78 +72,48 @@ class Extend_Lambda
 		// functional interface. This interface 
 		// by default implements abstractFun() 
 		FuncInterface fobj = (int x)->System.out.println(2*x); 
-		int num_elements = 50000;
+		LinkedList<Integer> linkedList = new LinkedList<Integer>(); 
+		int num_elements = 100000;
 		
-
-		mem_info("Memory Information");
+		//_UNSAFE.tcMarkObjectWithId(fobj, 0, 0);
+		
 		gc();
-		mem_info("Memory Information");
 	
 		fobj.abstractFun(5); 
 
-		LinkedList<Integer> linkedList = new @Cache LinkedList<Integer>(); 
+		_UNSAFE.tcMarkObjectWithId(linkedList, 1, 0);
 
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
 
 		for (int i = 0; i < num_elements; i++)
-		{
 			linkedList.add(new Integer(i));
-		}
 
 		fobj.abstractFun(1000); 
 		
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
 
 		fobj.abstractFun(2000); 
+		gc();
+		linkedList = null;
 
-		
 		LinkedList<Integer> linkedList2 = new LinkedList<Integer>(); 
-		for (int i = 0; i < num_elements; i++)
-		{
-			linkedList2.add(new Integer(i));
-		}
+		_UNSAFE.tcMarkObjectWithId(linkedList2, 2, 0);
 
-		String str = new @Cache String("Jack Kolokasis");
-		
+		for (int i = 0; i < num_elements; i++)
+			linkedList2.add(new Integer(i));
+
 		fobj.abstractFun(4000); 
 	
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
 		
-		int x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += linkedList.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
+		calcHashCode(linkedList2, num_elements);
 		
-		x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			System.out.println(linkedList2.get(i));
-		}
-
-		System.out.println("Hashcode Element = " + x);
 		fobj.abstractFun(4000); 
 		
-		mem_info("Memory Information");
 		gc();
-		mem_info("Memory Information");
 		
-		x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += linkedList2.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
-		System.out.println("String = " + str);
+		calcHashCode(linkedList2, num_elements);
 		
-		mem_info("Memory Information");
 		gc();
 		mem_info("Memory Information");
 	} 

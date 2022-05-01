@@ -10,14 +10,14 @@
 extern "C" {
 #endif
 
+#include "segments.h"
+
 #if defined (__ia64__) || defined (__x86_64__)
 #define INT_PTR unsigned long
 
 #else
 #define INT_PTR unsigned int
 #endif
-
-#define TC_ALIGN_ON 1
 
 	struct _mem_pool{
 		char *mmap_start;					//< Memory mapped allocation start addresss
@@ -26,10 +26,13 @@ extern "C" {
 		char* stop_address;					//< Last address of TeraCache
 
 		uint64_t size;						//< Current allocated bytes in TeraCache
-#if TC_ALIGN_ON
-		uint64_t region_free_space;
-#endif
 	};
+    
+    struct region_list{
+        char *start;
+        char *end;
+        struct region_list *next;
+    };
 
 	extern struct _mem_pool tc_mem_pool;	//< Allocator pool
 	extern int fd;							//< File descriptor for the opended file
@@ -44,11 +47,11 @@ extern "C" {
 	
 	// Return the start address of the memory allocation pool
 	size_t     mem_pool_size(void);
-	
+
 	// Allocate a new object with `size` and return the `start allocation
 	// address`.
-	char *     allocate(size_t size);
-	
+	char *     allocate(size_t size, uint64_t rdd_id, uint64_t partition_id);
+
 	// Return the last address of the memory allocation pool
 	char*      stop_addr_mem_pool(void);
 	
@@ -86,16 +89,6 @@ extern "C" {
 	// cur_alloc_ptrcur_alloc_ptrhe and they will be written to the device.
 	void		r_fsync(void);
 
-#if TC_ALIGN_ON
-	// Check if the current object with 'size' can fit in the available region
-	// Return 1 on succesfull, and 0 otherwise
-	int		   r_is_obj_fits_in_region(size_t size);
-
-	// Get the top address of the current region and set the current_ptr to the
-	// next region
-	char*	   r_region_top_addr(void);
-#endif
-	
 	// This function if for the FastMap hybrid version. Give advise to kernel to
 	// serve all the pagefault using regular pages.
 	void	   r_enable_regular_flts(void);

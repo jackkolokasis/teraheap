@@ -1,4 +1,5 @@
 # for preparation 
+
 #numV=14722560  # 32GB
 #numV=5452800	# 12GB
 #numV=2726400	#  6GB

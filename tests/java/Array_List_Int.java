@@ -10,10 +10,22 @@ import java.lang.management.MemoryPoolMXBean;
 import java.util.LinkedList;
 import java.util.ArrayList;
 
-public class Array_List_Int
-{ 
-	public static void mem_info(String str)
-	{
+import java.lang.reflect.Field;
+
+public class Array_List_Int { 
+	private static final sun.misc.Unsafe _UNSAFE;
+
+	static {
+		try {
+			Field unsafeField = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			_UNSAFE = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Exception e) {
+			throw new RuntimeException("SimplePartition: Failed to " + "get unsafe", e);
+		}
+	}
+
+	public static void mem_info(String str) {
 		System.out.println("=========================================");
 		System.out.println(str + "\n");
 		System.out.println("=========================================");
@@ -23,82 +35,57 @@ public class Array_List_Int
 		}
 	}
 
-	public static void gc()
-	{
+	public static void gc() {
 		System.out.println("=========================================");
 		System.out.println("Call GC");
 		System.gc();
 		System.out.println("=========================================");
 	}
 
+	public static void calcHashCode(ArrayList<Integer> arl, int num_elements) {
+		long sum = 0;
+
+		for (int i = 0; i < num_elements; i++)
+			sum += arl.get(i).hashCode();
+
+		System.out.println("Hashcode Element = " + sum);
+	}
+
 	public static void main (String[] args) 
 	{		 
-		// declares an Array of integers. 
-		// allocating memory for 5 integers. 
-		//
-		int num_elements = 60000;
+		int num_elements =10000000;
+		long sum = 0;
 
 		mem_info("Memory Before");
 
-		// Create the array list
-		ArrayList<Integer> arl = new @Cache ArrayList<Integer>();
+		ArrayList<Integer> arl = new ArrayList<Integer>();
+		_UNSAFE.tcMarkObjectWithId(arl, 0, 0);
 
-		// Add data to the list
 		for (int i = 0; i < num_elements; i++)
-		{
-			Integer num = new @Cache Integer(10000);
-			arl.add(num);
-		}
+			arl.add(new Integer(i));
 
 		gc();
+		calcHashCode(arl, num_elements);
+
+        gc();
+		calcHashCode(arl, num_elements);
 
 		gc();
+		calcHashCode(arl, num_elements);
 
-		long x = 0;
-		// Traverse all the data of the list
+		arl = null;
+		gc();
+
+		ArrayList<Integer> arl2 = new ArrayList<Integer>();
+		_UNSAFE.tcMarkObjectWithId(arl2, 1, 0);
+
 		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
-
-
+			arl2.add(new Integer(i));
+		
 		gc();
 
-
-		gc();
-
-		x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
-
-
-		gc();
-
-		x = 0;
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-		System.out.println("Hashcode Element = " + x);
-
-		gc();
-
-		x = 0;
-		System.gc();
-		for (int i = 0; i < num_elements; i++)
-		{
-			x += arl.get(i).hashCode();
-		}
-
-		System.out.println("Hashcode Element = " + x);
-
-		gc();
+		calcHashCode(arl2, num_elements);
 
 		mem_info("Memory After");
 	} 
-} 
-
+}

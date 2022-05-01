@@ -89,12 +89,13 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   GCCause::Cause gc_cause = heap->gc_cause();
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
+  bool full_gc_done = false;
 
   // Scavenge youngest generation before each full GC used with
   // UseParallelGC.
   // ScavengeBeforeFullGC by default is true
   if (ScavengeBeforeFullGC) {
-    PSScavenge::invoke_no_policy();
+	  PSScavenge::invoke_no_policy();
   }
 
   const bool clear_all_soft_refs =
@@ -102,7 +103,12 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 
   uint count = maximum_heap_compaction ? 1 : MarkSweepAlwaysCompactCount;
   UIntFlagSetting flag_setting(MarkSweepAlwaysCompactCount, count);
-  PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+  full_gc_done = PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+
+#if TERA_CARDS
+  // If the major GC fails then we need to clear the backward stacks
+  Universe::teraCache()->tc_clear_stacks();
+#endif
 }
 
 // This method contains no policy. You should probably
@@ -205,12 +211,22 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
 	// Initialize TeraCache statistics counters to 0
 #if !DISABLE_TERACACHE
-	if (EnableTeraCache && TeraCacheStatistics)
-		Universe::teraCache()->tc_init_counters();
+	if (EnableTeraCache) {
+		// We scavenge only the dirty objects in TeraCache and prepare the backward
+		// stacks. 
+		if (!Universe::teraCache()->tc_empty())
+			PSScavenge::tc_scavenge();
 
-	if (EnableTeraCache)
+		if (TeraCacheStatistics)
+			Universe::teraCache()->tc_init_counters();
+	
 		// Give advise to kernel to prefetch pages for TeraCache random
 		Universe::teraCache()->tc_enable_rand();
+#if REGIONS
+		// Reset the used field of all regions
+		Universe::teraCache()->reset_used_field();
+#endif
+	}
 #endif
 
     // Recursive mark all the live objects
@@ -229,7 +245,24 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
     // Move all active objects to a new position
     mark_sweep_phase4();
-  
+
+#if REGIONS
+	if (EnableTeraCache) {
+#if STATISTICS
+		// Print Region Groups
+		Universe::teraCache()->print_region_groups();
+#endif
+
+#if DEBUG_PLACEMENT
+		Universe::teraCache()->tc_print_objects_per_region();
+#endif
+#if GC_ANALYSIS
+        Universe::teraCache()->tc_mark_live_objects_per_region();
+#endif
+        // Free all the regions that are unused after marking
+        Universe::teraCache()->free_unused_regions();
+	}
+#endif   
     restore_marks();
 
     deallocate_stacks();
@@ -573,12 +606,6 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // General strong roots.
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
-    
-#if !DISABLE_TERACACHE
-	// Traverse TeraCache
-	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
-		Universe::teraCache()->scavenge();
-#endif
 
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
@@ -610,6 +637,13 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
+
+#if !DISABLE_TERACACHE
+	// Traverse TeraCache
+	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
+		Universe::teraCache()->scavenge();
+#endif
+
   }
 
   // Next, mark all objects that can be recursively traced from the marked object.
@@ -697,6 +731,9 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 		tclog_or_tty->print_cr("[STATISTICS] | PHASE1 = %llu\n",
 				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
 				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+#if STATISTICS
+        Universe::teraCache()->print_active_regions();
+#endif
 	}
 #endif
 
@@ -846,6 +883,15 @@ void PSMarkSweep::mark_sweep_phase4() {
 
 #if !DISABLE_TERACACHE
 	if (EnableTeraCache) {
+#if ASYNC
+#if PR_BUFFER
+		Universe::teraCache()->tc_free_all_buffers();
+#endif
+		while(!Universe::teraCache()->tc_areq_completed());
+#elif FMAP
+		Universe::teraCache()->tc_fsync();
+#endif
+
 		if (TeraCacheStatistics) {
 			gettimeofday(&end_time, NULL);
 

@@ -55,22 +55,15 @@ inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
       o = o->forwardee();
 
       // Card mark
-      if (PSScavenge::is_obj_in_young(o)) {
-		  assertf(Universe::teraCache()->tc_check(o) == false, "Error Object in TC");
-
-#if TERA_CARDS
-		if (Universe::teraCache()->tc_is_in((void *)p)) {
-			Universe::teraCache()->tc_push_object((void *)p, o);
-		}
-#endif 
-        PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
+	  if (PSScavenge::is_obj_in_young(o)) {
+		  assertf(!Universe::teraCache()->tc_check(o), "Error Object in TC");
+		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o, false);
       }
 
 #if TERA_CARDS
 	  if (Universe::teraCache()->tc_is_in((void *)p) && !PSScavenge::is_obj_in_young(o)) {
-		  assertf(Universe::teraCache()->tc_check(o) == false, "Error Object in TC");
-		  Universe::teraCache()->tc_push_object((void *)p, o);
-		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
+		  assertf(!Universe::teraCache()->tc_check(o), "Error Object in TC");
+		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o, true);
 	  }
 #endif
 
@@ -110,7 +103,6 @@ inline void PSPromotionManager::claim_or_forward_depth(T* p) {
 #if TERA_CARDS
 template <class T>
 inline void PSPromotionManager::tc_claim_or_forward_depth(T* p) {
-  assertf(PSScavenge::tc_should_scavenge(p, true), "revisiting object?");
   assertf(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
   assertf(Universe::teraCache()->tc_is_in((void *)p), "pointer outside of TeraCache");
 

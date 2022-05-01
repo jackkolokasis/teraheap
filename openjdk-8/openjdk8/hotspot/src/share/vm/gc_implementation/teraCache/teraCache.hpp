@@ -1,12 +1,13 @@
 #ifndef SHARE_VM_GC_IMPLEMENTATION_TERACACHE_TERACACHE_HPP
 #define SHARE_VM_GC_IMPLEMENTATION_TERACACHE_TERACACHE_HPP
-#include <vector>
-#include <map>
 #include "gc_implementation/parallelScavenge/objectStartArray.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
 #include "oops/oop.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include <regions.h>
+#include <thpool.h>
+#include <map>
+#include <tr1/tuple>
 
 class TeraCache {
 	private:
@@ -22,30 +23,13 @@ class TeraCache {
 		// Stack to keep back pointers (Objects that are pointed out of
 		// TeraCache objects) to mark them as alive durin mark_and_push phase of
 		// the Full GC.
-		static Stack<oop, mtGC>   _tc_stack;
+		static Stack<oop *, mtGC> _tc_stack;
 
 		// Stack to keep the element addresses of objects that are located in
 		// TeraCache and point to objects in the heap. We adjust these pointers
 		// during adjust phase of the Full GC.
 		static Stack<oop *, mtGC> _tc_adjust_stack;
 
-#if PR_BUFFER
-		// We use promotion buffer to reduce the number of system calls for
-		// small sized objects.
-		struct pr_buffer {
-			char buffer[PR_BUFFER_SIZE];	  // Allocation buffer
-
-			char* start_obj_addr_in_tc;		  // Address in TeraCache for the
-											  // first object in the buffer
-
-			char* buf_alloc_ptr;			  // Allocation pointer for the buffer
-
-			size_t size;					  // Current size of the buffer
-		};
-
-		struct pr_buffer _pr_buffer; 
-#endif
-		
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
 		 *---------------------------------------------*/
@@ -63,18 +47,43 @@ class TeraCache {
 		static uint64_t heap_ct_trav_time[16];	   //< Time to traverse heap card tables
 
 		static uint64_t back_ptrs_per_mgc;		   //< Total number of back ptrs per MGC
-		static uint64_t intra_ptrs_per_mgc;		   //< Total number of intra ptrs between objects in TC per MGC
 
 		static uint64_t obj_distr_size[3];         //< Object size distribution between B, KB, MB
 
-#if NEW_FEAT
-		static std::vector<HeapWord *> _mk_dirty;  //< These objects should
-												   // make dirty their cards
-#endif
 		static long int cur_obj_group_id;	       //<We save the current object
    												   // group id for tera-marked
 												   // object to promote this id
 												   // to their reference objects
+		static long int cur_obj_part_id;	       //<We save the current object
+   												   // partition id for tera-marked
+												   // object to promote this id
+												   // to their reference objects
+
+		HeapWord* obj_h1_addr;				       // We need to check this
+												   // object that will be moved
+												   // to H2 if it has back ptrs
+												   // to H1
+
+		HeapWord* obj_h2_addr;				       // We need to check this
+												   // object that will be moved
+												   // to H2 if it has back ptrs
+												   // to H1
+#if BACK_REF_STAT
+		// This histogram keeps internally statistics for the backward
+		// references (H2 to H1)
+		std::map<oop *, std::tr1::tuple<int, int, int> > histogram;
+		oop *back_ref_obj;
+#endif
+
+#if FWD_REF_STAT
+		// This histogram keeps internally statistics for the forward references
+		// (H1 to H2) per object
+		std::map<oop, int> fwd_ref_histo;
+#endif
+		
+#if PREFETCHING
+		threadpool thpool[8];
+#endif
 
 	public:
 		// Constructor
@@ -178,33 +187,56 @@ class TeraCache {
 		void tc_fsync();
 
 #if PR_BUFFER
-		// Add an object 'q' with size 'size' to the promotion buffer. 'New_adr'
-		// is used to know where the first object in the promotion buffer will
-		// move to TeraCache. We use promotion buffer to reduce the number of
-		// system calls for small sized objects.
-		void tc_prbuf_insert(char* q, char* new_adr, size_t size);
+		// Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
+		// used to know where the object will move to H2. We use promotion buffer to
+		// reduce the number of system calls for small sized objects.
+		void tc_buffer_insert(char* obj, char* new_adr, size_t size);
 		
-		// At the end of the major GC clear the promotion buffer.
-		void tc_flush_buffer();
+		// At the end of the major GC flush and free all the promotion buffers.
+		void tc_free_all_buffers();
 #endif
 
-		// Count the number of references between objects that are located in
-		// TC.
-		// This function works only when ParallelGCThreads = 1
-		void incr_intra_ptrs_per_mgc(void);
+        // Check if the object that the card is trying to reference is
+        // valid. 
+        bool check_if_valid_object(HeapWord *obj);
+        
+        // Get the ending address of the last object of the region obj
+        // belongs to.
+        HeapWord* get_last_object_end(HeapWord *obj);
+        
+        // Checks if the address of obj is the beginning of a region
+        bool is_start_of_region(HeapWord *obj);
 
-#if NEW_FEAT
-		// New feature
-		void tc_mk_dirty(oop obj);
-		
-		// New feature
-		bool tc_should_mk_dirty(HeapWord* obj);
-#endif
+        // Resets the used field of all regions
+        void reset_used_field(void);
 
-#if ALIGN
-		bool tc_obj_fit_in_region(size_t size);
+        // Marks the region containing obj as used
+        void mark_used_region(HeapWord *obj);
 
-#endif
+        // Prints all active regions
+        void print_active_regions(void);
+        
+        // Groups the region of obj with the previously enabled region
+        void group_region_enabled(HeapWord* obj, void *obj_field);
+
+        // Frees all unused regions
+        void free_unused_regions(void);
+    
+        // Prints all the region groups
+        void print_region_groups(void);
+
+        // Enables groupping with region of obj
+        void enable_groups(HeapWord* old_addr, HeapWord* new_addr);
+
+        // Disables region groupping
+        void disable_groups(void);
+        
+        void print_object_name(HeapWord *obj,const char *name);
+
+        // Groups the region of obj1 with the region of obj2
+        void group_regions(HeapWord *obj1, HeapWord *obj2);
+  
+        HeapWord *get_first_object_in_region(HeapWord *addr);
 
 		// We save the current object group 'id' for tera-marked object to
 		// promote this 'id' to its reference objects
@@ -213,10 +245,66 @@ class TeraCache {
 		// Get the saved current object group id 
 		long int get_cur_obj_group_id(void);
 		
-		// 
-		// // Validate if all the dirty cards that we found are dirty now are
-		// // clean. If one of the dirty card is still dirty then fail
-		// bool validate_dirty_card(unsigned int tid);
+		// We save the current object partition 'id' for tera-marked object to
+		// promote this 'id' to its reference objects
+		void set_cur_obj_part_id(long int id);
+		
+		// Get the saved current object partition id 
+		long int get_cur_obj_part_id(void);
+
+		// Iterate over all objects in each region and print their states
+		// This function is for debugging purposes to understand and fix the
+		// locality in regions
+		void tc_print_objects_per_region(void);
+
+        void mark_live(HeapWord *p);
+
+        void tc_mark_live_objects_per_region();
+		
+        void tc_count_marked_objects();
+
+        void tc_reset_marked_objects();
+
+		// Check if backward adjust stack is empty
+		bool tc_is_empty_back_stack();
+
+#if PREFETCHING
+		void tc_prefetch_data(HeapWord *obj, long rdd_id, long part_id);
+		
+		void tc_wait();
+#endif
+
+		// Get the group Id of the objects that belongs to this region. We
+		// locate the objects of the same group to the same region. We use the
+		// field 'p' of the object to identify in which region the object
+		// belongs to.
+		uint64_t tc_get_region_groupId(void* p);
+		
+		// Get the partition Id of the objects that belongs to this region. We
+		// locate the objects of the same group to the same region. We use the
+		// field 'p' of the object to identify in which region the object
+		// belongs to.
+		uint64_t tc_get_region_partId(void* p);
+
+#if BACK_REF_STAT
+		// Add a new entry to the histogram for back reference that start from
+		// 'obj' and results in H1 (new or old generation).
+		void tc_add_back_ref_stat(bool is_old, bool is_tera_cache);
+
+		void tc_enable_back_ref_traversal(oop* obj);
+		
+		// Print the histogram
+		void tc_print_back_ref_stat();
+#endif
+
+#if FWD_REF_STAT
+		// Add a new entry to the histogram for forward reference that start from
+		// H1 and results in 'obj' in H2 
+		void tc_add_fwd_ref_stat(oop obj);
+		
+		// Print the histogram
+		void tc_print_fwd_ref_stat();
+#endif
 };
 
 #endif

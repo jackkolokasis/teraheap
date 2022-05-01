@@ -159,19 +159,19 @@ CardTableModRefBS::CardTableModRefBS(MemRegion whole_heap, int max_covered_regio
   tc_byte_map_base = _tc_byte_map - (uintptr_t(tc_low_bound) >> tc_card_shift);
 
 #if DEBUG_TERACACHE
-  printf("======================================================\n");
-  printf("TC\n");
-  printf("CT_Base = %p \n", tc_heap_rs.base());
-  printf("CT_End = %p \n", tc_heap_rs.end());
-  printf("CT_ByteMapBase = %p \n", tc_byte_map_base);
-  printf("======================================================\n");
-  printf("\n");
-  printf("======================================================\n");
-  printf("Heap\n");
-  printf("CT_Base = %p \n", heap_rs.base());
-  printf("CT_End = %p \n", heap_rs.end());
-  printf("CT_ByteMapBase = %p \n", byte_map_base);
-  printf("======================================================\n");
+  fprintf(stderr, "======================================================\n");
+  fprintf(stderr, "TC\n");
+  fprintf(stderr, "CT_Base = %p \n", tc_heap_rs.base());
+  fprintf(stderr, "CT_End = %p \n", tc_heap_rs.end());
+  fprintf(stderr, "CT_ByteMapBase = %p \n", tc_byte_map_base);
+  fprintf(stderr, "======================================================\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "======================================================\n");
+  fprintf(stderr, "Heap\n");
+  fprintf(stderr, "CT_Base = %p \n", heap_rs.base());
+  fprintf(stderr, "CT_End = %p \n", heap_rs.end());
+  fprintf(stderr, "CT_ByteMapBase = %p \n", byte_map_base);
+  fprintf(stderr, "======================================================\n");
 #endif
 
   assertf(byte_for(tc_low_bound) == &_tc_byte_map[0], "Checking start of map");
@@ -738,32 +738,10 @@ void CardTableModRefBS::tc_invalidate(HeapWord *start, HeapWord* end) {
   //dirty_MemRegion(_tc_whole_heap);
   dirty_MemRegion(MemRegion(start, end));
 }
-#endif
 
-#if NEW_FEAT
-void CardTableModRefBS::tc_write_ref_field(HeapWord *obj) {
+void CardTableModRefBS::tc_write_ref_field(void *obj) {
   jbyte* card  = byte_for(obj);
   *card = dirty_card;
-}
-
-bool CardTableModRefBS::tc_num_dirty_cards(HeapWord *start, HeapWord* end,
-									       bool before) {
-  assert((HeapWord*)align_size_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
-  assert((HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
-  jbyte* cur  = byte_for(start);
-  jbyte* last = byte_after(end);
-  unsigned long int counter = 0;
-  while (cur < last) {
-	  if (*cur++ != clean_card)
-		  counter++;
-  }
-
-  if (before)
-	  std::cout << "NUM_DIRTY_CARDS | BEFORE | " << counter << std::endl;
-  else
-	  std::cout << "NUM_DIRTY_CARDS | AFTER | " << counter << std::endl;
-
-  return true;
 }
 
 void CardTableModRefBS::tc_clean_cards(HeapWord *start, HeapWord* end) {
@@ -773,6 +751,49 @@ void CardTableModRefBS::tc_clean_cards(HeapWord *start, HeapWord* end) {
   jbyte* last = byte_for(end);
 
   memset(cur, clean_card, (last-cur)-1);
+}
+
+bool CardTableModRefBS::tc_num_dirty_cards(HeapWord *start, HeapWord* end,
+		bool before) {
+	assert((HeapWord*)align_size_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
+	assert((HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
+	jbyte* cur  = byte_for(start);
+	jbyte* last = byte_after(end);
+
+	int num_dirty_card = 0;
+	int num_clean_card = 0;
+	int num_youngen_card = 0;
+	int num_oldgen_card = 0;
+
+	while (cur < last) { 
+		if (*cur == dirty_card)
+			num_dirty_card++;
+		else if (*cur == (CardTableModRefBS::CT_MR_BS_last_reserved + 1))
+			num_youngen_card++;
+		else if (*cur == (CardTableModRefBS::CT_MR_BS_last_reserved + 2))
+			num_oldgen_card++;
+		else {
+			num_clean_card++;
+		}
+		cur++;
+	}
+
+	if (before)
+		fprintf(stderr, "BEFORE\n");
+	else 
+		fprintf(stderr, "AFTER\n");
+
+
+	fprintf(stderr, "\t\t DIRTY_CARDS  = %d\n", num_dirty_card);
+	fprintf(stderr, "\t\t YOUNGEN_CARD = %d\n", num_youngen_card);
+	fprintf(stderr, "\t\t OLDGEN_CARD  = %d\n", num_oldgen_card);
+	fprintf(stderr, "\t\t CLEAN_CARD   = %d\n", num_clean_card);
+	
+    // After minor gc the number of dirty cards should be zero
+	if (!before && num_dirty_card != 0)
+		return false;
+
+	return true;
 }
 
 #endif

@@ -594,7 +594,18 @@ int ObjArrayKlass::oop_adjust_pointers(oop obj) {
   // Get size before changing pointers.
   // Don't call size() or oop_size() since that is a virtual call.
   int size = a->object_size();
+
+#if REGIONS
+	if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer())))
+		Universe::teraCache()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+
   ObjArrayKlass_OOP_ITERATE(a, p, MarkSweep::adjust_pointer(p))
+
+#if REGIONS
+  if (EnableTeraCache && obj->is_tera_cache())
+	  Universe::teraCache()->disable_groups();                   
+#endif
   return size;
 }
   

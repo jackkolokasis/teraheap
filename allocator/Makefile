@@ -12,47 +12,41 @@ include ./Makefile_common.mk
 include ./makefile.colors
 
 #rules
-.PHONY: all lib test1 test2 test3 test4 test5 test6 clean distclean test
+.PHONY: all lib tc_allocate tc_group tc_free tc_sync tc_async clean distclean test depedencies
 
-all: test1 test2 test3 test4 test5 test6
+all: tc_allocate tc_group tc_free tc_sync tc_async
 
 lib: $(REGIONSLIBRARY)
 
-test1: $(TEST1EXE)
+tc_allocate: $(TC_ALLOCATE_EXE)
 
-test2: $(TEST2EXE)
+tc_group: $(TC_GROUP_EXE)
 
-test3: $(TEST3EXE)
+tc_free: $(TC_FREE_EXE)
 
-test4: $(TEST4EXE)
+tc_sync: $(TC_SYNC_EXE)
 
-test5: $(TEST5EXE)
+tc_async: $(TC_ASYNC_EXE)
 
-test6: $(TEST6EXE)
-
-$(TEST1EXE): $(TEST1OBJ) $(REGIONSLIBRARY)
+$(TC_ALLOCATE_EXE): $(TC_ALLOCATE_OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
 	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
-$(TEST2EXE): $(TEST2OBJ) $(REGIONSLIBRARY)
+$(TC_GROUP_EXE): $(TC_GROUP_OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
-$(TEST3EXE): $(TEST3OBJ) $(REGIONSLIBRARY)
+$(TC_FREE_EXE): $(TC_FREE_OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
-$(TEST4EXE): $(TEST4OBJ) $(REGIONSLIBRARY)
+$(TC_SYNC_EXE): $(TC_SYNC_OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
-$(TEST5EXE): $(TEST5OBJ) $(REGIONSLIBRARY)
+$(TC_ASYNC_EXE): $(TC_ASYNC_OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
-
-$(TEST6EXE): $(TEST6OBJ) $(REGIONSLIBRARY)
-	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
-	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
 $(REGIONSLIBRARY): $(LIBREGIONSOBJS)
 	@echo -e '[$(BBLUE)MKDIR$(RESET)]' $(LIBDIR)
@@ -65,9 +59,6 @@ $(REGIONSLIBRARY): $(LIBREGIONSOBJS)
 	@$(CC) $(CFLAGS) -fPIC $< $(OFLAG) $@
 
 %.o: $(LIBHEADERS)
-
-test:
-	./test3.bin
 
 install:
 	@echo -e '[$(BGREEN)INSTALL$(RESET)]' $(REGIONSLIBRARY)
@@ -90,13 +81,22 @@ uninstall:
 	@rm $(INSTALL_PREFIX)/include/regions.h
 
 clean:
-	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ) $(TEST5OBJ) $(TEST6OBJ)
-	@$(RM) $(LIBREGIONSOBJS) $(TEST1OBJ) $(TEST2OBJ) $(TEST3OBJ) $(TEST4OBJ) $(TEST5OBJ) $(TEST6OBJ)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TC_ALLOCATE_OBJ) $(TC_SYNC_OBJ) $(TC_ASYNC_OBJ) $(TC_GROUP_OBJ) $(TC_FREE_OBJ)
+	@$(RM) $(LIBREGIONSOBJS) $(TC_ALLOCATE_OBJ) $(TC_SYNC_OBJ) $(TC_ASYNC_OBJ) $(TC_GROUP_OBJ) $(TC_FREE_OBJ)
 
 distclean: clean
-	@echo -e '[$(BRED)RM$(RESET)]' $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE) $(TEST5EXE) $(TEST6EXE)
-	@$(RM) $(TEST1EXE) $(TEST2EXE) $(TEST3EXE) $(TEST4EXE) $(TEST5EXE) $(TEST6EXE)
+	@echo -e '[$(BRED)RM$(RESET)]' $(TC_ALLOCATE_EXE) $(TC_SYNC_EXE) $(TC_ASYNC_EXE) $(TC_GROUP_EXE) $(TC_FREE_EXE)
+	@$(RM) $(TC_ALLOCATE_EXE) $(TC_SYNC_EXE) $(TC_ASYNC_EXE) $(TC_GROUP_EXE) $(TC_FREE_EXE)
 	@echo -e '[$(BRED)RM$(RESET)]' $(REGIONSLIBRARY)
 	@$(RM) $(REGIONSLIBRARY)
 	@echo -e '[$(BRED)RM$(RESET)]' $(LIBDIR)
 	@$(RM) $(LIBDIR)
+
+test:
+	@for t in $$(ls *.bin); do \
+		./$$t 2> out; \
+	done 
+	@rm out
+
+dependencies:
+	@test ! -d "C-Thread-Pool" && git clone git@github.com:Pithikos/C-Thread-Pool.git

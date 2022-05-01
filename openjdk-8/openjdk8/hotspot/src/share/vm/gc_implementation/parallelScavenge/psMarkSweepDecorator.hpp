@@ -99,6 +99,8 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
   // Debugging
   void verify_compacted_objects();
 #endif
+
+  void moveObjToH2(HeapWord *q, HeapWord *compaction_top, size_t size);
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSMARKSWEEPDECORATOR_HPP

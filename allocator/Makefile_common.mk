@@ -21,21 +21,21 @@ LIBDIR = $(PREFIX)/lib
 INCLUDEDIR = $(PREFIX)/include
 
 ## Depended files
-LIBHEADERS =  $(INCLUDEDIR)/regions.h $(INCLUDEDIR)/asyncIO.h
-LIBREGIONSOBJS = $(SRCDIR)/regions.o $(SRCDIR)/asyncIO.o
+LIBHEADERS =  $(INCLUDEDIR)/regions.h $(INCLUDEDIR)/asyncIO.h $(INCLUDEDIR)/segments.h
+LIBREGIONSOBJS = $(SRCDIR)/regions.o $(SRCDIR)/asyncIO.o $(SRCDIR)/segments.o
 REGIONSLIBRARY = $(LIBDIR)/libregions.so
-TEST1OBJ = $(TESTDIR)/test1.o
-TEST2OBJ = $(TESTDIR)/test2.o
-TEST3OBJ = $(TESTDIR)/test3.o
-TEST4OBJ = $(TESTDIR)/test4.o
-TEST5OBJ = $(TESTDIR)/test5.o
-TEST6OBJ = $(TESTDIR)/test6.o
-TEST1EXE = test1.bin
-TEST2EXE = test2.bin
-TEST3EXE = test3.bin
-TEST4EXE = test4.bin
-TEST5EXE = test5.bin
-TEST6EXE = test6.bin
+
+TC_ALLOCATE_OBJ = $(TESTDIR)/tc_allocate.o
+TC_GROUP_OBJ = $(TESTDIR)/tc_group.o
+TC_FREE_OBJ = $(TESTDIR)/tc_free.o
+TC_SYNC_OBJ = $(TESTDIR)/tc_sync_write.o
+TC_ASYNC_OBJ = $(TESTDIR)/tc_async_write.o
+
+TC_ALLOCATE_EXE = tc_allocate.bin
+TC_GROUP_EXE = tc_group.bin
+TC_FREE_EXE = tc_free.bin
+TC_SYNC_EXE = tc_sync_write.bin
+TC_ASYNC_EXE = tc_async_write.bin
 
 CC = gcc
 
@@ -43,7 +43,7 @@ CC = gcc
 BINFLAG = -c
 DEBUGFLAG = -ggdb3
 OFLAG = -o
-WALLFLAG = -Wall -Werror
+WALLFLAG = -Wall -Werror -pedantic
 OPTIMZEFLAG = -O3
 AIOFLAG = -lrt
 

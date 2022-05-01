@@ -15,11 +15,12 @@ DU ${INPUT_HDFS} SIZE
 
 JAR="${DIR}/target/ShortestPathsApp-1.0.jar"
 CLASS="src.main.scala.ShortestPathsApp"
-OPTION="${INOUT_SCHEME}${INPUT_HDFS} ${INOUT_SCHEME}${OUTPUT_HDFS} ${NUM_OF_PARTITIONS} ${numV} ${STORAGE_LEVEL}"
+#OPTION="${INOUT_SCHEME}${INPUT_HDFS} ${INOUT_SCHEME}${OUTPUT_HDFS} ${NUM_OF_PARTITIONS} ${numV} ${STORAGE_LEVEL}"
+OPTION="/mnt/pmem_fsdax1/SparkBench/ShortestPaths/Input/web-cc12-PayLevelDomain.edges ${INOUT_SCHEME}${OUTPUT_HDFS} ${NUM_OF_PARTITIONS} ${numV} ${STORAGE_LEVEL}"
+
 echo "INOUT_SHEMES ${INOUT_SHEMES}"
 
 echo "opt ${OPTION}"
-
 
 setup
 for((i=0;i<${NUM_TRIALS};i++)); do
