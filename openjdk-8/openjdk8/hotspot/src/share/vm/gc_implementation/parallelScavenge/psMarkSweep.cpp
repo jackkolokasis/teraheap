@@ -607,12 +607,6 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   {
     ParallelScavengeHeap::ParStrongRootsScope psrs;
 
-#if !DISABLE_TERACACHE
-	// Traverse TeraCache
-	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
-		Universe::teraCache()->scavenge();
-#endif
-
     // Mainly some kind of mirrors
     Universe::oops_do(mark_and_push_closure());
 
@@ -643,6 +637,12 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
+
+#if !DISABLE_TERACACHE
+	// Traverse TeraCache
+	if (EnableTeraCache && !Universe::teraCache()->tc_empty())
+		Universe::teraCache()->scavenge();
+#endif
 
   }
 
@@ -883,6 +883,15 @@ void PSMarkSweep::mark_sweep_phase4() {
 
 #if !DISABLE_TERACACHE
 	if (EnableTeraCache) {
+#if ASYNC
+#if PR_BUFFER
+		Universe::teraCache()->tc_free_all_buffers();
+#endif
+		while(!Universe::teraCache()->tc_areq_completed());
+#elif FMAP
+		Universe::teraCache()->tc_fsync();
+#endif
+
 		if (TeraCacheStatistics) {
 			gettimeofday(&end_time, NULL);
 

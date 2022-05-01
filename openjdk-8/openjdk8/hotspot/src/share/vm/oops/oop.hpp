@@ -124,20 +124,6 @@ class oopDesc {
   markOop* mark_addr() const    { return (markOop*) &_mark; }
 
 #if TERA_FLAG
-  // Mark this object that is pointed be TeraCache and is in old generation.
-  // This object should be moved to TeraCache in next full GC.
-  void set_tc_to_old(uint64_t rdd_id, uint64_t part_id)  { 
-	  _tera_flag = (part_id << 48);
-	  _tera_flag |= (rdd_id << 32);
-	  _tera_flag |= TERA_TO_OLD;
-  }
-  
-  // Check if this objects is pointed by an object from TeraCache and is in old
-  // generation. If yes return 'true', 'false' othersise.
-  bool is_tc_to_old()  { 
-	  return (_tera_flag & 0xffffffff) == TERA_TO_OLD;
-  }
-
   // Mark an object with 'id' to be moved in TeraCache.
   // TeraCache allocator uses the 'id' to locate objects with the same 'id' by
   // to the same region.

@@ -80,13 +80,11 @@
 #define SYNC				     0  //< Enable explicit I/O path for the writes
 									// in TeraCache during major GC
 
-#define ASYNC				     0  //< Asynchronous I/O path for the writes in
+#define ASYNC				     1  //< Asynchronous I/O path for the writes in
 									// TeraCache
 
-#define PR_BUFFER			     0  //< Enable promotion buffer for async I/O to
+#define PR_BUFFER			     1  //< Enable promotion buffer for async I/O to
 									// reduce the number of system calls 
-
-#define PR_BUFFER_SIZE (2 * 1024 * 1024) //< Size of the promotion buffer in TeraCache
 
 #define FMAP				     0  //< When we use fastmap we need to ensure
 									// that all the writes in buffered cached
@@ -94,15 +92,14 @@
 									// memory of fast map is different from
 									// buffer cache. 
 
-#define FMAP_ASYNC				 0  //< When we use fastmap we need to ensure
-									// that all the writes in buffered cached
-									// will be flushed to the device because the
-									// memory of fast map is different from
-									// buffer cache. 
-									
 #define FMAP_HYBRID				 0  //< When we use fastmap hybrid version we
 									// employ huge pages for mutator threads and
 									// regular pages for GC 
+
+#define MADVISE_ON				 1  //< During minor gc we advise kernel for
+									// random accesses. During mutator thread
+									// execution we advise kernel for sequential
+									// accesses
 
 #define TERA_CARD_SIZE			 13 // This is the size of each card in
 									// TeraCache card table. The size is in bit
@@ -114,44 +111,26 @@
 /**********************************
  * Policies for TeraCache
  **********************************/
-#define TC_POLICY				1	//< Enable TeraCahce Policies (Always ON)
+#define TC_POLICY				 1	//< Enable TeraCahce Policies (Always ON)
 
-#define P_BALANCE				0	//< Balance Policy. Move the first neighbors
-									//  of cached data
-
-#define P_AGGRESSIVE            0	//< Aggressive Policy. Move all the closure
-
-#define P_DISTINCT				1   //< Move objects to TeraCache based on their
-									//  size. We use -XX:TeraCacheThreshold to
-									//  define the size lmit 
-
-#define P_SIMPLE                0	//< Move Objects to TeraCache based on their
-									//  teraflag value. This policy should be
-									//  used in combination with P_Balance or
-									//  P_Aggressive
-
-#define P_SIZE                  0	//< Move Objects to TeraCache based on their
-									//  size. This policy should be used in
-									//  combination with P_Balance or
-									//  P_Aggressive
-
-
-#define P_SD					1	//< Move Objects to TeraCache based on
+#define P_SD					 1	//< Move Objects to TeraCache based on
 									//  serialization policy.  This policy
 									//  should be used in combination with
 									//  P_DISTINCT 
 
-#define P_SD_BITMAP				1	//< Bitmap to optimize the search in tree
+#define P_SD_BITMAP				 1	//< Bitmap to optimize the search in tree
 									//  
 
-#define P_SD_BACK_REF_CLOSURE	1	//< Find the transitive closure of backward
+#define P_SD_BACK_REF_CLOSURE	 1	//< Find the transitive closure of backward
 									// edges
 
-#define P_NO_TRANSFER           0	//< This policy is ONLY for debugging.
+#define P_NO_TRANSFER            0	//< This policy is ONLY for debugging.
 									//  Calculate the closure but do not move
 									//  anything to TeraCache. This policy
 									//  should be used in combination with
 									//  P_POLICY and P_DISTINCT
+									//
+#define SPARK_POLICY			 0	// Policy that we use for Spark
 
 #define P_SD_EXCLUDE_CLOSURE	 1	//< Exclude objects from the closure
 

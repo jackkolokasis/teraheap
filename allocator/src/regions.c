@@ -32,7 +32,6 @@ void* align_ptr_up(void* ptr, size_t alignment) {
 // Initialize allocator
 void init(uint64_t align) {
     fd = -1;
-	assertf(false, "HERE");
 
 #if ANONYMOUS
 	// Anonymous mmap

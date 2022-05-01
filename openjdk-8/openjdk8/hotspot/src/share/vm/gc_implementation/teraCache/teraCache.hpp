@@ -30,23 +30,6 @@ class TeraCache {
 		// during adjust phase of the Full GC.
 		static Stack<oop *, mtGC> _tc_adjust_stack;
 
-#if PR_BUFFER
-		// We use promotion buffer to reduce the number of system calls for
-		// small sized objects.
-		struct pr_buffer {
-			char buffer[PR_BUFFER_SIZE];	  // Allocation buffer
-
-			char* start_obj_addr_in_tc;		  // Address in TeraCache for the
-											  // first object in the buffer
-
-			char* buf_alloc_ptr;			  // Allocation pointer for the buffer
-
-			size_t size;					  // Current size of the buffer
-		};
-
-		struct pr_buffer _pr_buffer; 
-#endif
-		
 		/*-----------------------------------------------
 		 * Statistics of TeraCache
 		 *---------------------------------------------*/
@@ -204,14 +187,13 @@ class TeraCache {
 		void tc_fsync();
 
 #if PR_BUFFER
-		// Add an object 'q' with size 'size' to the promotion buffer. 'New_adr'
-		// is used to know where the first object in the promotion buffer will
-		// move to TeraCache. We use promotion buffer to reduce the number of
-		// system calls for small sized objects.
-		void tc_prbuf_insert(char* q, char* new_adr, size_t size);
+		// Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
+		// used to know where the object will move to H2. We use promotion buffer to
+		// reduce the number of system calls for small sized objects.
+		void tc_buffer_insert(char* obj, char* new_adr, size_t size);
 		
-		// At the end of the major GC clear the promotion buffer.
-		void tc_flush_buffer();
+		// At the end of the major GC flush and free all the promotion buffers.
+		void tc_free_all_buffers();
 #endif
 
         // Check if the object that the card is trying to reference is
