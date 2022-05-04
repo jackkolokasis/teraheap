@@ -19,13 +19,14 @@ DEV_TH=nvme1n1
 # TeraHeap file size in GB e.g. 900 -> 900GB
 TH_FILE_SZ=150
 # Heap size for executors '-Xms'
-HEAP=30
+HEAP=5
 # Garbage collection threads
 GC_THREADS=16
 # Giraph number of compute threads
 COMPUTE_THREADS=8
 # Benchmarks to run
-BENCHMARKS=( "pr" )
+BENCHMARKS=( "pr" "bfs" "wcc" "cdlp" "sssp" )
+#BENCHMARKS=( "pr" )
 # Number of executors
 EXECUTORS=1
 # Number of executors

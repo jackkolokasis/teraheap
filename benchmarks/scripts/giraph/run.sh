@@ -102,7 +102,7 @@ start_hadoop_yarn_zkeeper() {
 	message="Start Yarn" 
 	check ${retValue} "${message}"
 
-	${ZOOKEEPER}/bin/zkServer.sh start >> $LOG 2>&1
+	SERVER_JVMFLAGS="-Xmx4g" ${ZOOKEEPER}/bin/zkServer.sh start >> $LOG 2>&1
 	retValue=$?
 	message="Start Zookeeper" 
 	check ${retValue} "${message}"
@@ -219,6 +219,7 @@ update_conf() {
 	local bench=$1
 	local heap_size=$(( $HEAP * 1024 ))
 	local is_ser=$2
+	local check
 
 	# Set benchmark
 	sed -i '/benchmark.custom.algorithms/c\benchmark.custom.algorithms = '"$bench" \
@@ -236,19 +237,35 @@ update_conf() {
 
 	if  [ -z ${is_ser} ]
 	then
-		# Comment these lines in the configuration
-		sed -e '/platform.giraph.options.useOutOfCoreGraph/s/^/#/' \
-			-i ${BENCHMARK_CONFIG}/platform.properties
+		sed -i '/useOutOfCoreGraph/c\platform.giraph.options.useOutOfCoreGraph: false' \
+			${BENCHMARK_CONFIG}/platform.properties
  
-		sed -e '/platform.giraph.options.partitionsDirectory/s/^/#/' \
-			-i ${BENCHMARK_CONFIG}/platform.properties
+		# Check if this line is not commented 
+		check=$(grep "^#[a-z].*.partitionsDirectory" ${BENCHMARK_CONFIG}/platform.properties)
+		if [ -z "${check}" ]
+		then 
+			# Comment these line in the configuration
+			sed -e '/platform.giraph.options.partitionsDirectory/s/^/#/' \
+				-i ${BENCHMARK_CONFIG}/platform.properties
+		fi
+		
+		sed -i '/teraheap/c\platform.giraph.options.teraheap.enable: true' \
+			${BENCHMARK_CONFIG}/platform.properties
 	else
-		# Uncomment these lines in the configuration
-		sed -e '/platform.giraph.options.useOutOfCoreGraph/s/^#//' \
-			-i ${BENCHMARK_CONFIG}/platform.properties
+		sed -i '/useOutOfCoreGraph/c\platform.giraph.options.useOutOfCoreGraph: true' \
+			${BENCHMARK_CONFIG}/platform.properties
  
-		sed -e '/platform.giraph.options.partitionsDirectory/s/^#//' \
-			-i ${BENCHMARK_CONFIG}/platform.properties
+		# Check if this line is commented
+		check=$(grep "^#[a-z].*.partitionsDirectory" ${BENCHMARK_CONFIG}/platform.properties)
+		if [ "${check}" ]
+		then 
+			# Uncomment these lines in the configuration
+			sed -e '/platform.giraph.options.partitionsDirectory/s/^#//' \
+				-i ${BENCHMARK_CONFIG}/platform.properties
+		fi
+		
+		sed -i '/teraheap/c\platform.giraph.options.teraheap.enable: false' \
+			${BENCHMARK_CONFIG}/platform.properties
 	fi
 }
 
