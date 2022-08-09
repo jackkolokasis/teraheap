@@ -46,8 +46,9 @@ OFLAG = -o
 WALLFLAG = -Wall -Werror -pedantic
 OPTIMZEFLAG = -O3
 AIOFLAG = -lrt
+UMMAP = -lummapio -pthread
 
-LDFLAGS = $(AIOFLAG)
+LDFLAGS = $(AIOFLAG) $(UMMAP)
 CFLAGS = $(BINFLAG) $(WALLFLAG) $(OPTIMIZEFLAG)
 
 ## Commands
