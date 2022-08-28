@@ -44,6 +44,7 @@
 #include "runtime/vmThread.hpp"
 #include "services/memTracker.hpp"
 #include "utilities/vmError.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 
 PSYoungGen*  ParallelScavengeHeap::_young_gen = NULL;
 PSOldGen*    ParallelScavengeHeap::_old_gen = NULL;
@@ -77,8 +78,34 @@ jint ParallelScavengeHeap::initialize() {
   _reserved = MemRegion((HeapWord*)heap_rs.base(),
                         (HeapWord*)(heap_rs.base() + heap_rs.size()));
 
+#ifdef TERA_CARDS
+  CardTableExtension* barrier_set;
+  if (EnableTeraHeap) {
+
+	  _tera_heap_reserved = MemRegion(
+			  (HeapWord*)Universe::teraHeap()->h2_start_addr(),
+			  (HeapWord*)Universe::teraHeap()->h2_end_addr());
+
+    if (!(_tera_heap_reserved.start() >= _reserved.end()))
+      vm_shutdown_during_initialization(
+          "H2 should be in greater addresses than H1");
+
+	  barrier_set = new CardTableExtension(_reserved, 3, _tera_heap_reserved);
+    barrier_set->initialize();
+    barrier_set->th_card_table_initialize();
+
+    Universe::teraHeap()->start_array()->th_initialize(_tera_heap_reserved);
+	  Universe::teraHeap()->start_array()->th_set_covered_region(_tera_heap_reserved);
+  }
+  else {
+	  barrier_set = new CardTableExtension(_reserved, 3);
+    barrier_set->initialize();
+  }
+#else
   CardTableExtension* const barrier_set = new CardTableExtension(_reserved, 3);
-  barrier_set->initialize();
+    barrier_set->initialize();
+#endif
+
   _barrier_set = barrier_set;
   oopDesc::set_bs(_barrier_set);
   if (_barrier_set == NULL) {

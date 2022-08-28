@@ -521,6 +521,11 @@ class InstanceKlass: public Klass {
   bool find_local_field_from_offset(int offset, bool is_static, fieldDescriptor* fd) const;
   bool find_field_from_offset(int offset, bool is_static, fieldDescriptor* fd) const;
 
+#ifdef SPARK_POLICY 
+  bool find_transient_local_field_from_offset(int offset, fieldDescriptor* fd) const;
+  bool find_transient_field_from_offset(int offset, fieldDescriptor* fd) const;
+#endif
+
   // find a local method (returns NULL if not found)
   Method* find_method(Symbol* name, Symbol* signature) const;
   static Method* find_method(Array<Method*>* methods, Symbol* name, Symbol* signature);
@@ -1015,6 +1020,9 @@ class InstanceKlass: public Klass {
   // Garbage collection
   void oop_follow_contents(oop obj);
   int  oop_adjust_pointers(oop obj);
+#ifdef TERA_MAJOR_GC
+  void h2_oop_follow_contents(oop obj);
+#endif
 
   void clean_weak_instanceklass_links(BoolObjectClosure* is_alive);
   void clean_implementors_list(BoolObjectClosure* is_alive);

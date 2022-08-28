@@ -1107,7 +1107,11 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
     return NULL;
   }
   oop r = *oop_adr;
+#ifdef TERA_MAJOR_GC
+  assert(Universe::heap()->is_in_or_null(r) || Universe::teraHeap()->is_obj_in_h2(r), err_msg("bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", (void *) r, (void *) r));
+#else
   assert(Universe::heap()->is_in_or_null(r), err_msg("bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", (void *) r, (void *) r));
+#endif
   return r;
 }
 

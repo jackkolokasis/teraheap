@@ -3276,7 +3276,7 @@ static char* anon_mmap(char* requested_addr, size_t bytes, bool fixed) {
   char * addr;
   int flags;
 
-  flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS;
+  flags = MAP_PRIVATE | MAP_ANONYMOUS;
   if (fixed) {
     assert((uintptr_t)requested_addr % os::Linux::page_size() == 0, "unaligned address");
     flags |= MAP_FIXED;
@@ -3285,7 +3285,7 @@ static char* anon_mmap(char* requested_addr, size_t bytes, bool fixed) {
   // Map reserved/uncommitted pages PROT_NONE so we fail early if we
   // touch an uncommitted page. Otherwise, the read/write might
   // succeed if we have enough swap space to back the physical page.
-  addr = (char*)::mmap(requested_addr, bytes, PROT_NONE,
+  addr = (char*)::mmap(requested_addr, bytes, PROT_READ | PROT_WRITE,
                        flags, -1, 0);
 
   if (addr != MAP_FAILED) {

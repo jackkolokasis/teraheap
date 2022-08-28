@@ -2502,6 +2502,30 @@ class CommandLineFlags {
           "The percentage of the used heap that the instances of a class "  \
           "must occupy for the class to generate a trace event")            \
                                                                             \
+  product(bool, EnableTeraHeap, false,                                      \
+          "Enable TeraHeap. Works only with ParallelScavenge Collector")    \
+                                                                            \
+  product(bool, TeraHeapStatistics, false,                                  \
+          "Print TeraHeap statistics")                                      \
+                                                                            \
+  product(bool, TeraHeapAllocatorStatistics, false,                         \
+          "Print TeraHeap allocator statistics")                            \
+                                                                            \
+  product(bool, TeraHeapCardStatistics, false,                              \
+          "Count the number of dirty cards in H2")                          \
+                                                                            \
+  product(bool, H2ObjectPlacement, false,                                   \
+          "Print the objects labels in H2 regions")                         \
+		                                                                    \
+  product(bool, H2LivenessAnalysis, false,                                 \
+          "Liveness analysis per H2 region objects")                        \
+		                                                                    \
+  product(uintx, TeraHeapSize, 0,                                           \
+          "Initial TeraHeap total size (in bytes)")                         \
+																		    \
+  product(uintx, TeraStripeSize, 512,                                       \
+          "Size of TeraHeap stripe size (e.g 128)")                         \
+                                                                            \
   /* GC log rotation setting */                                             \
                                                                             \
   product(bool, UseGCLogFileRotation, false,                                \

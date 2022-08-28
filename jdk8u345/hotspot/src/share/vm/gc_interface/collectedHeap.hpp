@@ -99,6 +99,9 @@ class CollectedHeap : public CHeapObj<mtInternal> {
 
  protected:
   MemRegion _reserved;
+#ifdef TERA_CARDS
+  MemRegion _tera_heap_reserved;
+#endif
   BarrierSet* _barrier_set;
   bool _is_gc_active;
   uint _n_par_threads;

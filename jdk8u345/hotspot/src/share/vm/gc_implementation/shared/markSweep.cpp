@@ -28,6 +28,7 @@
 #include "gc_implementation/shared/gcTrace.hpp"
 #include "gc_implementation/shared/markSweep.inline.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "oops/methodData.hpp"
 #include "oops/objArrayKlass.inline.hpp"
 #include "oops/oop.inline.hpp"
@@ -145,7 +146,13 @@ void MarkSweep::restore_marks() {
 
 MarkSweep::IsAliveClosure   MarkSweep::is_alive;
 
-bool MarkSweep::IsAliveClosure::do_object_b(oop p) { return p->is_gc_marked(); }
+bool MarkSweep::IsAliveClosure::do_object_b(oop p) {
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(p))
+    return true;
+#endif
+  return p->is_gc_marked();
+}
 
 MarkSweep::KeepAliveClosure MarkSweep::keep_alive;
 

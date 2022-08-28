@@ -46,7 +46,12 @@ jobject JNIHandles::make_local(oop obj) {
     return NULL;                // ignore null handles
   } else {
     Thread* thread = Thread::current();
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(obj) ||
+           Universe::teraHeap()->is_obj_in_h2(obj), "sanity check");
+#else
     assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+#endif
     return thread->active_handles()->allocate_handle(obj);
   }
 }
@@ -58,7 +63,12 @@ jobject JNIHandles::make_local(Thread* thread, oop obj) {
   if (obj == NULL) {
     return NULL;                // ignore null handles
   } else {
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(obj) ||
+           Universe::teraHeap()->is_obj_in_h2(obj), "sanity check");
+#else
     assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+#endif
     return thread->active_handles()->allocate_handle(obj);
   }
 }
@@ -69,7 +79,12 @@ jobject JNIHandles::make_local(JNIEnv* env, oop obj) {
     return NULL;                // ignore null handles
   } else {
     JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(obj) ||
+           Universe::teraHeap()->is_obj_in_h2(obj), "sanity check");
+#else
     assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+#endif
     return thread->active_handles()->allocate_handle(obj);
   }
 }
@@ -81,7 +96,12 @@ jobject JNIHandles::make_global(Handle obj) {
   if (!obj.is_null()) {
     // ignore null handles
     MutexLocker ml(JNIGlobalHandle_lock);
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(obj()) ||
+           Universe::teraHeap()->is_obj_in_h2(obj()), "sanity check");
+#else
     assert(Universe::heap()->is_in_reserved(obj()), "sanity check");
+#endif
     res = _global_handles->allocate_handle(obj());
   } else {
     CHECK_UNHANDLED_OOPS_ONLY(Thread::current()->clear_unhandled_oops());
@@ -97,7 +117,12 @@ jobject JNIHandles::make_weak_global(Handle obj) {
     // ignore null handles
     {
       MutexLocker ml(JNIGlobalHandle_lock);
-      assert(Universe::heap()->is_in_reserved(obj()), "sanity check");
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(obj()) ||
+           Universe::teraHeap()->is_obj_in_h2(obj()), "sanity check");
+#else
+    assert(Universe::heap()->is_in_reserved(obj()), "sanity check");
+#endif
       res = _weak_global_handles->allocate_handle(obj());
     }
     // Add weak tag.
@@ -438,7 +463,12 @@ void JNIHandleBlock::weak_oops_do(BoolObjectClosure* is_alive,
 
 
 jobject JNIHandleBlock::allocate_handle(oop obj) {
-  assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(obj) ||
+           Universe::teraHeap()->is_obj_in_h2(obj), "sanity check");
+#else
+    assert(Universe::heap()->is_in_reserved(obj), "sanity check");
+#endif
   if (_top == 0) {
     // This is the first allocation or the initial block got zapped when
     // entering a native function. If we have any following blocks they are

@@ -281,6 +281,11 @@ class Arguments : AllStatic {
   // Option flags
   static bool   _has_profile;
   static const char*  _gc_log_filename;
+
+  #ifdef TERA_LOG
+  static const char*  _th_log_filename;
+  #endif // TERA_LOG
+
   // Value of the conservative maximum heap alignment needed
   static size_t  _conservative_max_heap_alignment;
 
@@ -517,6 +522,11 @@ class Arguments : AllStatic {
 
   // -Xloggc:<file>, if not specified will be NULL
   static const char* gc_log_filename()      { return _gc_log_filename; }
+  
+  #ifdef TERA_LOG
+  // -Xlogtc:<file>, if not specified will be NULL
+  static const char* th_log_filename()      { return _th_log_filename; }
+  #endif // TERA_LOG
 
   // -Xprof
   static bool has_profile()                 { return _has_profile; }

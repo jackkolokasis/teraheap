@@ -72,6 +72,19 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
   return _destination_decorator;
 }
 
+#ifdef TERA_MAJOR_GC
+// Implementation of policies that move objects to the TeraCache This function
+// takes as argument the position `q` of the object and its `size` in the Java
+// heap and return `true` if the policy is satisfied, and `false` otherwise.
+bool PSMarkSweepDecorator::h2_policy(HeapWord *q, size_t size) {
+#ifdef P_NO_TRANSFER
+	return false;
+#else
+	return oop(q)->is_marked_move_h2();
+#endif
+}
+#endif
+
 // FIX ME FIX ME FIX ME FIX ME!!!!!!!!!
 // The object forwarding code is duplicated. Factor this out!!!!!
 //
@@ -125,6 +138,30 @@ void PSMarkSweepDecorator::precompact() {
       Prefetch::write(q, interval);
       size_t size = oop(q)->size();
 
+#ifdef TERA_MAJOR_GC
+    // Check if the object needs to be moved in TeraCache based on the
+    // current policy
+    if (EnableTeraHeap && h2_policy(q, size)) {
+      // Take a pointer from the region
+      HeapWord* h2_obj_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(oop(q), size);
+      assert(Universe::teraHeap()->is_obj_in_h2(oop(h2_obj_addr)), "Pointer from H2 is not valid");
+
+      // Store the forwarding pointer into the mark word
+      oop(q)->forward_to(oop(h2_obj_addr));
+
+      // Encoding the pointer should preserve the mark
+      assert(oop(q)->is_gc_marked(),  "encoding the pointer should preserve the mark");
+
+      // Move to the next object
+      q += size;
+
+      // Set this object as live in the in the precompact space
+      end_of_live = q;
+
+      // Continue with the next object
+      continue;
+    }
+#endif
       size_t compaction_max_size = pointer_delta(compact_end, compact_top);
 
       // This should only happen if a space in the young gen overflows the
@@ -179,9 +216,32 @@ void PSMarkSweepDecorator::precompact() {
         end += oop(end)->size();
       } while (end < t && (!oop(end)->is_gc_marked()));
 
-      /* see if we might want to pretend this object is alive so that
+      /* See if we might want to pretend this object is alive so that
        * we don't have to compact quite as often.
-       */
+
+       * If the amount of garbage does not reach the allowed_deadspace
+       * limit and the current object is equall to the compact_top
+       * pointer then we precess the following block.
+			 *
+       * In this case, it is actually a garbage object, but it is
+       * treated as a live object. (To be more precise, it is
+       * considered that one live object occupies from the current
+       * location (q) to the next live object position (end),  and the
+       * forwarding pointer is embedded in it. 
+			 *
+       * In this case, since the block continues until the end, the
+       * statements after are not executed. Then, the process proceeds
+       * to the next object in the loop.
+			 *
+       * (whether or not the allowed_deadspace amount has been reached
+       * is Determined by PSMarkSweepDecorator::insert_deadspace().
+			 *
+       * To be precise, PSMarkSweepDecorator::insert_deadspace () has
+       * an argument passed by reference, so the value of
+       * allowed_deadspace decreases each time it is called. When the
+       * amount of garbage reaches the initial amount of
+       * allowed_deadspace, allowed_deadspace The value will be 0)
+			 */
       if (allowed_deadspace > 0 && q == compact_top) {
         size_t sz = pointer_delta(end, q);
         if (insert_deadspace(allowed_deadspace, q, sz)) {
@@ -276,6 +336,10 @@ bool PSMarkSweepDecorator::insert_deadspace(size_t& allowed_deadspace_words,
     allowed_deadspace_words -= deadlength;
     CollectedHeap::fill_with_object(q, deadlength);
     oop(q)->set_mark(oop(q)->mark()->set_marked());
+#ifdef TERA_FLAG
+	assert(oop(q)->get_obj_state() == INIT_TF,
+        err_msg("Object state is wrong %lu", oop(q)->get_obj_state()));
+#endif
     assert((int) deadlength == oop(q)->size(), "bad filler object size");
     // Recall that we required "q == compaction_top".
     return true;
@@ -339,30 +403,90 @@ void PSMarkSweepDecorator::adjust_pointers() {
   assert(q == t, "just checking");
 }
 
+#ifdef TERA_MAJOR_GC
+void PSMarkSweepDecorator::moveObjToH2(HeapWord *q, HeapWord *compaction_top, size_t size) {
+  // Size is in words. Each word is 8 bytes. I use memcpy instead of
+  // memmove to avoid the extra copy of the data in the buffer.
+#if defined(SYNC)
+  Universe::teraHeap()->h2_write((char *)q, (char *)compaction_top, size);
+  // Change the value of teraflag in the new location of the object
+  oop(compaction_top)->set_in_h2();
+  /* Initialize mark word of the destination */
+  oop(compaction_top)->init_mark();
+
+#elif defined(FMAP)
+  // Change the value of teraflag in the new location of the object
+  oop(q)->set_in_h2();
+  /* Initialize mark word of the destination */
+  oop(q)->init_mark();
+  Universe::teraHeap()->h2_write((char *)q, (char *)compaction_top, size);
+
+#elif defined(ASYNC)
+  // Change the value of teraflag in the new location of the object
+  oop(q)->set_in_h2();
+  /* Initialize mark word of the destination */
+  oop(q)->init_mark();
+
+#if defined(PR_BUFFER)
+  Universe::teraHeap()->h2_promotion_buffer_insert((char *)q, (char *)compaction_top, size);
+#else
+  Universe::teraHeap()->h2_awrite((char *)q, (char *)compaction_top, size);
+#endif
+
+#else
+  memcpy(compaction_top, q, size * 8);
+  if (!H2LivenessAnalysis)
+    // Change the value of teraflag in the new location of the object
+    oop(compaction_top)->set_in_h2();
+
+  /* Initialize mark word of the destination */
+  oop(compaction_top)->init_mark();
+#endif // SYNC
+}
+#endif // TERA_MAJOR_GC
+
 void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   // Copy all live objects to their new location
   // Used by MarkSweep::mark_sweep_phase4()
 
   HeapWord*       q = space()->bottom();
   HeapWord* const t = _end_of_live;
-  debug_only(HeapWord* prev_q = NULL);
 
-  if (q < t && _first_dead > q &&
-      !oop(q)->is_gc_marked()) {
-#ifdef ASSERT
-    // we have a chunk of the space which hasn't moved and we've reinitialized the
-    // mark word during the previous pass, so we can't use is_gc_marked for the
-    // traversal.
-    HeapWord* const end = _first_dead;
+  if (q < t && _first_dead > q && !oop(q)->is_gc_marked()) {
 
-    while (q < end) {
-      size_t size = oop(q)->size();
-      assert(!oop(q)->is_gc_marked(), "should be unmarked (special dense prefix handling)");
-      debug_only(prev_q = q);
-      q += size;
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+      HeapWord* const end = _first_dead;
+
+      while (q < end) {
+        /* Get the size of the object */
+        size_t size = oop(q)->size();
+
+        if(oop(q)->is_gc_marked() && oop(q)->forwardee() != NULL) {
+          HeapWord* compaction_top = (HeapWord*)oop(q)->forwardee();
+
+          if (Universe::teraHeap()->is_obj_in_h2(oop(compaction_top))) {
+            moveObjToH2(q, compaction_top, size);
+          }
+          else {
+            /* Copy object to the new destination */
+            Copy::aligned_conjoint_words(q, compaction_top, size);
+            /* Initialize mark word of the destination */
+            oop(compaction_top)->init_mark();
+            // If the object is transient field then keep it state
+            // without change it to the default value
+            oop(compaction_top)->init_obj_state();
+          }
+        }
+        else {
+          oop(q)->init_mark();
+          oop(q)->init_obj_state();
+        }
+        /* Move to the next object */
+        q += size;
+      }
     }
-#endif
-
+#endif // TERA_MAJOR_GC
     if (_first_dead == t) {
       q = t;
     } else {
@@ -377,9 +501,7 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
   while (q < t) {
     if (!oop(q)->is_gc_marked()) {
       // mark is pointer to next marked oop
-      debug_only(prev_q = q);
       q = (HeapWord*) oop(q)->mark()->decode_pointer();
-      assert(q > prev_q, "we should be moving forward through memory");
     } else {
       // prefetch beyond q
       Prefetch::read(q, scan_interval);
@@ -393,11 +515,21 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 
       // copy object and reinit its mark
       assert(q != compaction_top, "everything in this pass should be moving");
-      Copy::aligned_conjoint_words(q, compaction_top, size);
-      oop(compaction_top)->init_mark();
-      assert(oop(compaction_top)->klass() != NULL, "should have a class");
-
-      debug_only(prev_q = q);
+#ifdef TERA_MAJOR_GC
+		  // Change the value of teraflag in the new location of the object
+		  if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(oop(compaction_top))) {
+			  moveObjToH2(q, compaction_top, size);
+		  }
+		  else {
+			  Copy::aligned_conjoint_words(q, compaction_top, size);
+			  // Change the value of teraflag in the new location of the object
+			  oop(compaction_top)->init_mark();
+        oop(compaction_top)->init_obj_state();
+		  }
+#else
+		  Copy::aligned_conjoint_words(q, compaction_top, size);
+		  oop(compaction_top)->init_mark();
+#endif
       q += size;
     }
   }

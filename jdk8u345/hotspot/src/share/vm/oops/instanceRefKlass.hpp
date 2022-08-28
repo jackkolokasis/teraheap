@@ -66,6 +66,9 @@ class InstanceRefKlass: public InstanceKlass {
   // Garbage collection
   int  oop_adjust_pointers(oop obj);
   void oop_follow_contents(oop obj);
+#ifdef TERA_MAJOR_GC
+  void h2_oop_follow_contents(oop obj);
+#endif
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS

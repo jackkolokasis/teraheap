@@ -108,6 +108,11 @@ class ObjArrayKlass : public ArrayKlass {
   inline void oop_follow_contents(oop obj, int index);
   template <class T> inline void objarray_follow_contents(oop obj, int index);
 
+#ifdef TERA_MAJOR_GC
+  void h2_oop_follow_contents(oop obj);
+  template <class T> inline void h2_objarray_follow_contents(oop obj, int index);
+#endif
+
   int  oop_adjust_pointers(oop obj);
 
   // Parallel Scavenge and Parallel Old

@@ -211,9 +211,16 @@ void ConstantOopWriteValue::write_on(DebugInfoWriteStream* stream) {
     // cannot use ThreadInVMfromNative here since in case of JVMCI compiler,
     // thread is already in VM state.
     ThreadInVMfromUnknown tiv;
+#ifdef TERA_MAJOR_GC
+    assert(JNIHandles::resolve(value()) == NULL ||
+           Universe::heap()->is_in_reserved(JNIHandles::resolve(value())) ||
+           Universe::teraHeap()->is_obj_in_h2(JNIHandles::resolve(value())),
+           "Should be in heap");
+#else
     assert(JNIHandles::resolve(value()) == NULL ||
            Universe::heap()->is_in_reserved(JNIHandles::resolve(value())),
            "Should be in heap");
+  #endif
  }
 #endif
   stream->write_int(CONSTANT_OOP_CODE);

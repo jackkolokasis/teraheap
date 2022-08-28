@@ -167,6 +167,11 @@ void C1_MacroAssembler::initialize_header(Register obj, Register klass, Register
     movptr(Address(obj, oopDesc::klass_offset_in_bytes()), klass);
   }
 
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    movptr(Address(obj, oopDesc::teraflag_offset_in_bytes()), (intptr_t) INIT_TF_HEX);
+#endif
+
   if (len->is_valid()) {
     movl(Address(obj, arrayOopDesc::length_offset_in_bytes()), len);
   }

@@ -649,6 +649,49 @@ UNSAFE_ENTRY(void, Unsafe_FreeMemory(JNIEnv *env, jobject unsafe, jlong addr))
   os::free(p);
 UNSAFE_END
 
+UNSAFE_ENTRY(void, Unsafe_h2TagAndMoveRoot(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong label, jlong partId))
+  UnsafeWrapper("Unsafe_h2TagAndMoveRoot");
+  
+  if (!EnableTeraHeap)
+    return;
+
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  // If the object is already in TeraCache then do not mark its teraflag
+  if (Universe::teraHeap()->is_obj_in_h2(o))
+  	return;
+
+  // Initialize object's teraflag
+  o->mark_move_h2(label, partId);
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_h2TagRoot(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong label, jlong partId))
+  UnsafeWrapper("Unsafe_h2TagRoot");
+  
+  if (!EnableTeraHeap)
+    return;
+
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  // If the object is already in TeraCache then do not mark its teraflag
+  if (Universe::teraHeap()->is_obj_in_h2(o))
+  	return;
+
+  // Initialize object's teraflag
+  o->mark_move_h2(label, partId);
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_h2Move(JNIEnv *env, jobject unsafe,
+			jlong label))
+  UnsafeWrapper("Unsafe_h2Move");
+  
+  if (!EnableTeraHeap)
+      return;
+  // To be implement
+UNSAFE_END
+
 UNSAFE_ENTRY(void, Unsafe_SetMemory(JNIEnv *env, jobject unsafe, jlong addr, jlong size, jbyte value))
   UnsafeWrapper("Unsafe_SetMemory");
   size_t sz = (size_t)size;
@@ -1636,6 +1679,15 @@ static JNINativeMethod methods_18[] = {
     {CC "allocateMemory",     CC "(J)" ADR,                 FN_PTR(Unsafe_AllocateMemory)},
     {CC "reallocateMemory",   CC "(" ADR "J)" ADR,            FN_PTR(Unsafe_ReallocateMemory)},
     {CC "freeMemory",         CC "(" ADR ")V",               FN_PTR(Unsafe_FreeMemory)},
+
+    // Mark object and move it in the next full GC in H2 - TeraHeap
+    {CC"h2TagAndMoveRoot",    CC"("OBJ"JJ)V",               FN_PTR(Unsafe_h2TagAndMoveRoot)},
+    // Mark root object to be moved in H2 - TeraHeap. Object will be
+    // moved only after calling h2Move().
+    {CC"h2TagRoot",           CC"("OBJ"JJ)V",               FN_PTR(Unsafe_h2TagRoot)},
+    // Move all objects with the specific label in H2 - TeraHeap. Object
+    // will be moved in H2 in the next full GC.
+    {CC"h2Move",              CC"(J)V",                     FN_PTR(Unsafe_h2Move)},
 
     {CC "objectFieldOffset",  CC "(" FLD ")J",               FN_PTR(Unsafe_ObjectFieldOffset)},
     {CC "staticFieldOffset",  CC "(" FLD ")J",               FN_PTR(Unsafe_StaticFieldOffset)},

@@ -39,6 +39,7 @@
 #include "utilities/macros.hpp"
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/g1/heapRegion.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #endif // INCLUDE_ALL_GCS
 
 #ifdef ASSERT
@@ -1582,6 +1583,26 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
 
   assert(sizeof(*((CardTableModRefBS*)_bs)->byte_map_base) == sizeof(jbyte), "adjust this code");
   LIR_Const* card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->byte_map_base);
+	LIR_Opr heap_ct = load_constant(card_table_base);
+
+#ifdef TERA_C1
+	// These registers are used for TeraCache and TeraCard tables
+	LIR_Const* tera_card_table_base = NULL;
+	LIR_Opr tera_ct = NULL;
+
+	if (EnableTeraHeap) {
+		tera_card_table_base = new LIR_Const(((CardTableModRefBS*)_bs)->th_byte_map_base);
+		tera_ct = load_constant(tera_card_table_base);
+	}
+#endif //TERA_C1
+
+	// An address in x86_x64 is interpreted as: base + index * scalar + disp
+	// We check if the `addr` has an address type and then:
+	// 
+	// (1) If the index and disp are null => move the value of the base
+	//		register to the new register
+	// (2) Use load effective address to move the address of the new object
+	//
   if (addr->is_address()) {
     LIR_Address* address = addr->as_address_ptr();
     // ptr cannot be an object because we use this barrier for array card marks
@@ -1596,6 +1617,39 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
     addr = ptr;
   }
   assert(addr->is_register(), "must be a register at this point");
+	
+  LabelObj* L = new LabelObj();
+	LabelObj* M = new LabelObj();
+
+#ifdef TERA_C1
+	// Check if the object belongs to TeraCache or in the heap. If belongs to
+	// TeraCache then jump to mark the tera card tables, otherwise continue to
+	// mark the heap card tables.
+	if (EnableTeraHeap) {
+		LIR_Opr h2_start_addr = new_register(T_LONG);
+		__ move(LIR_OprFact::intptrConst((address)Universe::teraHeap()->h2_start_addr()), h2_start_addr);
+
+		assert(h2_start_addr->is_register(), "must be a register at this point");
+		assert(h2_start_addr->is_double_cpu(), "must be a single cpu");
+
+		if (addr->is_single_cpu()) {
+			LIR_Opr tmp_addr = new_register(T_LONG);
+			__ move(addr, tmp_addr);
+
+			assert(tmp_addr->is_double_cpu(), "must be a single cpu");
+
+			__ cmp(lir_cond_greaterEqual, tmp_addr, h2_start_addr);
+			__ branch(lir_cond_greaterEqual, T_INT, M->label());
+
+		} 
+		else if (addr->is_double_cpu()) {
+			__ cmp(lir_cond_greaterEqual, addr, h2_start_addr);
+			__ branch(lir_cond_greaterEqual, T_INT, M->label());
+		} 
+		else 
+			ShouldNotReachHere();
+	}
+#endif //TERA_C1
 
 #ifdef CARDTABLEMODREF_POST_BARRIER_HELPER
   CardTableModRef_post_barrier_helper(addr, card_table_base);
@@ -1617,9 +1671,40 @@ void LIRGenerator::CardTableModRef_post_barrier(LIR_OprDesc* addr, LIR_OprDesc* 
               new LIR_Address(tmp, card_table_base->as_jint(), T_BYTE));
   } else {
     __ move(LIR_OprFact::intConst(0),
-              new LIR_Address(tmp, load_constant(card_table_base),
-                              T_BYTE));
+              new LIR_Address(tmp, heap_ct, T_BYTE));
   }
+
+#ifdef TERA_C1
+	// Mark teracache card tables
+	if (EnableTeraHeap) {
+
+		__ branch(lir_cond_always, T_SHORT, L->label());
+
+		__ branch_destination(M->label());
+
+		LIR_Opr tmp_reg = new_pointer_register();
+
+		if (TwoOperandLIRForm) {
+			__ move(addr, tmp_reg);
+			__ unsigned_shift_right(tmp_reg, CardTableModRefBS::th_card_shift, tmp_reg);
+		} else {
+			__ unsigned_shift_right(addr, CardTableModRefBS::th_card_shift, tmp_reg);
+		}
+  
+    if (UseConcMarkSweepGC && CMSPrecleaningEnabled) {
+      __ membar_storestore();
+    }
+
+		if (can_inline_as_constant(tera_card_table_base)) {
+			__ move(LIR_OprFact::intConst(0),
+					new LIR_Address(tmp_reg, tera_card_table_base->as_jint(), T_BYTE));
+		} else {
+			__ move(LIR_OprFact::intConst(0), new LIR_Address(tmp_reg, tera_ct, T_BYTE));
+		}
+
+		__ branch_destination(L->label());
+	}
+#endif // TERA_C1
 #endif
 }
 

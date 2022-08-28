@@ -101,7 +101,11 @@ inline Klass* oopDesc::klass_or_null_acquire() const volatile {
 
 inline int oopDesc::klass_gap_offset_in_bytes() {
   assert(UseCompressedClassPointers, "only applicable to compressed klass pointers");
+#ifdef TERA_FLAG
+  return oopDesc::klass_offset_in_bytes() + sizeof(narrowKlass) + sizeof(int64_t);
+#else
   return oopDesc::klass_offset_in_bytes() + sizeof(narrowKlass);
+#endif
 }
 
 inline Klass** oopDesc::klass_addr() {
@@ -610,7 +614,12 @@ inline bool oopDesc::has_bias_pattern() const {
 inline bool oopDesc::is_oop(bool ignore_mark_word) const {
   oop obj = (oop) this;
   if (!check_obj_alignment(obj)) return false;
+#ifdef TERA_MAJOR_GC
+  if (!Universe::heap()->is_in_reserved(obj) &&
+    !Universe::teraHeap()->is_obj_in_h2(obj)) return false;
+#else
   if (!Universe::heap()->is_in_reserved(obj)) return false;
+#endif
   // obj is aligned and accessible in heap
   if (Universe::heap()->is_in_reserved(obj->klass_or_null())) return false;
 
@@ -646,6 +655,14 @@ inline void oopDesc::follow_contents(void) {
   klass()->oop_follow_contents(this);
 }
 
+#ifdef TERA_MAJOR_GC
+inline void oopDesc::h2_follow_contents() {
+  assert(Universe::teraHeap()->is_obj_in_h2(this), "Object should be in TeraCache");
+  
+  klass()->h2_oop_follow_contents(this);
+}
+#endif
+
 // Used by scavengers
 
 inline bool oopDesc::is_forwarded() const {
@@ -658,8 +675,13 @@ inline bool oopDesc::is_forwarded() const {
 inline void oopDesc::forward_to(oop p) {
   assert(check_obj_alignment(p),
          "forwarding to something not aligned");
+#ifdef TERA_MAJOR_GC
+  assert(Universe::heap()->is_in_reserved(p) || Universe::teraHeap()->is_obj_in_h2(p),
+         "forwarding to something not in H1 or in H2");
+#else
   assert(Universe::heap()->is_in_reserved(p),
          "forwarding to something not in heap");
+#endif
   markOop m = markOopDesc::encode_pointer_as_mark(p);
   assert(m->decode_pointer() == p, "encoding must be reversable");
   set_mark(m);

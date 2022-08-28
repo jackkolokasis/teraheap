@@ -50,6 +50,12 @@ void CollectedHeap::post_allocation_setup_common(KlassHandle klass,
   // concurrent collectors.
   obj->release_set_klass(klass());
 #endif
+
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    obj->init_obj_state();
+#endif // TERA_FLAG
+
 }
 
 void CollectedHeap::post_allocation_setup_no_klass_install(KlassHandle klass,
@@ -210,6 +216,10 @@ oop CollectedHeap::obj_allocate(KlassHandle klass, int size, TRAPS) {
   assert(!Universe::heap()->is_gc_active(), "Allocation during gc not allowed");
   assert(size >= 0, "int won't convert to size_t");
   HeapWord* obj = common_mem_allocate_init(klass, size, CHECK_NULL);
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    ((oop)obj)->init_obj_state();
+#endif // TERA_FLAG
   post_allocation_setup_obj(klass, obj, size);
   NOT_PRODUCT(Universe::heap()->check_for_bad_heap_word_value(obj, size));
   return (oop)obj;
@@ -223,6 +233,10 @@ oop CollectedHeap::array_allocate(KlassHandle klass,
   assert(!Universe::heap()->is_gc_active(), "Allocation during gc not allowed");
   assert(size >= 0, "int won't convert to size_t");
   HeapWord* obj = common_mem_allocate_init(klass, size, CHECK_NULL);
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    ((oop)obj)->init_obj_state();
+#endif // TERA_FLAG
   post_allocation_setup_array(klass, obj, length);
   NOT_PRODUCT(Universe::heap()->check_for_bad_heap_word_value(obj, size));
   return (oop)obj;
@@ -237,6 +251,10 @@ oop CollectedHeap::array_allocate_nozero(KlassHandle klass,
   assert(size >= 0, "int won't convert to size_t");
   HeapWord* obj = common_mem_allocate_noinit(klass, size, CHECK_NULL);
   ((oop)obj)->set_klass_gap(0);
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    ((oop)obj)->init_obj_state();
+#endif // TERA_FLAG
   post_allocation_setup_array(klass, obj, length);
 #ifndef PRODUCT
   const size_t hs = oopDesc::header_size()+1;

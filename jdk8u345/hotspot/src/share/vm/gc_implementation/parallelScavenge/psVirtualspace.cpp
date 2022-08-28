@@ -89,7 +89,9 @@ bool PSVirtualSpace::contains(void* p) const {
 }
 
 void PSVirtualSpace::release() {
+#ifndef TERA_MAJOR_GC
   DEBUG_ONLY(PSVirtualSpaceVerifier this_verifier(this));
+#endif
   // This may not release memory it didn't reserve.
   // Use rs.release() to release the underlying memory instead.
   _reserved_low_addr = _reserved_high_addr = NULL;

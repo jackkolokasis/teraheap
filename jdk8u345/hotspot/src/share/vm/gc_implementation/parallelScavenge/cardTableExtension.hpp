@@ -50,11 +50,20 @@ class CardTableExtension : public CardTableModRefBS {
  public:
   enum ExtendedCardValue {
     youngergen_card   = CardTableModRefBS::CT_MR_BS_last_reserved + 1,
+#ifdef TERA_CARDS
+	oldergen_card       = CardTableModRefBS::CT_MR_BS_last_reserved + 2,
+#endif
     verify_card       = CardTableModRefBS::CT_MR_BS_last_reserved + 5
   };
 
   CardTableExtension(MemRegion whole_heap, int max_covered_regions) :
     CardTableModRefBS(whole_heap, max_covered_regions) { }
+
+#ifdef TERA_CARDS
+  CardTableExtension(MemRegion whole_heap, int max_covered_regions,  
+				     MemRegion whole_tera_cache) :
+    CardTableModRefBS(whole_heap, max_covered_regions, whole_tera_cache) { }
+#endif
 
   // Too risky for the 4/10/02 putback
   // BarrierSet::Name kind() { return BarrierSet::CardTableExtension; }
@@ -66,6 +75,18 @@ class CardTableExtension : public CardTableModRefBS {
                                   PSPromotionManager* pm,
                                   uint stripe_number,
                                   uint stripe_total);
+
+#ifdef TERA_CARDS
+  // Scavenge support for TeraCache
+  // 'is_scavenge_done' field shows if we use this function during minor gc or
+  // we use this function only to trace dirty objects of TeraCache
+  void h2_scavenge_contents_parallel(ObjectStartArray* start_array,
+                                  HeapWord* space_top,
+                                  PSPromotionManager* pm,
+                                  uint stripe_number,
+                                  uint stripe_total, 
+                                  bool is_scavenge_done);
+#endif
 
   // Verification
   static void verify_all_young_refs_imprecise();
@@ -82,10 +103,36 @@ class CardTableExtension : public CardTableModRefBS {
   static bool card_is_clean(int value)      { return value == clean_card; }
   static bool card_is_verify(int value)     { return value == verify_card; }
 
+#ifdef TERA_CARDS
+  static bool card_is_oldgen(int value)     {return value == oldergen_card; }
+
+  static bool th_card_is_clean(int value, bool is_scavenge_done) {
+#ifdef DISABLE_TRAVERSE_OLD_GEN
+	  if (!is_scavenge_done)
+		  return card_is_clean(value); 
+
+	  return (card_is_clean(value) || card_is_oldgen(value));
+#else
+	  return card_is_clean(value);
+#endif
+  }
+#endif
+
   // Card marking
-  void inline_write_ref_field_gc(void* field, oop new_val) {
+  void inline_write_ref_field_gc(void* field, oop new_val, bool promote_to_oldgen=false) {
     jbyte* byte = byte_for(field);
+#ifdef TERA_CARDS
+	if (EnableTeraHeap && is_field_in_tera_heap(field)) {
+		if (promote_to_oldgen) {
+			Atomic::cmpxchg((jbyte)oldergen_card, byte, (jbyte)clean_card);
+			Atomic::cmpxchg((jbyte)oldergen_card, byte, (jbyte)dirty_card);
+			return;
+		}
+	}
+	*byte = youngergen_card;
+#else
     *byte = youngergen_card;
+#endif
   }
 
   // Adaptive size policy support
@@ -104,10 +151,21 @@ class CardTableExtension : public CardTableModRefBS {
 #ifdef ASSERT
 
   bool is_valid_card_address(jbyte* addr) {
+#ifdef TERA_CARDS
+    if (EnableTeraHeap) {
+      // Check if the address belongs to the address range of the Old Generation
+      // or in the TeraCache
+      return ((addr >= _byte_map) && (addr < _byte_map + _byte_map_size)
+      ||
+      ((addr >= _th_byte_map) && (addr < _th_byte_map + _th_byte_map_size)));
+    } 
     return (addr >= _byte_map) && (addr < _byte_map + _byte_map_size);
+#else
+    return (addr >= _byte_map) && (addr < _byte_map + _byte_map_size);
+#endif
   }
 
-#endif // ASSERT
+  #endif // ASSERT
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_CARDTABLEEXTENSION_HPP

@@ -72,6 +72,9 @@ public:
 
     // Garbage collection
   void oop_follow_contents(oop obj);
+#ifdef TERA_MAJOR_GC
+  void h2_oop_follow_contents(oop obj);
+#endif
 
   // Parallel Scavenge and Parallel Old
   PARALLEL_GC_DECLS

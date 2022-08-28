@@ -3448,6 +3448,10 @@ void TemplateTable::_new() {
     __ xorl(rcx, rcx); // use zero reg to clear memory (shorter code)
     __ store_klass_gap(rax, rcx);  // zero klass gap for compressed oops
     __ store_klass(rax, rsi);      // store klass last
+#ifdef TERA_FLAG
+    if (EnableTeraHeap)
+      __ movptr(Address(rax, oopDesc::teraflag_offset_in_bytes()), (intptr_t) INIT_TF_HEX);
+#endif
 
     {
       SkipIfEqual skip(_masm, &DTraceAllocProbes, false);

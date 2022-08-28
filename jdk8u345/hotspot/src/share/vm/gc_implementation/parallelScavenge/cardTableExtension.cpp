@@ -28,6 +28,7 @@
 #include "gc_implementation/parallelScavenge/parallelScavengeHeap.hpp"
 #include "gc_implementation/parallelScavenge/psTasks.hpp"
 #include "gc_implementation/parallelScavenge/psYoungGen.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oop.psgc.inline.hpp"
 #include "runtime/prefetch.inline.hpp"
@@ -319,6 +320,216 @@ void CardTableExtension::scavenge_contents_parallel(ObjectStartArray* start_arra
     }
   }
 }
+
+
+#ifdef TERA_CARDS
+void CardTableExtension::h2_scavenge_contents_parallel(ObjectStartArray* start_array,
+													  HeapWord* space_top,
+													  PSPromotionManager* pm,
+													  uint stripe_number,
+													  uint stripe_total,
+													  bool is_scavenge_done) {
+  
+	int ssize = TeraStripeSize; // Naked constant!  Default work unit = 8M
+	int dirty_card_count = 0;
+	oop* sp_top = (oop*)space_top;
+	jbyte* start_card = byte_for(Universe::teraHeap()->h2_start_addr());
+	jbyte* end_card = byte_for(sp_top - 1) + 1;
+
+	assert(start_card != end_card, "Sanity check");
+
+	 // Preventing scanning objects more than onece
+	oop* last_scanned = NULL;
+
+	// In the following loop, in the specified area (currently only H2)
+	// process from bottom (start_card in the above variable declaration) to top
+	// (end_card in the above variable declaration).
+
+	// The width of the stripe ssize*stripe_total must be consistent with the
+	// number of so that the complete slice is covered.
+	//
+	// However, it does not process everything from bottom to top, but divides
+	// this into ParallelGCThreads and processes them in parallel.
+	//
+	// Your responsibility is indicated by the argument stripe_number.
+	// Specifically, it is processed as follows.
+	//  (1) Process ssize bytes from the address of start (start_card) + stripe_number * ssize
+  //  (2) Next, advance by ssize * ParallelGCThreads and process ssize bytes.
+	//      That is, ssize bytes from the address of the beginning + stripe_number * ssize + ssize * ParallelGCThreads)
+	//  (3) Further advance by ssize * ParallelGCThreads. Repeat until the
+	//  end_card is reached
+	//
+	// To be precise, start_card and end_card are not the start address or end
+	// address itself to be processed, but the address of the entry in the
+	// CardTableExtension corresponding to that address.
+	// The value 512 of ssize corresponds to 8M because the size of 1 card is
+	// 16K.
+	size_t slice_width = ssize * stripe_total;
+		
+	for (jbyte* slice = start_card; slice < end_card; slice += slice_width) {
+
+		jbyte* worker_start_card = slice + stripe_number * ssize;
+		if (worker_start_card >= end_card)
+			return; // We're done.
+
+		jbyte* worker_end_card = worker_start_card + ssize;
+		if (worker_end_card > end_card) {
+			worker_end_card = end_card;
+		}
+	
+		// We do not want to scan objects more than once. In order to accomplish
+		// this, we assert that any object with an object head inside our
+		// 'slice' belongs to us. We may need to extend the range of scanned
+		// cards if the last object continues into the next 'slice'
+		//
+		// Note! ending cards are exclusive!
+		HeapWord* slice_start = addr_for(worker_start_card);
+		HeapWord* slice_end = MIN2((HeapWord*) sp_top, addr_for(worker_end_card));
+
+		// If there are not objects starting within the chunk, skip it.
+		if (!start_array->th_object_starts_in_range(slice_start, slice_end))
+			continue;
+
+		// Update our beginning addr
+    if (!Universe::teraHeap()->check_if_valid_object(slice_start))
+      continue;
+
+    HeapWord* first_object = Universe::teraHeap()->get_first_object_in_region(slice_start);
+    assert(oop(first_object)->is_oop_or_null(), "check for header");
+
+		oop* first_object_within_slice = (oop*) first_object;
+
+		assert(slice_end <= (HeapWord*)sp_top, "Last object in slice crosses space boundary");
+		assert(is_valid_card_address(worker_start_card), "Invalid worker start card");
+		assert(is_valid_card_address(worker_end_card), "Invalid worker end card");
+		// Note that worker_start_card >= worker_end_card is legal, and happens when
+		// an object spans an entire slice.
+		assert(worker_start_card <= end_card, "worker start card beyond end card");
+		assert(worker_end_card <= end_card, "worker end card beyond end card");
+
+		jbyte* current_card = worker_start_card;
+		while (current_card < worker_end_card) {
+			while (current_card < worker_end_card && th_card_is_clean(*current_card, is_scavenge_done)) {
+				current_card++;
+			}
+
+			jbyte* first_unclean_card = current_card;
+
+			// Find the end of a run of contiguous dirty cards
+			while (current_card < worker_end_card && !th_card_is_clean(*current_card, is_scavenge_done)) {
+				while (current_card < worker_end_card && !th_card_is_clean(*current_card, is_scavenge_done)) {
+					current_card++;
+				}
+				if (current_card < worker_end_card) {
+					// Some objects may be large enough to span several cards. If such
+					// an object has more than one dirty card, separated by a clean card,
+					// we will attempt to scan it twice. The test against "last_scanned"
+					// prevents the redundant object scan, but it does not prevent newly
+					// marked cards from being cleaned.
+                    HeapWord* last_object_in_dirty_region;
+                    size_t size_of_last_object;
+                    HeapWord* end_of_last_object;
+                    if (!Universe::teraHeap()->check_if_valid_object(addr_for(current_card)-1)) {
+                        end_of_last_object = Universe::teraHeap()->get_last_object_end(addr_for(current_card)- 1);
+                    }
+                    else {
+                        last_object_in_dirty_region = start_array->th_object_start(addr_for(current_card)-1);
+                        size_of_last_object = oop(last_object_in_dirty_region)->size();
+                        end_of_last_object = last_object_in_dirty_region + size_of_last_object;
+                    }
+
+					jbyte* ending_card_of_last_object = byte_for(end_of_last_object);
+					assert(ending_card_of_last_object <= worker_end_card, "ending_card_of_last_object is greater than worker_end_card");
+
+					if (ending_card_of_last_object > current_card) {
+						// This means the object spans the next complete card.
+						// We need to bump the current_card to ending_card_of_last_object
+						current_card = ending_card_of_last_object;
+					}
+				}
+			}
+
+			jbyte* following_clean_card = current_card;
+			if (first_unclean_card < worker_end_card && Universe::teraHeap()->check_if_valid_object(addr_for(first_unclean_card))) {
+                oop* p = NULL;
+                if (Universe::teraHeap()->is_start_of_region(addr_for(first_unclean_card))){
+                    p = (oop*) addr_for(first_unclean_card);
+                } else {
+                    p = (oop*) start_array->th_object_start(addr_for(first_unclean_card));
+                }
+				assert((HeapWord*)p <= addr_for(first_unclean_card), "checking");
+
+				// "p" should always be >= "last_scanned" because newly GC
+				// dirtied cards are no longer scanned again (see comments at
+				// end of loop on the increment of "current_card"). Test that
+				// hypothesis before removing this code.
+				// If this code is removed, deal with the first time through the
+				// loop when the last_scanned is the object starting in the
+				// previous slices.
+				assert((p >= last_scanned) ||
+			    			(last_scanned == first_object_within_slice),
+						"Should no longer be possible");
+				if (p < last_scanned) {
+					// Avoid scanning more than once; this can happen because
+					// newgen cards set by GC may a different set than the
+					// originally dirty set
+					p = last_scanned;
+				}
+				
+
+				oop* to = (oop*)addr_for(following_clean_card);
+        
+        if (to > sp_top) {
+          to = sp_top;
+        }
+                
+        assert(first_unclean_card >= worker_start_card, 
+                "first unclean card is less than worker start card");
+        assert(following_clean_card <= worker_end_card, 
+                err_msg("Following clean card: %p must be less than worker end card %p",
+                following_clean_card, worker_end_card));
+
+				while (first_unclean_card < following_clean_card) {
+					*first_unclean_card++ = clean_card;
+				}
+
+				while (p < to) {
+					oop m = oop(p);
+					assert(m->is_oop_or_null(), "check for header");
+					if (is_scavenge_done) {
+#ifdef BACK_REF_STAT
+            Universe::teraHeap()->h2_enable_back_ref_traversal(p);
+#endif
+						m->h2_push_contents(pm);
+					}
+					else
+						m->h2_trace_contents(pm);
+
+          if (!Universe::teraHeap()->check_if_valid_object((HeapWord *)p + m->size()))
+            break;
+
+					p += m->size();
+
+				}
+				pm->drain_stacks_cond_depth();
+				last_scanned = p;
+			}
+			// "current_card" is still the "following_clean_card" or
+			// the current_card is >= the worker_end_card so the
+			// loop will not execute again.
+			assert((current_card == following_clean_card) ||
+					(current_card >= worker_end_card) || Universe::teraHeap()->check_if_valid_object(addr_for(current_card)), 
+					"current_card should only be incremented if it still equals "
+					"following_clean_card");
+			// Increment current_card so that it is not processed again.
+			// It may now be dirty because a old-to-young pointer was
+			// found on it an updated.  If it is now dirty, it cannot be
+			// be safely cleaned in the next iteration.
+			current_card++;
+		}
+	}
+}
+#endif
 
 // This should be called before a scavenge.
 void CardTableExtension::verify_all_young_refs_imprecise() {

@@ -1127,7 +1127,11 @@ void ThreadSafepointState::handle_polling_page_exception() {
       oop result = caller_fr.saved_oop_result(&map);
       assert(result == NULL || result->is_oop(), "must be oop");
       return_value = Handle(thread(), result);
+#ifdef TERA_MAJOR_GC
+      assert(Universe::heap()->is_in_or_null(result) || Universe::teraHeap()->is_obj_in_h2(result), "must be heap pointer");
+#else
       assert(Universe::heap()->is_in_or_null(result), "must be heap pointer");
+#endif
     }
 
     // Block the thread

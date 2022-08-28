@@ -50,9 +50,23 @@ inline void ParallelScavengeHeap::invoke_scavenge()
 inline bool ParallelScavengeHeap::is_in_young(oop p) {
   // Assumes the the old gen address range is lower than that of the young gen.
   const void* loc = (void*) p;
+#ifdef TERA_MAJOR_GC
+  bool result;
+  if (EnableTeraHeap) {
+    result = ((HeapWord*)p >= young_gen()->reserved().start()
+      && (HeapWord*)p < (HeapWord *)Universe::teraHeap()->h2_start_addr());
+  assert(result == young_gen()->is_in_reserved(p),
+         err_msg("incorfastdebugrect test - result=%d, p=" PTR_FORMAT, result, p2i((void*)p)));
+  } else {
+    result = ((HeapWord*)p) >= young_gen()->reserved().start();
+    assert(result == young_gen()->is_in_reserved(p),
+           err_msg("incorrect test - result=%d, p=" PTR_FORMAT, result, p2i((void*)p)));
+  }
+#else
   bool result = ((HeapWord*)p) >= young_gen()->reserved().start();
   assert(result == young_gen()->is_in_reserved(p),
         err_msg("incorrect test - result=%d, p=" PTR_FORMAT, result, p2i((void*)p)));
+#endif
   return result;
 }
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PARALLELSCAVENGEHEAP_INLINE_HPP

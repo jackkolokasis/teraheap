@@ -197,7 +197,12 @@ bool ciObject::should_be_constant() {
 void ciObject::init_flags_from(oop x) {
   int flags = 0;
   if (x != NULL) {
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved(x) ||
+           Universe::teraHeap()->is_obj_in_h2(x), "must be");
+#else
     assert(Universe::heap()->is_in_reserved(x), "must be");
+#endif
     if (x->is_scavengable())
       flags |= SCAVENGABLE_FLAG;
   }

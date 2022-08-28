@@ -29,6 +29,7 @@
 #include "gc_implementation/parallelScavenge/psVirtualspace.hpp"
 #include "gc_implementation/shared/collectorCounters.hpp"
 #include "gc_implementation/shared/gcTrace.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "utilities/stack.hpp"
@@ -132,10 +133,24 @@ class PSScavenge: AllStatic {
   // Return true if a collection was done; false otherwise.
   static bool invoke_no_policy();
 
+#ifdef TERA_MINOR_GC
+  // Scavenge only the dirty objects in H2 TeraHeap. We use this
+  // function in case where we perform directly major gc without
+  // performing minor gc. So using this function we identify backward
+  // references (from H2 to H1) to use them during major gc.
+  static void h2_scavenge_back_references();
+#endif //TERA_MINOR_GC
+
   // If an attempt to promote fails, this method is invoked
   static void oop_promotion_failed(oop obj, markOop obj_mark);
 
   template <class T> static inline bool should_scavenge(T* p);
+
+#ifdef TERA_MINOR_GC
+  template <class T> static inline bool h2_should_scavenge(T* p);
+  
+  template <class T> static inline bool h2_should_trace(T* p);
+#endif // TERA_MINOR_GC
 
   // These call should_scavenge() above and, if it returns true, also check that
   // the object was not newly copied into to_space.  The version with the bool
@@ -154,7 +169,11 @@ class PSScavenge: AllStatic {
   // so it only checks one side of the complete predicate.
 
   inline static bool is_obj_in_young(oop o) {
-    return (HeapWord*)o >= _young_generation_boundary;
+    if (EnableTeraHeap)
+      return ((HeapWord*)o >= _young_generation_boundary 
+              && (HeapWord *)o < (HeapWord *) Universe::teraHeap()->h2_start_addr());
+    else
+      return (HeapWord*)o >= _young_generation_boundary;
   }
 
   inline static bool is_obj_in_young(narrowOop o) {
@@ -162,7 +181,12 @@ class PSScavenge: AllStatic {
   }
 
   inline static bool is_obj_in_young(HeapWord* o) {
-    return o >= _young_generation_boundary;
+    if (EnableTeraHeap)
+      return (o >= _young_generation_boundary 
+              && o < (HeapWord *) Universe::teraHeap()->h2_start_addr());
+    else
+      return o >= _young_generation_boundary;
+
   }
 };
 

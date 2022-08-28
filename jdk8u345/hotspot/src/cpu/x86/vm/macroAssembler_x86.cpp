@@ -27,6 +27,7 @@
 #include "asm/assembler.inline.hpp"
 #include "compiler/disassembler.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "interpreter/interpreter.hpp"
 #include "memory/cardTableModRefBS.hpp"
 #include "memory/resourceArea.hpp"
@@ -4367,10 +4368,42 @@ void MacroAssembler::g1_write_barrier_post(Register store_addr,
 
 
 void MacroAssembler::store_check(Register obj) {
-  // Does a store check for the oop in register obj. The content of
-  // register obj is destroyed afterwards.
-  store_check_part_1(obj);
-  store_check_part_2(obj);
+  Label L_in_h2;
+	Label L_Done;
+
+#ifdef TERA_INTERPRETER
+	if (EnableTeraHeap) {
+    // We have to check if the object belongs to H2 or in H1. So we
+    // compare the object address with start addresss of H2.
+		AddressLiteral h2_start_addr((address)Universe::teraHeap()->h2_start_addr(), relocInfo::none);
+		// Push the teraCache address in r11
+		lea(r11, h2_start_addr);
+
+		cmpptr(obj, r11); 
+		
+		jcc(Assembler::greaterEqual, L_in_h2);
+
+    // Does a store check for the oop in register obj. The content of
+    // register obj is destroyed afterwards.
+		store_check_part_1(obj);
+		store_check_part_2(obj);
+		jmp(L_Done);
+
+		bind(L_in_h2);
+
+		h2_store_check_part_1(obj);
+		h2_store_check_part_2(obj);
+
+		bind(L_Done);
+	}
+	else {
+		store_check_part_1(obj);
+		store_check_part_2(obj);
+	}
+#else
+	store_check_part_1(obj);
+	store_check_part_2(obj);
+#endif //TERA_INTERPRETER
 }
 
 void MacroAssembler::store_check(Register obj, Address dst) {
@@ -4410,6 +4443,42 @@ void MacroAssembler::store_check_part_2(Register obj) {
     movb(as_Address(ArrayAddress(cardtable, index)), 0);
   }
 }
+
+#ifdef TERA_INTERPRETER
+// split the store check operation so that other instructions can be scheduled inbetween
+void MacroAssembler::h2_store_check_part_1(Register obj) {
+  BarrierSet* bs = Universe::heap()->barrier_set();
+  assert(bs->kind() == BarrierSet::CardTableModRef, "Wrong barrier set kind");
+  shrptr(obj, CardTableModRefBS::th_card_shift);
+}
+
+void MacroAssembler::h2_store_check_part_2(Register obj) {
+  BarrierSet* bs = Universe::heap()->barrier_set();
+  assert(bs->kind() == BarrierSet::CardTableModRef, "Wrong barrier set kind");
+  CardTableModRefBS* ct = (CardTableModRefBS*)bs;
+  assert(sizeof(*ct->th_byte_map_base) == sizeof(jbyte), "adjust this code");
+
+  // The calculation for byte_map_base is as follows:
+  // byte_map_base = _byte_map - (uintptr_t(low_bound) >> card_shift);
+  // So this essentially converts an address to a displacement and it will
+  // never need to be relocated. On 64bit however the value may be too
+  // large for a 32bit displacement.
+  intptr_t disp = (intptr_t) ct->th_byte_map_base;
+
+  if (is_simm32(disp)) {
+    Address cardtable(noreg, obj, Address::times_1, disp);
+    movb(cardtable, 0);
+  } else {
+    // By doing it as an ExternalAddress 'disp' could be converted to a rip-relative
+    // displacement and done in a single instruction given favorable mapping and a
+    // smarter version of as_Address. However, 'ExternalAddress' generates a relocation
+    // entry and that entry is not properly handled by the relocation code.
+    AddressLiteral cardtable((address)ct->th_byte_map_base, relocInfo::none);
+    Address index(noreg, obj, Address::times_1);
+    movb(as_Address(ArrayAddress(cardtable, index)), 0);
+  }
+}
+#endif //TERA_INTERPRETER
 
 void MacroAssembler::subptr(Register dst, int32_t imm32) {
   LP64_ONLY(subq(dst, imm32)) NOT_LP64(subl(dst, imm32));

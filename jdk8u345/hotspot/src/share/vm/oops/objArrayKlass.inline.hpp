@@ -54,15 +54,54 @@ void ObjArrayKlass::objarray_follow_contents(oop obj, int index) {
   T* const beg = base + beg_index;
   T* const end = base + end_index;
 
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap && obj->is_marked_move_h2()) {
+		Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+		Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+
+    // Push the non-NULL elements of the next stride on the marking stack.
+		for (T* e = beg; e < end; e++) {
+			MarkSweep::tera_mark_and_push<T>(e);
+		}
+	}
+	else {
+    // Push the non-NULL elements of the next stride on the marking stack.
+    for (T* e = beg; e < end; e++) {
+			MarkSweep::mark_and_push<T>(e);
+		}
+	}
+#else
   // Push the non-NULL elements of the next stride on the marking stack.
-  for (T* e = beg; e < end; e++) {
-    MarkSweep::mark_and_push<T>(e);
-  }
+	for (T* e = beg; e < end; e++) {
+		MarkSweep::mark_and_push<T>(e);
+	}
+#endif
 
   if (end_index < len) {
     MarkSweep::push_objarray(a, end_index); // Push the continuation.
   }
 }
+
+#ifdef TERA_MAJOR_GC
+template <class T>
+void ObjArrayKlass::h2_objarray_follow_contents(oop obj, int index) {
+  objArrayOop a = objArrayOop(obj);
+  const size_t len = size_t(a->length());
+  const size_t beg_index = size_t(index);
+  assert(beg_index < len || len == 0, "index too large");
+
+  const size_t stride = MIN2(len - beg_index, ObjArrayMarkingStride);
+  const size_t end_index = beg_index + stride;
+  T* const base = (T*)a->base();
+  T* const beg = base + beg_index;
+  T* const end = base + end_index;
+
+  // Push the non-NULL elements of the next stride on the marking stack.
+  for (T* e = beg; e < end; e++) {
+    MarkSweep::h2_liveness_analysis<T>(e);
+  }
+}
+#endif
 
 #if INCLUDE_ALL_GCS
 void ObjArrayKlass::oop_follow_contents(ParCompactionManager* cm, oop obj,

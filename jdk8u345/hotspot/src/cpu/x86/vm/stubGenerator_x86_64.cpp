@@ -24,6 +24,7 @@
 
 #include "asm/macroAssembler.hpp"
 #include "asm/macroAssembler.inline.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "interpreter/interpreter.hpp"
 #include "nativeInst_x86.hpp"
 #include "oops/instanceOop.hpp"
@@ -1273,7 +1274,70 @@ private:
     case BarrierSet::CardTableExtension: {
       CardTableModRefBS *ct = (CardTableModRefBS *)bs;
       assert(sizeof(*ct->byte_map_base) == sizeof(jbyte), "adjust this code");
+      DEBUG_ONLY(if (EnableTeraHeap) { assert(sizeof(*ct->th_byte_map_base) == sizeof(jbyte), "adjust this code"); });
 
+#ifdef TERA_INTERPRETER
+      if (EnableTeraHeap) {
+        Label L_loop;
+        Label L_in_h2;
+        Label L_done;
+        const Register end = count;
+
+        __ leaq(end, Address(start, count, TIMES_OOP, 0));  // end == start+count*oop_size
+        __ subptr(end, BytesPerHeapOop); // end - 1 to make inclusive
+
+        AddressLiteral h2_start_addr((address)Universe::teraHeap()->h2_start_addr(), relocInfo::none);
+        __ lea(scratch, h2_start_addr);
+
+        __ cmpptr(start, scratch);
+        __ jcc(Assembler::greaterEqual, L_in_h2);
+
+        __ shrptr(start, CardTableModRefBS::card_shift);
+        __ shrptr(end,   CardTableModRefBS::card_shift);
+        __ subptr(end, start); // end --> cards count
+
+        int64_t disp = (int64_t) ct->byte_map_base;
+        __ mov64(scratch, disp);
+        __ addptr(start, scratch);
+        __ jmp(L_done);
+
+        __ bind(L_in_h2);
+
+        __ shrptr(start, CardTableModRefBS::th_card_shift);
+        __ shrptr(end,   CardTableModRefBS::th_card_shift);
+        __ subptr(end, start); // end --> cards count
+
+        int64_t th_disp = (int64_t) ct->th_byte_map_base;
+        __ mov64(scratch, th_disp);
+        __ addptr(start, scratch);
+
+        __ BIND(L_done);
+        __ BIND(L_loop);
+        __ movb(Address(start, count, Address::times_1), 0);
+        __ decrement(count);
+        __ jcc(Assembler::greaterEqual, L_loop);
+
+      } else {
+
+        Label L_loop;
+        const Register end = count;
+
+        __ leaq(end, Address(start, count, TIMES_OOP,
+                             0));        // end == start+count*oop_size
+        __ subptr(end, BytesPerHeapOop); // end - 1 to make inclusive
+        __ shrptr(start, CardTableModRefBS::card_shift);
+        __ shrptr(end, CardTableModRefBS::card_shift);
+        __ subptr(end, start); // end --> cards count
+
+        int64_t disp = (int64_t)ct->byte_map_base;
+        __ mov64(scratch, disp);
+        __ addptr(start, scratch);
+        __ BIND(L_loop);
+        __ movb(Address(start, count, Address::times_1), 0);
+        __ decrement(count);
+        __ jcc(Assembler::greaterEqual, L_loop);
+      }
+#else
       Label L_loop;
       const Register end = count;
 
@@ -1291,6 +1355,8 @@ private:
       __ movb(Address(start, count, Address::times_1), 0);
       __ decrement(count);
       __ jcc(Assembler::greaterEqual, L_loop);
+
+#endif // TERA_INTERPRETER
     } break;
     default:
       ShouldNotReachHere();

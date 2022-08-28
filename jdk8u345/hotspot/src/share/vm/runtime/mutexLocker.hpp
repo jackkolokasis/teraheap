@@ -160,6 +160,11 @@ extern Mutex*   JfrCounters_lock;                // provides atomic updates of J
 extern Mutex*   UnsafeJlong_lock;                // provides Unsafe atomic updates to jlongs on platforms that don't support cx8
 #endif
 
+#ifdef TERA_MINOR_GC
+extern Mutex*   tera_heap_lock;                 // Protects backward reference stacks
+extern Mutex*   tera_heap_group_lock;           // Protects region grouping in H2
+#endif // TERA_MINOR_GC
+
 // A MutexLocker provides mutual exclusion with respect to a given mutex
 // for the scope which contains the locker.  The lock is an OS lock, not
 // an object lock, and the two do not interoperate.  Do not use Mutex-based

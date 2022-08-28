@@ -33,6 +33,7 @@
 #include "gc_implementation/parallelScavenge/psParallelCompact.hpp"
 #include "gc_implementation/parallelScavenge/psScavenge.inline.hpp"
 #include "gc_implementation/parallelScavenge/psTasks.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "gc_implementation/shared/gcHeapSummary.hpp"
 #include "gc_implementation/shared/gcTimer.hpp"
 #include "gc_implementation/shared/gcTrace.hpp"
@@ -77,6 +78,10 @@ CollectorCounters*         PSScavenge::_counters = NULL;
 class PSIsAliveClosure: public BoolObjectClosure {
 public:
   bool do_object_b(oop p) {
+#ifdef TERA_MINOR_GC
+    if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(p))
+      return true;
+#endif //TERA_MINOR_GC
     return (!PSScavenge::is_obj_in_young(p)) || p->is_forwarded();
   }
 };
@@ -101,6 +106,7 @@ public:
     assert (!oopDesc::is_null(*p), "expected non-null ref");
     assert ((oopDesc::load_decode_heap_oop_not_null(p))->is_oop(),
             "expected an oop while scanning weak refs");
+    assert(!Universe::teraHeap()->is_field_in_h2((void *)p), "Error");
 
     // Weak refs may be visited more than once.
     if (PSScavenge::should_scavenge(p, _to_space)) {
@@ -127,6 +133,9 @@ class PSEvacuateFollowersClosure: public VoidClosure {
 
 class PSPromotionFailedClosure : public ObjectClosure {
   virtual void do_object(oop obj) {
+    #ifdef TERA_MINOR_GC
+    assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object should not be in H2 (TeraHeap)");
+    #endif //TERA_MINOR_GC
     if (obj->is_forwarded()) {
       obj->init_mark();
     }
@@ -252,8 +261,75 @@ bool PSScavenge::invoke() {
     }
   }
 
+#ifdef TERA_MINOR_GC
+  if (EnableTeraHeap)
+	  Universe::teraHeap()->h2_clear_back_ref_stacks();
+#endif // TERA_MINOR_GC
+
   return full_gc_done;
 }
+
+#ifdef TERA_MINOR_GC
+// Scavenge only the dirty objects in H2 TeraHeap. We use this
+// function in case where we perform directly major gc without
+// performing minor gc. So using this function we identify backward
+// references (from H2 to H1) to use them during major gc.
+void PSScavenge::h2_scavenge_back_references() {
+  struct timeval start_time;
+  struct timeval end_time;
+
+  assert(Universe::teraHeap()->h2_is_empty_back_ref_stacks(), "Backward stack should be empty");
+
+  if (TeraHeapStatistics) 
+    gettimeofday(&start_time, NULL);
+
+  // Release all previously held resources
+  gc_task_manager()->release_all_resources();
+
+  // Set the number of GC threads to be used in this collection
+  gc_task_manager()->set_active_gang();
+  gc_task_manager()->task_idle_workers();
+
+  uint active_workers = gc_task_manager()->active_workers();
+
+  // Create the task queu for the scavengers
+  GCTaskQueue* q = GCTaskQueue::create();
+
+  PSPromotionManager* promotion_manager = PSPromotionManager::vm_thread_promotion_manager();
+
+  // Give advise to kernel to prefetch pages for TeraCache random
+  Universe::teraHeap()->h2_enable_rand_faults();
+
+  uint stripe_total = active_workers;
+  for (uint i = 0; i < stripe_total; i++) {
+    q->enqueue(new H2ToH1RootsTask(Universe::teraHeap(), 
+                                   (HeapWord*)Universe::teraHeap()->h2_top_addr(), 
+                                   i, stripe_total));
+  }
+
+  // End the scavengers
+  ParallelTaskTerminator terminator(active_workers,
+                                    (TaskQueueSetSuper*) promotion_manager->stack_array_depth());
+
+  if (active_workers > 1) {
+    for (uint j = 0; j < active_workers; j++) {
+      q->enqueue(new StealTask(&terminator));
+    }
+  }
+
+  gc_task_manager()->execute_and_wait(q);
+
+  gc_task_manager()->release_idle_workers();
+
+  if (TeraHeapStatistics) {
+    gettimeofday(&end_time, NULL);
+
+    thlog_or_tty->print_cr("[STATISTICS] | PHASE0 = %llu\n",
+                           (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                           (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+  }
+}
+#endif //TERA_MINOR_GC
 
 // This method contains no policy. You should probably
 // be calling invoke() instead.
@@ -292,6 +368,31 @@ bool PSScavenge::invoke_no_policy() {
   PSYoungGen* young_gen = heap->young_gen();
   PSOldGen* old_gen = heap->old_gen();
   PSAdaptiveSizePolicy* size_policy = heap->size_policy();
+
+#ifdef TERA_MINOR_GC
+  BarrierSet *bs = Universe::heap()->barrier_set();
+  ModRefBarrierSet* modBS = (ModRefBarrierSet*)bs;
+  static bool first_minor_gc = true;
+
+  if (EnableTeraHeap) {
+	  // In the first minor collection make all the cells in the teracache card
+	  // table to be clean. We note that the default value of the card
+	  // table during initialization is dirty. Thus increase the overhead of
+	  // traversing the card tables in teraCache.
+	  if (first_minor_gc) {
+		  modBS->th_clean_cards(
+				  (HeapWord *) Universe::teraHeap()->h2_start_addr(), 
+				  (HeapWord *) Universe::teraHeap()->h2_end_addr() - 1);
+		  first_minor_gc = false;
+	  }
+
+    if (TeraHeapCardStatistics) {
+      modBS->th_num_dirty_cards(
+          (HeapWord*)Universe::teraHeap()->h2_start_addr(),
+          (HeapWord *) Universe::teraHeap()->h2_top_addr(), 1);
+    }
+  }
+#endif // TERA_MINOR_GC
 
   heap->increment_total_collections();
 
@@ -400,6 +501,23 @@ bool PSScavenge::invoke_no_policy() {
       ParallelScavengeHeap::ParStrongRootsScope psrs;
 
       GCTaskQueue* q = GCTaskQueue::create();
+
+#ifdef TERA_MINOR_GC
+	  if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty())
+	  {
+		  // Give advise to kernel to prefetch pages for TeraCache random
+		  Universe::teraHeap()->h2_enable_rand_faults();
+
+		  // There are objects from TeraCache to heap if there are objects in
+		  // the old gen
+		  uint stripe_total = active_workers;
+		  for (uint i = 0; i < stripe_total; i++) {
+		      q->enqueue(new H2ToYoungRootsTask(Universe::teraHeap(), 
+		    			 (HeapWord*)Universe::teraHeap()->h2_top_addr(), 
+		    			 i, stripe_total));
+		  }
+	  }
+#endif
 
       if (!old_gen->object_space()->is_empty()) {
         // There are only old-to-young pointers if there are objects
@@ -700,6 +818,21 @@ bool PSScavenge::invoke_no_policy() {
   _gc_timer.register_gc_end();
 
   _gc_tracer.report_gc_end(_gc_timer.gc_end(), _gc_timer.time_partitions());
+  
+  if (EnableTeraHeap) {
+    // Give advise to kernel to prefetch pages for TeraCache sequentially
+    Universe::teraHeap()->h2_enable_seq_faults();
+
+    // Print statistics for TeraCache
+    if (TeraHeapStatistics)
+      Universe::teraHeap()->print_minor_gc_statistics();
+
+    if (TeraHeapCardStatistics) {
+      modBS->th_num_dirty_cards(
+          (HeapWord*)Universe::teraHeap()->h2_start_addr(),
+          (HeapWord *) Universe::teraHeap()->h2_top_addr(), 0);
+    }
+  }
 
   return !promotion_failure_occurred;
 }

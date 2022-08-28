@@ -33,6 +33,7 @@
 #include "gc_implementation/parallelScavenge/psOldGen.hpp"
 #include "gc_implementation/parallelScavenge/psScavenge.hpp"
 #include "gc_implementation/parallelScavenge/psYoungGen.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "gc_implementation/shared/gcHeapSummary.hpp"
 #include "gc_implementation/shared/gcTimer.hpp"
 #include "gc_implementation/shared/gcTrace.hpp"
@@ -103,6 +104,11 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   uint count = maximum_heap_compaction ? 1 : MarkSweepAlwaysCompactCount;
   UIntFlagSetting flag_setting(MarkSweepAlwaysCompactCount, count);
   PSMarkSweep::invoke_no_policy(clear_all_soft_refs || maximum_heap_compaction);
+
+#ifdef TERA_MAJOR_GC
+  // If the major GC fails then we need to clear the backward stacks
+  Universe::teraHeap()->h2_clear_back_ref_stacks();
+#endif
 }
 
 // This method contains no policy. You should probably
@@ -200,6 +206,25 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
     ref_processor()->enable_discovery(true /*verify_disabled*/, true /*verify_no_refs*/);
     ref_processor()->setup_policy(clear_all_softrefs);
+	
+    // Initialize TeraCache statistics counters to 0
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap) {
+    // We scavenge only the dirty objects in TeraCache and prepare the
+      // backward stacks. 
+		if (!Universe::teraHeap()->h2_is_empty())
+			PSScavenge::h2_scavenge_back_references();
+
+		if (TeraHeapStatistics)
+			Universe::teraHeap()->h2_init_stats_counters();
+	
+		// Give advise to kernel to prefetch pages for TeraCache random
+		Universe::teraHeap()->h2_enable_rand_faults();
+
+		// Reset the used field of all regions
+		Universe::teraHeap()->h2_reset_used_field();
+	}
+#endif // TERA_MAJOR_GC
 
     mark_sweep_phase1(clear_all_softrefs);
 
@@ -213,9 +238,36 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
 
     mark_sweep_phase4();
 
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+
+      if (TeraHeapAllocatorStatistics)
+        Universe::teraHeap()->print_region_groups();
+
+      if (H2ObjectPlacement)
+        Universe::teraHeap()->h2_print_objects_per_region();
+
+      if (H2LivenessAnalysis)
+        Universe::teraHeap()->h2_mark_live_objects_per_region();
+
+      // Free all the regions that are unused after marking
+      Universe::teraHeap()->free_unused_regions();
+	}
+#endif   
+
     restore_marks();
 
     deallocate_stacks();
+
+#ifdef TERA_MINOR_GC
+    // Deallocate stacks for TeraCache
+    if (EnableTeraHeap) {
+      Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->h2_print_stats();
+    }
+#endif
 
     if (ZapUnusedHeapArea) {
       // Do a complete mangle (top to end) because the usage for
@@ -514,6 +566,15 @@ void PSMarkSweep::deallocate_stacks() {
 }
 
 void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
+
+#ifdef TERA_MAJOR_GC
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraHeap && TeraHeapStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif
+
   // Recursively traverse all live objects and mark them
   GCTraceTime tm("phase 1", PrintGCDetails && Verbose, true, _gc_timer, _gc_tracer->gc_id());
   trace(" 1");
@@ -540,6 +601,12 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
     ClassLoaderDataGraph::always_strong_cld_do(follow_cld_closure());
     // Do not treat nmethods as strong roots for mark/sweep, since we can unload them.
     //CodeCache::scavenge_root_nmethods_do(CodeBlobToOopClosure(mark_and_push_closure()));
+
+#ifdef TERA_MAJOR_GC
+    // Traverse TeraCache
+    if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty())
+      Universe::teraHeap()->h2_mark_back_references();
+#endif // TERA_MAJOR_GC
   }
 
   // Flush marking stack.
@@ -557,6 +624,48 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   // This is the point where the entire marking should have completed.
   assert(_marking_stack.is_empty(), "Marking should have completed");
 
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap) {
+	  // Unload classes and purge the SystemDictionary.
+	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
+
+	  // Unload nmethods.
+	  CodeCache::do_unloading(is_alive_closure(), purged_class);
+	  
+    // Delete entries for dead interned strings.
+	  StringTable::unlink(is_alive_closure());
+
+	  // Clean up unreferenced symbols in symbol table.
+	  SymbolTable::unlink();
+
+    if (TeraHeapStatistics) {
+      gettimeofday(&end_time, NULL);
+
+      thlog_or_tty->print_cr("[STATISTICS] | PHASE1 = %llu\n",
+                             (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                             (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+
+      if (TeraHeapAllocatorStatistics)
+        Universe::teraHeap()->print_h2_active_regions();
+    }
+  }
+  else {
+	  // Unload classes and purge the SystemDictionary.
+	  bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
+
+	  // Unload nmethds.
+	  CodeCache::do_unloading(is_alive_closure(), purged_class);
+
+	  // Prune dead klasses from subklass/sibling/impleme
+	  Klass::clean_weak_klass_links(is_alive_closure());
+
+	  // Delete entries for dead interned strings.
+	  StringTable::unlink(is_alive_closure());
+
+	  // Clean up unreferenced symbols in symbol table.
+	  SymbolTable::unlink();
+  }
+#else
   // Unload classes and purge the SystemDictionary.
   bool purged_class = SystemDictionary::do_unloading(is_alive_closure());
 
@@ -571,11 +680,23 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
 
   // Clean up unreferenced symbols in symbol table.
   SymbolTable::unlink();
+
+#endif //TERA_MAJOR_GC
+
   _gc_tracer->report_object_count_after_gc(is_alive_closure());
 }
 
 
 void PSMarkSweep::mark_sweep_phase2() {
+
+#ifdef TERA_MAJOR_GC
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraHeap && TeraHeapStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif
+
   GCTraceTime tm("phase 2", PrintGCDetails && Verbose, true, _gc_timer, _gc_tracer->gc_id());
   trace("2");
 
@@ -595,9 +716,28 @@ void PSMarkSweep::mark_sweep_phase2() {
 
   // This will also compact the young gen spaces.
   old_gen->precompact();
+
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap && TeraHeapStatistics) {
+		gettimeofday(&end_time, NULL);
+
+    thlog_or_tty->print_cr("[STATISTICS] | PHASE2 = %llu\n",
+                           (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                           (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+	}
+#endif // TERA_MAJOR_GC
 }
 
 void PSMarkSweep::mark_sweep_phase3() {
+
+#ifdef TERA_MAJOR_GC
+	struct timeval start_time;
+	struct timeval end_time;
+
+  if (EnableTeraHeap && TeraHeapStatistics) 
+    gettimeofday(&start_time, NULL);
+#endif // TERA_MAJOR_GC
+
   // Adjust the pointers to reflect the new locations
   GCTraceTime tm("phase 3", PrintGCDetails && Verbose, true, _gc_timer, _gc_tracer->gc_id());
   trace("3");
@@ -610,6 +750,12 @@ void PSMarkSweep::mark_sweep_phase3() {
 
   // Need to clear claim bits before the tracing starts.
   ClassLoaderDataGraph::clear_claimed_marks();
+
+#ifdef TERA_MAJOR_GC
+  // Traverse TeraCache
+  if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty())
+	  Universe::teraHeap()->h2_adjust_back_references();
+#endif // TERA_MAJOR_GC
 
   // General strong roots.
   Universe::oops_do(adjust_pointer_closure());
@@ -639,9 +785,28 @@ void PSMarkSweep::mark_sweep_phase3() {
 
   young_gen->adjust_pointers();
   old_gen->adjust_pointers();
+
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap && TeraHeapStatistics) {
+    gettimeofday(&end_time, NULL);
+
+    thlog_or_tty->print_cr("[STATISTICS] | PHASE3 = %llu\n",
+                           (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                           (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+  }
+#endif // TERA_MAJOR_GC
 }
 
 void PSMarkSweep::mark_sweep_phase4() {
+
+#ifdef TERA_MAJOR_GC
+	struct timeval start_time;
+	struct timeval end_time;
+
+	if (EnableTeraHeap && TeraHeapStatistics) 
+		gettimeofday(&start_time, NULL);
+#endif // TERA_MAJOR_GC
+
   EventMark m("4 compact heap");
   GCTraceTime tm("phase 4", PrintGCDetails && Verbose, true, _gc_timer, _gc_tracer->gc_id());
   trace("4");
@@ -656,6 +821,31 @@ void PSMarkSweep::mark_sweep_phase4() {
 
   old_gen->compact();
   young_gen->compact();
+
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap) {
+
+#if defined(ASYNC) && defined(PR_BUFFER)
+    Universe::teraHeap()->h2_free_promotion_buffers();
+    while(!Universe::teraHeap()->h2_areq_completed());
+#elif defined(ASYNC) && !defined(PR_BUFFER)
+    while(!Universe::teraHeap()->h2_areq_completed());
+#elif defined(FMAP)
+    Universe::teraHeap()->tc_fsync();
+#endif
+
+    if (TeraHeapStatistics) {
+      gettimeofday(&end_time, NULL);
+
+      thlog_or_tty->print_cr("[STATISTICS] | PHASE4 = %llu\n",
+                             (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                             (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+    }
+
+    // Give advise to kernel to prefetch pages for TeraCache sequentially
+    Universe::teraHeap()->h2_enable_seq_faults();
+  }
+#endif // TERA_MAJOR_GC
 }
 
 jlong PSMarkSweep::millis_since_last_gc() {

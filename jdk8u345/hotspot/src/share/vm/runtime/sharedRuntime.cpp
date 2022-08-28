@@ -32,6 +32,7 @@
 #include "compiler/compileBroker.hpp"
 #include "compiler/compilerOracle.hpp"
 #include "compiler/disassembler.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #include "interpreter/interpreter.hpp"
 #include "interpreter/interpreterRuntime.hpp"
 #include "memory/gcLocker.inline.hpp"
@@ -240,6 +241,38 @@ JRT_LEAF(void, SharedRuntime::g1_wb_post(void* card_addr, JavaThread* thread))
 JRT_END
 
 #endif // INCLUDE_ALL_GCS
+
+#ifdef TERA_C2
+JRT_LEAF(void, SharedRuntime::h2_wb_post(void* obj))
+	CardTableModRefBS* ct = (CardTableModRefBS*)(Universe::heap()->barrier_set());
+
+#ifdef C2_ONLY_LEAF_CALL
+  assert(sizeof(*ct->th_byte_map_base) == sizeof(jbyte), "Adjust users of this code");
+  assert(ct->th_byte_map_base != NULL, "TeraHeap card table is NULL");
+  assert(sizeof(*ct->byte_map_base) == sizeof(jbyte), "Adjust users of this code");
+  assert(ct->byte_map_base != NULL, "Heap card table is NULL");
+  assert(Universe::teraHeap()->is_field_in_h2(obj) || Universe::heap()->is_in_reserved(obj),
+        err_msg("Objects is out of reserved space %p", (HeapWord *) obj));
+
+	if (Universe::teraHeap()->is_field_in_h2(obj))
+		ct->th_byte_map_base[uintptr_t(obj) >> CardTableModRefBS::th_card_shift] = 0;
+	else
+		ct->byte_map_base[uintptr_t(obj) >> CardTableModRefBS::card_shift] = 0;
+
+#else
+
+  assert(sizeof(*ct->th_byte_map_base) == sizeof(jbyte), "adjust users of this code");
+  assert(ct->th_byte_map_base != NULL, "TeraCache card table is NULL");
+  assert(Universe::teraHeap()->is_field_in_h2(obj), 
+         err_msg("Objects is out of reserved space %p | is in H1 = %d", 
+         (HeapWord*)obj, Universe::heap()->is_in_reserved(obj)));
+		
+	ct->th_byte_map_base[uintptr_t(obj) >> CardTableModRefBS::th_card_shift] = 0;
+
+#endif // C2_ONLY_LEAF_CALL
+	JRT_END
+#endif // TERA_C2
+
 
 
 JRT_LEAF(jlong, SharedRuntime::lmul(jlong y, jlong x))

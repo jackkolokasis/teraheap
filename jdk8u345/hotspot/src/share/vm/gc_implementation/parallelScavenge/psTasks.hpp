@@ -27,6 +27,7 @@
 
 #include "memory/allocation.hpp"
 #include "utilities/growableArray.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 
 //
 // psTasks.hpp is a collection of GCTasks used by the
@@ -179,5 +180,96 @@ class OldToYoungRootsTask : public GCTask {
 
   virtual void do_it(GCTaskManager* manager, uint which);
 };
+
+#ifdef TERA_MINOR_GC
+//
+// TeraToHeapRootsTask
+//
+// This task is used to scan old to young roots in parallel
+//
+// A GC thread executing this tasks divides the generation (old gen)
+// into slices and takes a stripe in the slice as its part of the
+// work.
+//
+//      +===============+        slice 0
+//      |  stripe 0     |
+//      +---------------+
+//      |  stripe 1     |
+//      +---------------+
+//      |  stripe 2     |
+//      +---------------+
+//      |  stripe 3     |
+//      +===============+        slice 1
+//      |  stripe 0     |
+//      +---------------+
+//      |  stripe 1     |
+//      +---------------+
+//      |  stripe 2     |
+//      +---------------+
+//      |  stripe 3     |
+//      +===============+        slice 2
+//      ...
+//
+// A task is created for each stripe.  In this case there are 4 tasks
+// created.  A GC thread first works on its stripe within slice 0
+// and then moves to its stripe in the next slice until all stripes
+// exceed the top of the generation.  Note that having fewer GC threads
+// than stripes works because all the tasks are executed so all stripes
+// will be covered.  In this example if 4 tasks have been created to cover
+// all the stripes and there are only 3 threads, one of the threads will
+// get the tasks with the 4th stripe.  However, there is a dependence in
+// CardTableExtension::scavenge_contents_parallel() on the number
+// of tasks created.  In scavenge_contents_parallel the distance
+// to the next stripe is calculated based on the number of tasks.
+// If the stripe width is ssize, a task's next stripe is at
+// ssize * number_of_tasks (= slice_stride).  In this case after
+// finishing stripe 0 in slice 0, the thread finds the stripe 0 in slice1
+// by adding slice_stride to the start of stripe 0 in slice 0 to get
+// to the start of stride 0 in slice 1.
+class H2ToYoungRootsTask : public GCTask {
+private:
+  TeraHeap* _teraHeap;
+  HeapWord* _teraHeap_top;
+  uint _stripe_number;
+  uint _stripe_total;
+
+ public:
+  H2ToYoungRootsTask(TeraHeap *teraHeap,
+                      HeapWord* teraHeap_top,
+                      uint stripe_number,
+                      uint stripe_total) :
+    _teraHeap(teraHeap),
+    _teraHeap_top(teraHeap_top),
+    _stripe_number(stripe_number),
+    _stripe_total(stripe_total) { }
+
+  char* name() { return (char *)"h2-to-young-roots-task"; }
+
+  virtual void do_it(GCTaskManager* manager, uint which);
+};
+
+class H2ToH1RootsTask : public GCTask {
+private:
+  TeraHeap* _teraHeap;
+  HeapWord* _teraHeap_top;
+  uint _stripe_number;
+  uint _stripe_total;
+
+public:
+  H2ToH1RootsTask(TeraHeap *teraHeap,
+                  HeapWord* teraHeap_top,
+                  uint stripe_number,
+                  uint stripe_total) :
+    _teraHeap(teraHeap),
+    _teraHeap_top(teraHeap_top),
+    _stripe_number(stripe_number),
+    _stripe_total(stripe_total) { }
+
+  char* name() { return (char *)"h2-to-h1-roots-task"; }
+
+  virtual void do_it(GCTaskManager* manager, uint which);
+};
+#endif //TERA_MINOR_GC
+
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSTASKS_HPP

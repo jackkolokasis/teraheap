@@ -182,6 +182,10 @@ class SharedRuntime: AllStatic {
   static void g1_wb_post(void* card_addr, JavaThread* thread);
 #endif // INCLUDE_ALL_GCS
 
+#ifdef TERA_C2
+  static void h2_wb_post(void* obj);
+#endif
+
   // exception handling and implicit exceptions
   static address compute_compiled_exc_handler(nmethod* nm, address ret_pc, Handle& exception,
                                               bool force_unwind, bool top_frame_only, bool& recursive_exception_occurred);

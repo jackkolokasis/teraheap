@@ -26,6 +26,7 @@
 #define SHARE_VM_MEMORY_MODREFBARRIERSET_HPP
 
 #include "memory/barrierSet.hpp"
+#include "memory/sharedDefines.h"
 
 // This kind of "BarrierSet" allows a "CollectedHeap" to detect and
 // enumerate ref fields that have been modified (since the last
@@ -91,6 +92,12 @@ public:
   // is true, the caller asserts that the entire heap is being invalidated,
   // which may admit an optimized implementation for some barriers.
   virtual void invalidate(MemRegion mr, bool whole_heap = false) = 0;
+
+#ifdef TERA_CARDS
+  virtual void th_write_ref_field(void *obj) = 0;
+  virtual void th_clean_cards(HeapWord *start, HeapWord* end) = 0;
+  virtual bool th_num_dirty_cards(HeapWord *start, HeapWord* end, bool before) = 0;
+#endif
 
   // The caller guarantees that "mr" contains no references.  (Perhaps it's
   // objects have been moved elsewhere.)

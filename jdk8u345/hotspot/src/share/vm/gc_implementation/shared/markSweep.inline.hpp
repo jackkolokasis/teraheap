@@ -32,6 +32,7 @@
 #if INCLUDE_ALL_GCS
 #include "gc_implementation/g1/g1StringDedup.hpp"
 #include "gc_implementation/parallelScavenge/psParallelCompact.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #endif // INCLUDE_ALL_GCS
 
 inline void MarkSweep::mark_object(oop obj) {
@@ -71,11 +72,138 @@ template <class T> inline void MarkSweep::follow_root(T* p) {
   follow_stack();
 }
 
-template <class T> inline void MarkSweep::mark_and_push(T* p) {
-//  assert(Universe::heap()->is_in_reserved(p), "should be in object space");
+#ifdef TERA_MAJOR_GC
+
+template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+    if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj))
+    {
+      // Mark active region
+      Universe::teraHeap()->mark_used_region((HeapWord*)obj);
+
+      if (H2LivenessAnalysis)
+        obj->set_live();
+
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->h2_increase_fwd_ref();
+      return;
+    }
+
+#ifdef TEST_CLONE
+		DEBUG_ONLY(if (EnableTeraHeap) { assert(obj->get_obj_state() == MOVE_TO_TERA || obj->get_obj_state() == INIT_TF, "Fix clone operation"); });
+#endif
+
+		if (!obj->mark()->is_marked()) {
+
+			mark_object(obj);
+
+			if (!obj->is_marked_move_h2()) {
+				uint64_t groupId = Universe::teraHeap()->h2_get_region_groupId((void *) p);
+				uint64_t partId = Universe::teraHeap()->h2_get_region_partId((void *) p);
+				obj->mark_move_h2(groupId, partId);
+			}
+
+			_marking_stack.push(obj);
+		}
+	}
+}
+
+template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
+  T heap_oop = oopDesc::load_heap_oop(p);
+
+  if (!oopDesc::is_null(heap_oop)) {
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+    if (EnableTeraHeap && (Universe::teraHeap()->is_obj_in_h2(obj)))
+    {
+      Universe::teraHeap()->mark_used_region((HeapWord*)obj);
+
+      if (H2LivenessAnalysis)
+        obj->set_live();
+
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->h2_increase_fwd_ref();
+
+#ifdef FWD_REF_STAT
+      Universe::teraHeap()->h2_add_fwd_ref_stat(obj);
+#endif
+      return;
+    }
+
+#ifdef TEST_CLONE
+		DEBUG_ONLY(if (EnableTeraHeap) { assert(obj->get_obj_state() == MOVE_TO_TERA || obj->get_obj_state() == INIT_TF, "Fix clone operation"); });
+#endif
+
+#ifdef SPARK_POLICY
+    if (!(obj->mark()->is_marked() && obj->is_marked_move_h2())) {
+      if (!obj->mark()->is_marked())
+        mark_object(obj);
+
+      if (!obj->is_marked_move_h2())
+        obj->mark_move_h2(Universe::teraHeap()->get_cur_obj_group_id(),
+                            Universe::teraHeap()->get_cur_obj_part_id());
+
+      _marking_stack.push(obj);
+    }
+#else
+    if (!obj->is_marked_move_h2()) {
+      obj->mark_move_h2(Universe::teraHeap()->get_cur_obj_group_id(),
+                          Universe::teraHeap()->get_cur_obj_part_id());
+    }
+
+    if (!obj->mark()->is_marked()) {
+      mark_object(obj);
+      _marking_stack.push(obj);
+    }
+#endif // SPARK_POLICY
+  }
+}
+
+// This function is used for h2 liveness analysis. We detect the live
+// objects in each H2 regions
+template <class T> inline void MarkSweep::h2_liveness_analysis(T* p) {
+    //oop obj = oop(p);
+	T heap_oop = oopDesc::load_heap_oop(p);
+	if (oopDesc::is_null(heap_oop))
+        return;
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+    if (!Universe::teraHeap()->is_obj_in_h2(obj))
+        return;
+    if (obj->is_visited())
+        return;
+    obj->set_visited();
+    obj->klass()->h2_oop_follow_contents(obj);
+}
+
+#endif // TERA_MAJOR_GC
+
+template <class T> inline void MarkSweep::mark_and_push(T* p) {
+  T heap_oop = oopDesc::load_heap_oop(p);
+  if (!oopDesc::is_null(heap_oop)) {
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+#ifdef TERA_MAJOR_GC
+		if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj))
+		{
+      //Mark active region
+      Universe::teraHeap()->mark_used_region((HeapWord*)obj);
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->h2_increase_fwd_ref();
+
+#ifdef FWD_REF_STAT
+			Universe::teraHeap()->h2_add_fwd_ref_stat(obj);
+#endif
+			return;
+		}
+#endif // TERA_MAJOR_GC
+
+#ifdef TEST_CLONE
+		DEBUG_ONLY(if (EnableTeraHeap) { assert(obj->get_obj_state() == MOVE_TO_TERA || obj->get_obj_state() == INIT_TF, "Fix clone operation"); });
+#endif
+
     if (!obj->mark()->is_marked()) {
       mark_object(obj);
       _marking_stack.push(obj);
@@ -93,14 +221,27 @@ template <class T> inline void MarkSweep::adjust_pointer(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop obj     = oopDesc::decode_heap_oop_not_null(heap_oop);
-    oop new_obj = oop(obj->mark()->decode_pointer());
+#ifdef TERA_MAJOR_GC
+		oop new_obj = NULL;
+        
+		if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj))
+			new_obj = obj;
+		else 
+			new_obj = oop(obj->mark()->decode_pointer());
+
+		if (EnableTeraHeap)
+			Universe::teraHeap()->group_region_enabled((HeapWord*) new_obj, (void *) p);
+#else
+		oop new_obj = oop(obj->mark()->decode_pointer());
+#endif // TERA_MAJOR_GC
     assert(new_obj != NULL ||                         // is forwarding ptr?
            obj->mark() == markOopDesc::prototype() || // not gc marked?
            (UseBiasedLocking && obj->mark()->has_bias_pattern()),
                                                       // not gc marked?
            "should be forwarded");
     if (new_obj != NULL) {
-      assert(Universe::heap()->is_in_reserved(new_obj),
+      assert(Universe::heap()->is_in_reserved(new_obj)
+             || Universe::teraHeap()->is_obj_in_h2(new_obj),
              "should be in object space");
       oopDesc::encode_store_heap_oop_not_null(p, new_obj);
     }

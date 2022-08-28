@@ -30,6 +30,7 @@
 #include "gc_interface/collectedHeap.inline.hpp"
 #include "memory/genCollectedHeap.hpp"
 #include "memory/genOopClosures.inline.hpp"
+#include "memory/sharedDefines.h"
 #include "oops/instanceRefKlass.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/preserveException.hpp"
@@ -49,6 +50,10 @@ PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 
 template <class T>
 void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
+#ifdef TERA_MAJOR_GC
+	DEBUG_ONLY(if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object is in TeraCache"); });
+#endif
+
   T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
   T heap_oop = oopDesc::load_heap_oop(referent_addr);
   debug_only(
@@ -58,9 +63,25 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
   )
   if (!oopDesc::is_null(heap_oop)) {
     oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
+#ifdef TERA_MAJOR_GC
+		if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(referent)) {
+			Universe::teraHeap()->mark_used_region((HeapWord*)referent);
+
+      if (H2LivenessAnalysis)
+        obj->set_live();
+    }
+#endif
     if (!referent->is_gc_marked() &&
         MarkSweep::ref_processor()->discover_reference(obj, ref->reference_type())) {
       // reference was discovered, referent will be traversed later
+
+#ifdef P_SD_REF_EXCLUDE_CLOSURE
+			if (EnableTeraHeap && obj->is_marked_move_h2())
+				obj->init_obj_state();
+#endif
+			if (EnableTeraHeap && obj->is_marked_move_h2() && !Universe::teraHeap()->is_obj_in_h2(referent))
+				referent->mark_move_h2(obj->get_obj_group_id(), obj->get_obj_part_id());
+
       ref->InstanceKlass::oop_follow_contents(obj);
       debug_only(
         if(TraceReferenceGC && PrintGCDetails) {
@@ -75,7 +96,17 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
           gclog_or_tty->print_cr("       Non NULL normal " INTPTR_FORMAT, (void *)obj);
         }
       )
+#ifdef P_SD_REF_EXCLUDE_CLOSURE
       MarkSweep::mark_and_push(referent_addr);
+#else
+		  if (EnableTeraHeap && obj->is_marked_move_h2()) {
+			  Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+			  Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+			  MarkSweep::tera_mark_and_push(referent_addr);
+		  }
+		  else 
+			  MarkSweep::mark_and_push(referent_addr);
+#endif
     }
   }
   T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
@@ -91,7 +122,17 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
                                  INTPTR_FORMAT, discovered_addr);
         }
       )
-      MarkSweep::mark_and_push(discovered_addr);
+#ifdef P_SD_REF_EXCLUDE_CLOSURE
+			MarkSweep::mark_and_push(discovered_addr);
+#else
+      if (EnableTeraHeap && obj->is_marked_move_h2()) {
+        Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+        Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+        MarkSweep::tera_mark_and_push(discovered_addr);
+      }
+      else
+        MarkSweep::mark_and_push(discovered_addr);
+#endif
     }
   } else {
 #ifdef ASSERT
@@ -111,7 +152,24 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
       gclog_or_tty->print_cr("   Process next as normal " INTPTR_FORMAT, next_addr);
     }
   )
-  MarkSweep::mark_and_push(next_addr);
+#ifdef P_SD_REF_EXCLUDE_CLOSURE
+	MarkSweep::mark_and_push(next_addr);
+#else
+		// Process the next attribute  
+		if (EnableTeraHeap && obj->is_marked_move_h2()) {
+			Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+			Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+			MarkSweep::tera_mark_and_push(next_addr);
+		}
+		else 
+			MarkSweep::mark_and_push(next_addr);
+#endif
+
+#ifdef P_SD_REF_EXCLUDE_CLOSURE
+	if (EnableTeraHeap && obj->is_marked_move_h2())
+		obj->init_obj_state();
+#endif
+
   ref->InstanceKlass::oop_follow_contents(obj);
 }
 
@@ -122,6 +180,42 @@ void InstanceRefKlass::oop_follow_contents(oop obj) {
     specialized_oop_follow_contents<oop>(this, obj);
   }
 }
+
+#ifdef TERA_MAJOR_GC
+template <class T>
+void h2_specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
+	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+	T heap_oop = oopDesc::load_heap_oop(referent_addr);
+
+	if (!oopDesc::is_null(heap_oop)) {
+		// Heap oop decription
+		oop referent = oopDesc::decode_heap_oop_not_null(heap_oop);
+
+    MarkSweep::h2_liveness_analysis(referent_addr);
+	}
+
+	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+
+	if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+		T  next_oop = oopDesc::load_heap_oop(next_addr);
+
+		if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+
+			// If the next attribute is not empty, the Reference instance is not in the
+			// Active state, and the discovered attribute is processed
+			T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+			MarkSweep::h2_liveness_analysis(discovered_addr);
+		}
+	}
+
+	MarkSweep::h2_liveness_analysis(next_addr);
+	ref->InstanceKlass::h2_oop_follow_contents(obj);
+}
+
+void InstanceRefKlass::h2_oop_follow_contents(oop obj) {
+    h2_specialized_oop_follow_contents<oop>(this, obj);
+}
+#endif
 
 #if INCLUDE_ALL_GCS
 template <class T>
@@ -222,12 +316,22 @@ template <class T> void trace_reference_gc(const char *s, oop obj,
 #endif
 
 template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, oop obj) {
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+		Universe::teraHeap()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+
   T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
   MarkSweep::adjust_pointer(referent_addr);
   T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
   MarkSweep::adjust_pointer(next_addr);
   T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
   MarkSweep::adjust_pointer(discovered_addr);
+
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+		Universe::teraHeap()->disable_groups();
+#endif
   debug_only(trace_reference_gc("InstanceRefKlass::oop_adjust_pointers", obj,
                                 referent_addr, next_addr, discovered_addr);)
 }
@@ -365,6 +469,84 @@ ALL_OOP_OOP_ITERATE_CLOSURES_1(InstanceRefKlass_OOP_OOP_ITERATE_DEFN_m)
 ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceRefKlass_OOP_OOP_ITERATE_DEFN_m)
 
 #if INCLUDE_ALL_GCS
+
+#ifdef TERA_CARDS
+
+template <class T>
+void h2_specialized_oop_push_contents(InstanceRefKlass *ref,
+                                   PSPromotionManager* pm, oop obj) {
+  T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+  if (PSScavenge::h2_should_scavenge(referent_addr)) {
+    ReferenceProcessor* rp = PSScavenge::reference_processor();
+    if (rp->discover_reference(obj, ref->reference_type())) {
+      // reference already enqueued, referent and next will be traversed later
+      ref->InstanceKlass::h2_oop_push_contents(pm, obj);
+      return;
+    } else {
+      // treat referent as normal oop
+      pm->h2_claim_or_forward_depth(referent_addr);
+    }
+  }
+  // Treat discovered as normal oop, if ref is not "active",
+  // i.e. if next is non-NULL.
+  T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+  if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+    T  next_oop = oopDesc::load_heap_oop(next_addr);
+    if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+      T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+      debug_only(
+        if(TraceReferenceGC && PrintGCDetails) {
+          gclog_or_tty->print_cr("   Process discovered as normal "
+                                 INTPTR_FORMAT, discovered_addr);
+        }
+      )
+      if (PSScavenge::h2_should_scavenge(discovered_addr)) {
+        pm->h2_claim_or_forward_depth(discovered_addr);
+      }
+    }
+  } else {
+#ifdef ASSERT
+    // In the case of older JDKs which do not use the discovered
+    // field for the pending list, an inactive ref (next != NULL)
+    // must always have a NULL discovered field.
+    oop next = oopDesc::load_decode_heap_oop(next_addr);
+    oop discovered = java_lang_ref_Reference::discovered(obj);
+    assert(oopDesc::is_null(next) || oopDesc::is_null(discovered),
+           err_msg("Found an inactive reference " PTR_FORMAT " with a non-NULL discovered field",
+                   (oopDesc*)obj));
+#endif
+  }
+
+  // Treat next as normal oop;  next is a link in the reference queue.
+  if (PSScavenge::h2_should_scavenge(next_addr)) {
+    pm->h2_claim_or_forward_depth(next_addr);
+  }
+  ref->InstanceKlass::h2_oop_push_contents(pm, obj);
+}
+
+template <class T>
+void h2_specialized_oop_trace_contents(InstanceRefKlass *ref,
+                                   PSPromotionManager* pm, oop obj) {
+	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
+	PSScavenge::h2_should_trace(referent_addr);
+
+	T* next_addr = (T*)java_lang_ref_Reference::next_addr(obj);
+	if (ReferenceProcessor::pending_list_uses_discovered_field()) {
+		T  next_oop = oopDesc::load_heap_oop(next_addr);
+		if (!oopDesc::is_null(next_oop)) { // i.e. ref is not "active"
+			T* discovered_addr = (T*)java_lang_ref_Reference::discovered_addr(obj);
+			PSScavenge::h2_should_trace(discovered_addr);
+		}
+	} 
+
+	// Treat next as normal oop;  next is a link in the reference queue.
+	PSScavenge::h2_should_trace(next_addr);
+
+	ref->InstanceKlass::h2_oop_trace_contents(pm, obj);
+}
+
+#endif // TERA_CARDS
+
 template <class T>
 void specialized_oop_push_contents(InstanceRefKlass *ref,
                                    PSPromotionManager* pm, oop obj) {
@@ -424,6 +606,27 @@ void InstanceRefKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
     specialized_oop_push_contents<oop>(this, pm, obj);
   }
 }
+
+#ifdef TERA_CARDS
+void InstanceRefKlass::h2_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  if (UseCompressedOops) {
+    //specialized_oop_push_contents<narrowOop>(this, pm, obj);
+    fprintf(stderr, "TeraHeap does not support compressed objects");
+    ShouldNotReachHere();
+  } else {
+    h2_specialized_oop_push_contents<oop>(this, pm, obj);
+  }
+}
+
+void InstanceRefKlass::h2_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  if (UseCompressedOops) {
+    fprintf(stderr, "TeraHeap does not support compressed objects");
+    ShouldNotReachHere();
+  } else {
+    h2_specialized_oop_trace_contents<oop>(this, pm, obj);
+  }
+}
+#endif // TERA_CARDS
 
 template <class T>
 void specialized_oop_update_pointers(InstanceRefKlass *ref,

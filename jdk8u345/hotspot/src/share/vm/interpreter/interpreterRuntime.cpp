@@ -175,12 +175,24 @@ IRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* thread, ConstantPool* pool,
   //       If we have a breakpoint, then we don't rewrite
   //       because the _breakpoint bytecode would be lost.
   oop obj = klass->allocate_instance(CHECK);
+
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    obj->init_obj_state();
+#endif // TERA_FLAG
+
   thread->set_vm_result(obj);
 IRT_END
 
 
 IRT_ENTRY(void, InterpreterRuntime::newarray(JavaThread* thread, BasicType type, jint size))
   oop obj = oopFactory::new_typeArray(type, size, CHECK);
+
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    obj->init_obj_state();
+#endif // TERA_FLAG
+
   thread->set_vm_result(obj);
 IRT_END
 
@@ -191,6 +203,12 @@ IRT_ENTRY(void, InterpreterRuntime::anewarray(JavaThread* thread, ConstantPool* 
   //       (This may have to change if this code changes!)
   Klass*    klass = pool->klass_at(index, CHECK);
   objArrayOop obj = oopFactory::new_objArray(klass, size, CHECK);
+
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    obj->init_obj_state();
+#endif // TERA_FLAG
+
   thread->set_vm_result(obj);
 IRT_END
 
@@ -218,6 +236,10 @@ IRT_ENTRY(void, InterpreterRuntime::multianewarray(JavaThread* thread, jint* fir
     dims[index] = first_size_address[n];
   }
   oop obj = ArrayKlass::cast(klass)->multi_allocate(nof_dims, dims, CHECK);
+#ifdef TERA_FLAG
+  if (EnableTeraHeap)
+    obj->init_obj_state();
+#endif // TERA_FLAG
   thread->set_vm_result(obj);
 IRT_END
 
@@ -647,8 +669,18 @@ IRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorexit(JavaThread* thread, Bas
   thread->last_frame().interpreter_frame_verify_monitor(elem);
 #endif
   Handle h_obj(thread, elem->obj());
-  assert(Universe::heap()->is_in_reserved_or_null(h_obj()),
-         "must be NULL or an object");
+
+#ifdef  TERA_ASSERT
+  DEBUG_ONLY(if (EnableTeraHeap) { 
+             assert(Universe::heap()->is_in_reserved_or_null(h_obj()) ||
+                    Universe::teraHeap()->is_field_in_h2(h_obj()),
+                    "must be NULL or an object");
+             } else {
+               assert(Universe::heap()->is_in_reserved_or_null(h_obj()), "must be NULL or an object");
+             });
+#else
+  assert(Universe::heap()->is_in_reserved_or_null(h_obj()), "must be NULL or an object");
+#endif
   if (elem == NULL || h_obj()->is_unlocked()) {
     THROW(vmSymbols::java_lang_IllegalMonitorStateException());
   }
@@ -712,8 +744,14 @@ IRT_ENTRY(void, InterpreterRuntime::resolve_invoke(JavaThread* thread, Bytecodes
     Symbol* signature = call.signature();
     receiver = Handle(thread,
                   thread->last_frame().interpreter_callee_receiver(signature));
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_reserved_or_null(receiver())
+           || Universe::teraHeap()->is_field_in_h2((void *)receiver()),
+           "sanity check");
+#else
     assert(Universe::heap()->is_in_reserved_or_null(receiver()),
            "sanity check");
+#endif
     assert(receiver.is_null() ||
            !Universe::heap()->is_in_reserved(receiver->klass()),
            "sanity check");

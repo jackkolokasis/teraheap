@@ -143,6 +143,11 @@ Mutex*   JfrCounters_lock             = NULL;
 Mutex*   UnsafeJlong_lock             = NULL;
 #endif
 
+#ifdef TERA_MINOR_GC
+Mutex*   tera_heap_lock              = NULL;
+Mutex*   tera_heap_group_lock        = NULL;
+#endif // TERA_MINOR_GC
+
 #define MAX_NUM_MUTEX 128
 static Monitor * _mutex_array[MAX_NUM_MUTEX];
 static int _num_mutex;
@@ -209,6 +214,12 @@ void mutex_init() {
     def(StringDedupQueue_lock      , Monitor, leaf,        true );
     def(StringDedupTable_lock      , Mutex  , leaf,        true );
   }
+#ifdef TERA_MINOR_GC
+  if (EnableTeraHeap) {
+    def(tera_heap_lock              , Mutex  , leaf    ,    true ); // Used for Teraheap backward reference stacks
+    def(tera_heap_group_lock        , Mutex  , leaf    ,    true ); // Used for TeraHeap region groupping
+  }
+#endif // TERA_MINOR_GC
   def(ParGCRareEvent_lock          , Mutex  , leaf     ,   true );
   def(DerivedPointerTableGC_lock   , Mutex,   leaf,        true );
   def(CodeCache_lock               , Mutex  , special,     true );

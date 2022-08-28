@@ -155,6 +155,13 @@ class MarkSweep : AllStatic {
   // Check mark and maybe push on marking stack
   template <class T> static void mark_and_push(T* p);
 
+#ifdef TERA_MAJOR_GC
+  // Mark backward references as live objects
+  template <class T> static void tera_back_ref_mark_and_push(T* p);
+  template <class T> static void tera_mark_and_push(T* p);
+  template <class T> static void h2_liveness_analysis(T* p);
+#endif
+
   static inline void push_objarray(oop obj, size_t index);
 
   static void follow_stack();   // Empty marking stack.

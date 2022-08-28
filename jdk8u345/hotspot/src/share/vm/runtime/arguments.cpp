@@ -105,6 +105,11 @@ int     Arguments::_num_jvm_args                = 0;
 char*  Arguments::_java_command                 = NULL;
 SystemProperty* Arguments::_system_properties   = NULL;
 const char*  Arguments::_gc_log_filename        = NULL;
+
+#ifdef TERA_LOG
+const char*  Arguments::_th_log_filename        = NULL;
+#endif
+
 bool   Arguments::_has_profile                  = false;
 size_t Arguments::_conservative_max_heap_alignment = 0;
 uintx  Arguments::_min_heap_size                = 0;
@@ -3008,6 +3013,15 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args,
       // Currently the minimum size and the initial heap sizes are the same.
       // Can be overridden with -XX:InitialHeapSize.
       FLAG_SET_CMDLINE(uintx, InitialHeapSize, (uintx)long_initial_heap_size);
+
+#ifdef TERA_MINOR_GC
+      if (EnableTeraHeap) {
+        assert(TeraHeapSize != 0, "Initialize TeraHeap size -XX:TeraHeapSize=<num>");
+        MaxHeapSize = MaxHeapSize - TeraHeapSize;
+        FLAG_SET_CMDLINE(uintx, MaxHeapSize, (uintx)MaxHeapSize);
+      }
+#endif // TERA_MINOR_GC
+
     // -Xmx
     } else if (match_option(option, "-Xmx", &tail) || match_option(option, "-XX:MaxHeapSize=", &tail)) {
       julong long_max_heap_size = 0;
@@ -3236,8 +3250,19 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args,
       FLAG_SET_CMDLINE(bool, PrintGC, true);
       FLAG_SET_CMDLINE(bool, PrintGCTimeStamps, true);
 
-    // JNI hooks
-    } else if (match_option(option, "-Xcheck", &tail)) {
+    } 
+#ifdef TERA_LOG
+      // TeraHepa log file
+    else if (match_option(option, "-Xlogth:", &tail)) {
+      // Redirect TeraHeap output to the file. -Xlogth:<filename>
+      // ostream_init_log(), when called will use this filename to initialize
+      // a fileStream)
+      _th_log_filename = strdup(tail);
+
+      // JNI hooks
+    } 
+#endif // TERA_LOG
+    else if (match_option(option, "-Xcheck", &tail)) {
       if (!strcmp(tail, ":jni")) {
 #if !INCLUDE_JNI_CHECK
         warning("JNI CHECKING is not supported in this VM");

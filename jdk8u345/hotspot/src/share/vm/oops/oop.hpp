@@ -31,6 +31,7 @@
 #include "oops/metadata.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/top.hpp"
+#include "memory/sharedDefines.h"
 
 // oopDesc is the top baseclass for objects classes.  The {name}Desc classes describe
 // the format of Java objects so the fields can be accessed from C++.
@@ -65,12 +66,110 @@ class oopDesc {
     narrowKlass _compressed_klass;
   } _metadata;
 
+#ifdef TERA_FLAG
+  // TeraFlag word is used by the TeraCache. TeraFlag is a 64-bit word and is
+  // divided in three parts:
+  //
+  //+-------+----------------------------------------------------------------+
+  //| Bits  | Description                                                    |
+  //+-------+----------------------------------------------------------------+
+  //| 63-48 | Represent the RDD partition Id                                 |
+  //+-------+----------------------------------------------------------------+
+  //| 32-47 | Represent the RDD Id											 |
+  //+-------+----------------------------------------------------------------+
+  //| 31-0  | Represent the state of the object                              |
+  //+-------+----------------------------------------------------------------+
+
+  volatile int64_t _tera_flag;      //< MarkTeracache objects
+#endif // TERA_FLAG
+
   // Fast access to barrier set.  Must be initialized.
   static BarrierSet* _bs;
 
  public:
   markOop  mark() const         { return _mark; }
   markOop* mark_addr() const    { return (markOop*) &_mark; }
+
+#ifdef TERA_FLAG
+  // Mark an object with 'id' to be moved in H2. H2 allocator uses the
+  // 'id' to locate objects with the same 'id' by to the same region.
+  // 'id' is defined by the application.
+  void mark_move_h2(uint64_t rdd_id, uint64_t part_id) { 
+	  _tera_flag = (part_id << 48);
+	  _tera_flag |= (rdd_id << 32);
+	  _tera_flag |= MOVE_TO_TERA;
+  }
+
+  // Check if an object is marked to be moved in H2
+  bool is_marked_move_h2() { 
+	  return (_tera_flag & 0xffffffff) == MOVE_TO_TERA ;
+  }
+
+  // Mark this object that is located in TeraCache
+  void set_in_h2() { 
+	  uint64_t part_id = (_tera_flag >> 48);
+	  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
+	  uint64_t state   = _tera_flag & 0xffffffff;
+
+	  _tera_flag = (part_id << 48);
+	  _tera_flag |= (rdd_id << 32);
+	  _tera_flag |= IN_TERA_CACHE;
+  }
+
+  // Get the state of the object
+  uint64_t get_obj_state() { 
+	  // Get the object state. The state is saved in the lowes 32bit 
+	  return (_tera_flag & 0xffffffff);
+  }
+  
+  // Init the object state 
+  void init_obj_state() { 
+	  _tera_flag = INIT_TF;
+  }
+
+  // Get the object group id
+  int get_obj_group_id() {
+	  return ((_tera_flag >> 32) & 0xffff) ;
+  }
+
+  // Get object partition Id
+  uint64_t get_obj_part_id() {
+	  return _tera_flag >> 48;
+  }
+
+  bool is_live(){
+	  return ((_tera_flag & 0xffffffff) == LIVE_TERA_OBJ || (_tera_flag & 0xffffffff) == VISITED_TERA_OBJ || (_tera_flag & 0xffffffff) == MOVE_TO_TERA );
+  }
+
+  void reset_live(){
+      set_in_h2();
+  }
+
+  void set_live(){
+	  uint64_t part_id = (_tera_flag >> 48);
+	  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
+	  uint64_t state = _tera_flag & 0xffffffff;
+
+	  _tera_flag = (part_id << 48);
+	  _tera_flag |= (rdd_id << 32);
+	  _tera_flag |= LIVE_TERA_OBJ;
+  }
+
+  void set_visited(){
+	  uint64_t part_id = (_tera_flag >> 48);
+	  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
+	  uint64_t state = _tera_flag & 0xffffffff;
+
+	  _tera_flag = (part_id << 48);
+	  _tera_flag |= (rdd_id << 32);
+	  _tera_flag |= VISITED_TERA_OBJ;
+  }
+
+  bool is_visited(){
+	  return (_tera_flag & 0xffffffff) == VISITED_TERA_OBJ;
+  }
+
+#endif // TERA_FLAG
 
   void set_mark(volatile markOop m)      { _mark = m;   }
 
@@ -294,10 +393,22 @@ class oopDesc {
   // Apply "MarkSweep::mark_and_push" to (the address of) every non-NULL
   // reference field in "this".
   void follow_contents(void);
+ 
+#ifdef TERA_MAJOR_GC
+  void h2_follow_contents(void);
+#endif
 
 #if INCLUDE_ALL_GCS
   // Parallel Scavenge
   void push_contents(PSPromotionManager* pm);
+
+#ifdef TERA_CARDS
+  // Parallel Scavenge TeraCache
+  void h2_push_contents(PSPromotionManager* pm);
+  
+  // Parallel Trace TeraCache contents
+  void h2_trace_contents(PSPromotionManager* pm);
+#endif
 
   // Parallel Old
   void update_contents(ParCompactionManager* cm);
@@ -376,6 +487,16 @@ class oopDesc {
   static int mark_offset_in_bytes()    { return offset_of(oopDesc, _mark); }
   static int klass_offset_in_bytes()   { return offset_of(oopDesc, _metadata._klass); }
   static int klass_gap_offset_in_bytes();
+#ifdef TERA_FLAG
+  // 0 +-----------+
+  //   | _mark     |
+  // 8 +-----------+
+  //   | _klass    |
+  // 16+-----------+
+  //   | _tera_flag|
+  //   +-----------+
+  static long teraflag_offset_in_bytes() { return offset_of(oopDesc, _tera_flag); }
+#endif // TERA_FLAG
 };
 
 #endif // SHARE_VM_OOPS_OOP_HPP

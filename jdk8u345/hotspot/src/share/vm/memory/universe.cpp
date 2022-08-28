@@ -80,7 +80,7 @@
 #include "gc_implementation/g1/g1CollectedHeap.inline.hpp"
 #include "gc_implementation/g1/g1CollectorPolicy_ext.hpp"
 #include "gc_implementation/parallelScavenge/parallelScavengeHeap.hpp"
-#include "gc_implementation/teraCache/teraCache.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
 #endif // INCLUDE_ALL_GCS
 
 PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
@@ -152,7 +152,7 @@ size_t Universe::_heap_capacity_at_last_gc;
 size_t Universe::_heap_used_at_last_gc = 0;
 
 CollectedHeap *Universe::_collectedHeap = NULL;
-TeraCache *Universe::_teraCache = NULL;
+TeraHeap *Universe::_teraHeap = NULL;
 
 NarrowPtrStruct Universe::_narrow_oop = {NULL, 0, true};
 NarrowPtrStruct Universe::_narrow_klass = {NULL, 0, true};
@@ -853,8 +853,8 @@ jint Universe::initialize_heap() {
   if (UseParallelGC) {
 #if INCLUDE_ALL_GCS
     Universe::_collectedHeap = new ParallelScavengeHeap();
-    if (EnableTeraCache) {
-      Universe::_teraCache = new TeraCache();
+    if (EnableTeraHeap) {
+      Universe::_teraHeap = new TeraHeap();
     }
 #else  // INCLUDE_ALL_GCS
     fatal("UseParallelGC not supported in this VM.");

@@ -423,8 +423,13 @@ void OopMapSet::all_do(const frame *fr, const RegisterMap *reg_map,
             continue;
           }
 #ifdef ASSERT
+#ifdef TERA_MAJOR_GC
           if ((((uintptr_t)loc & (sizeof(*loc)-1)) != 0) ||
-             !Universe::heap()->is_in_or_null(*loc)) {
+            (!Universe::heap()->is_in_or_null(*loc) && !Universe::teraHeap()->is_field_in_h2(*loc))) {
+#else
+          if ((((uintptr_t)loc & (sizeof(*loc)-1)) != 0) ||
+            !Universe::heap()->is_in_or_null(*loc)) {
+#endif
             tty->print_cr("# Found non oop pointer.  Dumping state at failure");
             // try to dump out some helpful debugging information
             trace_codeblob_maps(fr, reg_map);
@@ -433,7 +438,11 @@ void OopMapSet::all_do(const frame *fr, const RegisterMap *reg_map,
             omv.reg()->print();
             tty->print_cr("loc = %p *loc = %p\n", loc, (address)*loc);
             // do the real assert.
-            assert(Universe::heap()->is_in_or_null(*loc), "found non oop pointer");
+#ifdef TERA_MAJOR_GC
+             assert(Universe::heap()->is_in_or_null(*loc) || Universe::teraHeap()->is_field_in_h2(*loc), "found non oop pointer");
+#else
+             assert(Universe::heap()->is_in_or_null(*loc), "found non oop pointer");
+#endif
           }
 #endif // ASSERT
           oop_fn->do_oop(loc);
@@ -618,7 +627,17 @@ intptr_t value_of_loc(oop *pointer) { return cast_from_oop<intptr_t>((*pointer))
 
 
 void DerivedPointerTable::add(oop *derived_loc, oop *base_loc) {
-  assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
+#ifdef TERA_ASSERT
+           DEBUG_ONLY(if (EnableTeraHeap) {
+                        assert(Universe::heap()->is_in_or_null(*base_loc)
+                               || Universe::teraHeap()->is_obj_in_h2(*base_loc), "not an oop");
+                      } else {
+                        assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
+                      })
+#else
+           assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
+#endif
+
   assert(derived_loc != base_loc, "Base and derived in same location");
   if (_active) {
     assert(*derived_loc != (oop)base_loc, "location already added");
@@ -653,7 +672,16 @@ void DerivedPointerTable::update_pointers() {
     intptr_t offset  = entry->offset();
     // The derived oop was setup to point to location of base
     oop  base        = **(oop**)derived_loc;
-    assert(Universe::heap()->is_in_or_null(base), "must be an oop");
+#ifdef TERA_ASSERT
+             DEBUG_ONLY(if (EnableTeraHeap) {
+                          assert(Universe::heap()->is_in_or_null(base)
+                                 || Universe::teraHeap()->is_obj_in_h2(base), "must be an oop");
+                        } else {
+                          assert(Universe::heap()->is_in_or_null(base), "must be an oop");
+                        })
+#else
+             assert(Universe::heap()->is_in_or_null(base), "must be an oop");
+#endif
 
     *derived_loc = (oop)(((address)base) + offset);
     assert(value_of_loc(derived_loc) - value_of_loc(&base) == offset, "sanity check");

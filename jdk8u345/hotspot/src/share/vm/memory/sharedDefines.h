@@ -12,175 +12,108 @@
 #ifndef _SHARE_DEFINES_H_
 #define _SHARE_DEFINES_H_
 
-#include <csignal>
+/************************************
+ * Source code that we need to remove after testing
+ ************************************/
+#define TERA_LOG				         //< Define logging for TeraHeap
 
-/***********************************
- * DEBUG
- **********************************/
-#define clean_errno() (errno == 0 ? "None" : strerror(errno))
-#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n",\
-		                  __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__) 
-//#if !NDEBUG
-//#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); os::abort();}
-//#elif
-#define assertf(A, M, ...) ;
-//#endif
+#define TERA_FLAG				         //< Define teraFlag word
 
-/***********************************
- * Transient field bitmap array
- **********************************/
-#define SetBit(A,k)     ( A[(k/32)] |= (1 << (k%32)) )
-#define ClearBit(A,k)   ( A[(k/32)] &= ~(1 << (k%32)) )
-#define TestBit(A,k)    ( A[(k/32)] & (1 << (k%32)) )
+#define TERA_MINOR_GC            //< Enable Teraheap code for minor GC
 
-#define DEBUG_SLOWPATH_INTR		 0	//< Use only interpreter for object allocation
+#define TERA_CARDS               //< Enable Teraheap card table
 
-#define DEBUG_ANNO_INTR     	 0	//< Debug @Cache annotation, TODO Disable in Spark experiments
+//#define BACK_REF_STAT            //< Collect statistics for backward
+                                 //refenrences. Works only with -XX:GCThreads=1
 
-#define DEBUG_TERACACHE     	 0	//< Debug prints for teraCache, TODO Disable in experiments
+//#define FMAP_HYBRID				       //< When we use fastmap hybrid version we
+									               // employ huge pages for mutator threads and
+									               // regular pages for GC 
 
-#define DISABLE_TERACACHE		 0  //< Disable teraCache
+#define MADVISE_ON				        //< During minor gc we advise kernel for
+									                // random accesses. During mutator thread
+									                // execution we advise kernel for sequential
+									                // accesses
 
-#define DISABLE_PRECOMPACT		 0  //< Disable precompact of tera objects
+#define TERA_CARD_SIZE			 13   // This is the size of each card in
+                                  // TeraCache card table. The size is in bit
+                                  // e.g 9 = 512bytes
 
-#define TERA_CARDS				 1  //< Disable teraCache, TODO Set to 1
+#define TERA_INTERPRETER	        //< Enable Interpreter to support TeraHeap
 
+#define TERA_C1				            //< Enable C1 to support TeraHeap
 
-#define TERA_FLAG				 1  //< Define teraFlag word, TODO Set to 1
+#define TERA_C2				            //< Enable C1 to support TeraHeap
 
-#define TERA_C1				     1  //< Enable C1 to support TeraCache, TODO Set to 1
+//#define C2_ONLY_LEAF_CALL		    //< C2 Compiler version - Comparisons and
+                                  // card marking are all implemented in the
+                                  // make_leaf_call()
 
-#define TERA_C2				     1  //< Enable C1 to support TeraCache, TODO Set to 1
+#define TERA_MAJOR_GC             // Enable TeraHeap in Parallel
+                                  // Scavenge single threaded version
+                                  // MajorGC
 
-#define C2_ONLY_LEAF_CALL		 0  //< C2 Compiler version - Comparisons and
-									// card marking are all implemented in the
-									// make_leaf_call()
-#define TERA_INT			     1  //< Enable Interpreter to support TeraCache, TODO Set to 1
+//#define TEST_CLONE                // Clone objects
 
-#define CLOSURE					 1  //< Closure Calculation TEST  !!!!!
+#define DISABLE_TRAVERSE_OLD_GEN  //< Disable backward reference traversal
+									                // from H2 to old generation (H1) during
+									                // minor GC
 
-#define DEBUG_INTR               0  //< Debug Interpreter
+#define TERA_ASSERT               // Extended assertions for TeraHeap
 
-#define DEBUG_VECTORS			 0  //< Enable debug vectors in compaction phase
-									//  to check every memmove operation if
-									//  overwrites other objects
-
-#define DEBUG_PLACEMENT          0  //< Enable debug object placement in
-									// TeraCache showing their RDD ID and
-									// Partition ID
-
-#define TEST_CLOSURE             0
-
-#define TEST_CLONE				 0
-
-#define PERF_TEST				 0  //< Performance tests in minor collection.
-									// Keep this here until testing a lot and
-									// then remove it.
-									
-#define SYNC				     0  //< Enable explicit I/O path for the writes
-									// in TeraCache during major GC
-
-#define ASYNC				     1  //< Asynchronous I/O path for the writes in
-									// TeraCache
-
-#define PR_BUFFER			     1  //< Enable promotion buffer for async I/O to
-									// reduce the number of system calls 
-
-#define FMAP				     0  //< When we use fastmap we need to ensure
-									// that all the writes in buffered cached
-									// will be flushed to the device because the
-									// memory of fast map is different from
-									// buffer cache. 
-
-#define FMAP_HYBRID				 0  //< When we use fastmap hybrid version we
-									// employ huge pages for mutator threads and
-									// regular pages for GC 
-
-#define MADVISE_ON				 1  //< During minor gc we advise kernel for
-									// random accesses. During mutator thread
-									// execution we advise kernel for sequential
-									// accesses
-
-#define TERA_CARD_SIZE			 13 // This is the size of each card in
-									// TeraCache card table. The size is in bit
-									// e.g 9 = 512bytes
-
-#define REGIONS     			 1  // We set this to 1 when we are using
-                                    // the region allocator and 0 when
-                                    // we are not
 /**********************************
- * Policies for TeraCache
+ * Write Mode to H2
  **********************************/
-#define TC_POLICY				 1	//< Enable TeraCahce Policies (Always ON)
+//#define SYNC				            //< Enable explicit I/O path for the writes
+                                  // in TeraHeap during major GC
 
-#define P_SD					 1	//< Move Objects to TeraCache based on
-									//  serialization policy.  This policy
-									//  should be used in combination with
-									//  P_DISTINCT 
+#define ASYNC				              //< Asynchronous I/O path for the writes in
+                                  // TeraHeap
 
-#define P_SD_BITMAP				 1	//< Bitmap to optimize the search in tree
-									//  
+#define PR_BUFFER			            //< Enable promotion buffer for async I/O to
+                                  // reduce the number of system calls 
 
-#define P_SD_BACK_REF_CLOSURE	 1	//< Find the transitive closure of backward
-									// edges
+//#define FMAP				              //< When we use fastmap we need to ensure
+                                  // that all the writes in buffered cached
+                                  // will be flushed to the device because the
+                                  // memory of fast map is different from
+                                  // buffer cache. 
 
-#define P_NO_TRANSFER            0	//< This policy is ONLY for debugging.
-									//  Calculate the closure but do not move
-									//  anything to TeraCache. This policy
-									//  should be used in combination with
-									//  P_POLICY and P_DISTINCT
-									//
-#define SPARK_POLICY			 0	// Policy that we use for Spark
-
-#define P_SD_EXCLUDE_CLOSURE	 1	//< Exclude objects from the closure
-
-#define P_SD_REF_EXCLUDE_CLOSURE 1  //< Exclude reference objects from the closure
+/**********************************
+ * Statistics
+ **********************************/
+//#define FWD_REF_STAT               //< Collect statistics for class object
 
 /**********************************
  * States of TeraFlag  
  **********************************/
-#define MOVE_TO_TERA			255	//< Move this object to tera cache
+#define MOVE_TO_TERA			255	    //< Move this object to tera cache
 
-#define TERA_TO_OLD		        328	//< Pointer from TeraCache to Old Gen. Move
-									// this object to TeraCache
+#define TERA_TO_OLD		    328	    //< Pointer from TeraCache to Old Gen. Move
+                                  // this object to TeraCache
 
-#define IN_TERA_CACHE    2147483561	//< This object is located in TeraCache
+#define IN_TERA_CACHE     2147483561	//< This object is located in TeraCache
 
-#define INIT_TF				   2035	//< Initial object state
+#define INIT_TF				    2035	  //< Initial object state
 
-#define LIVE_TERA_OBJ           202 //< Object marked as live during GC Analysis
+#define INIT_TF_HEX			  0x7f3U  //< Initial object state
 
-#define VISITED_TERA_OBJ        203 //< Object visited during GC Analysis
+#define LIVE_TERA_OBJ     202     //< Object marked as live during GC Analysis
 
-#define TRANSIENT_FIELD		    428	//< Objects is pointed by transient field
+#define VISITED_TERA_OBJ  203     //< Object visited during GC Analysis
 
-
-/***********************************
- * Statistics
+/**********************************
+ * Policies for TeraCache
  **********************************/
-#define STATISTICS			      0  //< Enable statistics for
-                                     // TeraCache Allocator. Do NOT
-                                     // use this flag in performance
-                                     // measurements
+//#define SPARK_POLICY				      //< Policy that we use for Spark
 
-#define VERBOSE_TC				  0  //< Print objects in TeraCache during
-									 // allocation
+#define P_SD_BACK_REF_CLOSURE	 	  //< Find the transitive closure of backward
+                                  // edges
 
-#define PREFETCHING				  0  //< Enable read ahead in TeraCache
+//#define P_NO_TRANSFER           //< This policy is ONLY for debugging.
 
-#define BACK_REF_STAT             0  //< Collect statistics for backward refenrences
+#define P_SD_EXCLUDE_CLOSURE	 	  //< Exclude objects from the closure
 
-#define FWD_REF_STAT              0  //< Collect statistics for class object
+#define P_SD_REF_EXCLUDE_CLOSURE  //< Exclude reference objects from the closure
 
-#define DISABLE_TRAVERSE_OLD_GEN  1  //< Disable backward reference traversal
-									 // from H2 to old generation (H1) during
-									 // minor GC
-
-#define GC_ANALYSIS               0
-
-/************************************
- * Source code that we need to remove after testing
- ************************************/
-#define CHECK_TERA_CARDS		  0  //< Check if we need this. At this time we
-									 // do not need it
 #endif  // _SHARE_DEFINES_H_

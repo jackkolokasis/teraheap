@@ -149,8 +149,30 @@ template <class T> void assert_nothing(T *p) {}
   }                                                                        \
 }
 
+#ifdef TERA_MAJOR_GC
+void InstanceMirrorKlass::h2_oop_follow_contents(oop obj) {
+  
+  InstanceKlass::h2_oop_follow_contents(obj);
+
+  InstanceMirrorKlass_OOP_ITERATE( \
+		  start_of_static_fields(obj), \
+		  java_lang_Class::static_oop_field_count(obj), \
+		  MarkSweep::h2_liveness_analysis(p), \
+		  assert_is_in_closed_subset)
+}
+#endif
+
 
 void InstanceMirrorKlass::oop_follow_contents(oop obj) {
+#ifdef TERA_MAJOR_GC
+	DEBUG_ONLY(if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object is in TeraCache"); })
+#endif
+
+#ifdef P_SD_EXCLUDE_CLOSURE
+  if (EnableTeraHeap && obj->is_marked_move_h2())
+    obj->init_obj_state();
+#endif
+
   InstanceKlass::oop_follow_contents(obj);
 
   // Follow the klass field in the mirror.
@@ -175,10 +197,31 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
     assert(java_lang_Class::is_primitive(obj), "Sanity check");
   }
 
-  InstanceMirrorKlass_OOP_ITERATE(                                                    \
-    start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),        \
-    MarkSweep::mark_and_push(p),                                                      \
-    assert_is_in_closed_subset)
+#ifdef P_SD_EXCLUDE_CLOSURE
+  InstanceMirrorKlass_OOP_ITERATE(                   \
+                                  start_of_static_fields(obj),                   \
+                                  java_lang_Class::static_oop_field_count(obj),  \
+                                  MarkSweep::mark_and_push(p),                   \
+                                  assert_is_in_closed_subset)
+#else
+	if (EnableTeraHeap && obj->is_marked_move_h2()) {
+		Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+		Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+
+    InstanceMirrorKlass_OOP_ITERATE(                       \
+                                    start_of_static_fields(obj),                   \
+                                    java_lang_Class::static_oop_field_count(obj),  \
+                                    MarkSweep::tera_mark_and_push(p),              \
+                                    assert_is_in_closed_subset)
+	}
+	else {
+    InstanceMirrorKlass_OOP_ITERATE(                       \
+                                    start_of_static_fields(obj),                   \
+                                    java_lang_Class::static_oop_field_count(obj),  \
+                                    MarkSweep::mark_and_push(p),                   \
+                                    assert_is_in_closed_subset)
+	}
+#endif // P_SD_EXCLUDE_CLOSURE
 }
 
 #if INCLUDE_ALL_GCS
@@ -219,10 +262,21 @@ int InstanceMirrorKlass::oop_adjust_pointers(oop obj) {
   int size = oop_size(obj);
   InstanceKlass::oop_adjust_pointers(obj);
 
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+	  Universe::teraHeap()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+
   InstanceMirrorKlass_OOP_ITERATE(                                                    \
     start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),        \
     MarkSweep::adjust_pointer(p),                                                     \
     assert_nothing)
+
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+    Universe::teraHeap()->disable_groups();
+#endif
+
   return size;
 }
 
@@ -338,6 +392,36 @@ void InstanceMirrorKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
     },                                                                        \
     assert_nothing )
 }
+
+#ifdef TERA_CARDS
+void InstanceMirrorKlass::h2_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  // Note that we don't have to follow the mirror -> klass pointer, since all
+  // klasses that are dirty will be scavenged when we iterate over the
+  // ClassLoaderData objects.
+
+  InstanceKlass::h2_oop_push_contents(pm, obj);
+  InstanceMirrorKlass_OOP_ITERATE(                                            \
+    start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),\
+    if (PSScavenge::h2_should_scavenge(p)) {                                     \
+      pm->h2_claim_or_forward_depth(p);                                          \
+    },                                                                        \
+    assert_nothing )
+}
+
+void InstanceMirrorKlass::h2_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  // Note that we don't have to follow the mirror -> klass pointer, since all
+  // klasses that are dirty will be scavenged when we iterate over the
+  // ClassLoaderData objects.
+
+  InstanceKlass::h2_oop_trace_contents(pm, obj);
+  InstanceMirrorKlass_OOP_ITERATE(                                            \
+    start_of_static_fields(obj), java_lang_Class::static_oop_field_count(obj),\
+    if (PSScavenge::h2_should_trace(p)) {                                     \
+      pm->h2_claim_or_forward_depth(p);                                          \
+    },                                                                        \
+    assert_nothing )
+}
+#endif
 
 int InstanceMirrorKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   int size = oop_size(obj);

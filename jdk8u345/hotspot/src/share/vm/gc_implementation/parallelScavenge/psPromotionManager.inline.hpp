@@ -29,6 +29,8 @@
 #include "gc_implementation/parallelScavenge/psPromotionManager.hpp"
 #include "gc_implementation/parallelScavenge/psPromotionLAB.inline.hpp"
 #include "gc_implementation/parallelScavenge/psScavenge.hpp"
+#include "gc_implementation/teraHeap/teraHeap.hpp"
+#include "memory/sharedDefines.h"
 #include "oops/oop.psgc.inline.hpp"
 
 inline PSPromotionManager* PSPromotionManager::manager_array(int index) {
@@ -41,12 +43,31 @@ template <class T>
 inline void PSPromotionManager::claim_or_forward_internal_depth(T* p) {
   if (p != NULL) { // XXX: error if p != NULL here
     oop o = oopDesc::load_decode_heap_oop_not_null(p);
+
+#ifdef TERA_MINOR_GC
+    // XXX TODO Check this case again
+    if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(o))
+      return;
+#endif // TERA_MINOR_GC
+
     if (o->is_forwarded()) {
       o = o->forwardee();
       // Card mark
       if (PSScavenge::is_obj_in_young(o)) {
-        PSScavenge::card_table()->inline_write_ref_field_gc(p, o);
+#ifdef TERA_MINOR_GC
+        DEBUG_ONLY( if (EnableTeraHeap) {
+                     assert(!Universe::teraHeap()->is_obj_in_h2(o), "Error Object in TeraHeap");
+                   })
+#endif // TERA_MINOR_GC
+        PSScavenge::card_table()->inline_write_ref_field_gc(p, o, false);
       }
+
+#ifdef TERA_MINOR_GC
+	  if (Universe::teraHeap()->is_field_in_h2((void *)p) && !PSScavenge::is_obj_in_young(o)) {
+		  assert(!Universe::teraHeap()->is_obj_in_h2(o), "Error Object in Teraheap");
+		  PSScavenge::card_table()->inline_write_ref_field_gc(p, o, true);
+	  }
+#endif // TERA_MINOR_GC
       oopDesc::encode_store_heap_oop_not_null(p, o);
     } else {
       push_depth(p);
@@ -63,6 +84,16 @@ inline void PSPromotionManager::claim_or_forward_depth(T* p) {
 
   claim_or_forward_internal_depth(p);
 }
+
+#ifdef TERA_MINOR_GC
+template <class T>
+inline void PSPromotionManager::h2_claim_or_forward_depth(T* p) {
+  assert(Universe::heap()->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
+  assert(Universe::teraHeap()->is_obj_in_h2((void *)p), "pointer outside of TeraCache");
+
+  claim_or_forward_internal_depth(p);
+}
+#endif //TERA_MINOR_GC
 
 inline void PSPromotionManager::promotion_trace_event(oop new_obj, oop old_obj,
                                                       size_t obj_size,
@@ -99,6 +130,9 @@ inline void PSPromotionManager::promotion_trace_event(oop new_obj, oop old_obj,
 template<bool promote_immediately>
 oop PSPromotionManager::copy_to_survivor_space(oop o) {
   assert(PSScavenge::should_scavenge(&o), "Sanity");
+#ifdef TERA_MINOR_GC
+  DEBUG_ONLY(if (EnableTeraHeap) assert(!Universe::teraHeap()->is_obj_in_h2(o), "Object should not be belonged to teracache space"););
+#endif
 
   oop new_obj = NULL;
 

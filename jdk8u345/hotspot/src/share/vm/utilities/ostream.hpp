@@ -26,6 +26,7 @@
 #define SHARE_VM_UTILITIES_OSTREAM_HPP
 
 #include "memory/allocation.hpp"
+#include "memory/sharedDefines.h"
 #include "runtime/timer.hpp"
 
 class GCId;
@@ -128,6 +129,9 @@ class outputStream : public ResourceObj {
 // ANSI C++ name collision
 extern outputStream* tty;           // tty output
 extern outputStream* gclog_or_tty;  // stream for gc log if -Xloggc:<f>, or tty
+#ifdef TERA_LOG
+extern outputStream* thlog_or_tty;  // stream for teraheap log if -Xlogtc:<f>, or tty
+#endif
 
 class streamIndentor : public StackObj {
  private:
@@ -258,6 +262,21 @@ class gcLogFileStream : public fileStream {
   }
 
 };
+
+#ifdef TERA_LOG
+class thLogFileStream : public fileStream {
+	protected:
+		const char* _file_name;
+		jlong _bytes_written;
+		uintx _cur_file_num;	// current logfile rotation number
+	public:
+		thLogFileStream(const char* filename);
+		~thLogFileStream();
+		virtual void write(const char *c, size_t len);
+    virtual void rotate_log(bool force, outputStream* out = NULL);
+		void dump_logth_header();
+};
+#endif
 
 #ifndef PRODUCT
 // unit test for checking -Xloggc:<filename> parsing result

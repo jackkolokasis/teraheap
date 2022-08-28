@@ -456,6 +456,10 @@ void ObjArrayKlass::initialize(TRAPS) {
 
 void ObjArrayKlass::oop_follow_contents(oop obj) {
   assert (obj->is_array(), "obj must be array");
+#ifdef TERA_MAJOR_GC
+  DEBUG_ONLY(if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object is in H2"); });
+#endif
+
   MarkSweep::follow_klass(obj->klass());
   if (UseCompressedOops) {
     objarray_follow_contents<narrowOop>(obj, 0);
@@ -463,6 +467,17 @@ void ObjArrayKlass::oop_follow_contents(oop obj) {
     objarray_follow_contents<oop>(obj, 0);
   }
 }
+
+#ifdef TERA_MAJOR_GC
+void ObjArrayKlass::h2_oop_follow_contents(oop obj) {
+	assert(obj->is_array(), "obj must be array");
+	
+	if (UseCompressedOops) 
+		h2_objarray_follow_contents<narrowOop>(obj, 0);
+	else 
+		h2_objarray_follow_contents<oop>(obj, 0);
+}
+#endif //TERA_MAJOR_GC
 
 #if INCLUDE_ALL_GCS
 void ObjArrayKlass::oop_follow_contents(ParCompactionManager* cm,
@@ -565,7 +580,19 @@ int ObjArrayKlass::oop_adjust_pointers(oop obj) {
   // Get size before changing pointers.
   // Don't call size() or oop_size() since that is a virtual call.
   int size = a->object_size();
+
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+		Universe::teraHeap()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+
   ObjArrayKlass_OOP_ITERATE(a, p, MarkSweep::adjust_pointer(p))
+
+#ifdef TERA_MAJOR_GC
+	if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+	  Universe::teraHeap()->disable_groups();                   
+#endif
+
   return size;
 }
 
@@ -578,6 +605,26 @@ void ObjArrayKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
       pm->claim_or_forward_depth(p); \
     })
 }
+
+#ifdef TERA_CARDS
+  void ObjArrayKlass::h2_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  assert(obj->is_objArray(), "obj must be obj array");
+  ObjArrayKlass_OOP_ITERATE( \
+    objArrayOop(obj), p, \
+    if (PSScavenge::h2_should_scavenge(p)) { \
+      pm->h2_claim_or_forward_depth(p); \
+    })
+  }
+  
+void ObjArrayKlass::h2_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  assert(obj->is_objArray(), "obj must be obj array");
+  ObjArrayKlass_OOP_ITERATE( \
+    objArrayOop(obj), p, \
+    if (PSScavenge::h2_should_trace(p)) { \
+      pm->h2_claim_or_forward_depth(p); \
+    })
+  }
+#endif // TERA_CARDS
 
 int ObjArrayKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   assert (obj->is_objArray(), "obj must be obj array");

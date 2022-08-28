@@ -37,7 +37,7 @@
 // allocation support is provided. Allocation by the interpreter and compiled
 // code is done inline and bails out to Scavenge::invoke_and_allocate.
 
-class TeraCache;
+class TeraHeap;
 class CollectedHeap;
 class DeferredObjAllocEvent;
 
@@ -195,7 +195,7 @@ private:
   // The particular choice of collected heap.
   static CollectedHeap *_collectedHeap;
 
-  static TeraCache *_teraCache;
+  static TeraHeap *_teraHeap;
 
   static intptr_t _non_oop_bits;
 
@@ -396,7 +396,8 @@ public:
   // The particular choice of collected heap.
   static CollectedHeap *heap() { return _collectedHeap; }
 
-  static TeraCache *teraCache() { return _teraCache; }
+  // Accessor to Teraheap
+  static TeraHeap *teraHeap() { return _teraHeap; }
 
   // For UseCompressedOops
   // Narrow Oop encoding mode:

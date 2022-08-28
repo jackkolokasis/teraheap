@@ -114,7 +114,17 @@ ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceClassLoaderKlass_OOP_OOP_ITERATE_BACKWARD
 ALL_OOP_OOP_ITERATE_CLOSURES_1(InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m)
 ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceClassLoaderKlass_OOP_OOP_ITERATE_DEFN_m)
 
+#ifdef TERA_MAJOR_GC
+void InstanceClassLoaderKlass::h2_oop_follow_contents(oop obj) {
+	InstanceKlass::h2_oop_follow_contents(obj);
+}
+#endif
+
 void InstanceClassLoaderKlass::oop_follow_contents(oop obj) {
+#ifdef TERA_MAJOR_GC
+	DEBUG_ONLY(if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object is in TeraHeap"); });
+#endif
+
   InstanceKlass::oop_follow_contents(obj);
   ClassLoaderData * const loader_data = java_lang_ClassLoader::loader_data(obj);
 
@@ -142,6 +152,26 @@ void InstanceClassLoaderKlass::oop_push_contents(PSPromotionManager* pm, oop obj
   // all class loader data. So, we don't have to follow the class loader ->
   // class loader data link.
 }
+
+#ifdef TERA_CARDS
+void InstanceClassLoaderKlass::h2_oop_push_contents(PSPromotionManager* pm, oop obj) {
+  
+	InstanceKlass::h2_oop_push_contents(pm, obj);
+
+  // This is called by the young collector. It will already have taken care of
+  // all class loader data. So, we don't have to follow the class loader ->
+  // class loader data link.
+}
+
+void InstanceClassLoaderKlass::h2_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+  
+	InstanceKlass::h2_oop_trace_contents(pm, obj);
+
+  // This is called by the young collector. It will already have taken care of
+  // all class loader data. So, we don't have to follow the class loader ->
+  // class loader data link.
+}
+#endif // TERA_CARDS
 
 int InstanceClassLoaderKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   InstanceKlass::oop_update_pointers(cm, obj);

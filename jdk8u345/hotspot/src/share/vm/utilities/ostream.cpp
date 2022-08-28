@@ -376,6 +376,9 @@ stringStream::~stringStream() {}
 xmlStream*   xtty;
 outputStream* tty;
 outputStream* gclog_or_tty;
+#ifdef TERA_LOG
+outputStream* thlog_or_tty;
+#endif
 CDS_ONLY(fileStream* classlist_file;) // Only dump the classes that can be stored into the CDS archive
 extern Mutex* tty_lock;
 
@@ -1012,6 +1015,60 @@ void gcLogFileStream::rotate_log_impl(bool force, outputStream* out) {
   }
 }
 
+#ifdef TERA_LOG
+// dump vm version, os version, platform info, build id,
+// memory usage and command line flags into header
+void thLogFileStream::dump_logth_header() {
+  if (is_open()) {
+    print_cr("%s", Abstract_VM_Version::internal_vm_info_string());
+    os::print_memory_info(this);
+    print("CommandLine flags: ");
+    CommandLineFlags::printSetFlags(this);
+  }
+}
+
+thLogFileStream::~thLogFileStream() {
+  if (_file != NULL) {
+    if (_need_close) fclose(_file);
+    _file = NULL;
+  }
+  if (_file_name != NULL) {
+    FREE_C_HEAP_ARRAY(char, _file_name, mtInternal);
+    _file_name = NULL;
+  }
+}
+
+thLogFileStream::thLogFileStream(const char* file_name) {
+  _cur_file_num = 0;
+  _bytes_written = 0L;
+  _file_name = make_log_name(file_name, NULL);
+
+  _file = fopen(_file_name, "w");
+
+  if (_file != NULL) {
+    _need_close = true;
+    dump_logth_header();
+  } else {
+    warning("Cannot open file %s due to %s\n", _file_name, strerror(errno));
+    _need_close = false;
+  }
+}
+
+void thLogFileStream::write(const char* s, size_t len) {
+  if (_file != NULL) {
+    size_t count = fwrite(s, 1, len, _file);
+    _bytes_written += count;
+  }
+  update_position(s, len);
+}
+
+// XX TODO Complete this function later
+void thLogFileStream::rotate_log(bool force, outputStream* out) {
+	return;
+}
+
+#endif // TERA_LOG
+
 defaultStream* defaultStream::instance = NULL;
 int defaultStream::_output_fd = 1;
 int defaultStream::_error_fd  = 2;
@@ -1347,8 +1404,14 @@ void ostream_init() {
 void ostream_init_log() {
   // For -Xloggc:<file> option - called in runtime/thread.cpp
   // Note : this must be called AFTER ostream_init()
-
   gclog_or_tty = tty; // default to tty
+
+#ifdef TERA_LOG
+  // For -Xlogth:<file> option - called in runtime/thread.cpp
+  // Note : this must be called AFTER ostream_init()
+  thlog_or_tty = tty; // default to tty
+#endif // TERA_LOG
+
   if (Arguments::gc_log_filename() != NULL) {
     fileStream * gclog  = new(ResourceObj::C_HEAP, mtInternal)
                              gcLogFileStream(Arguments::gc_log_filename());
@@ -1359,6 +1422,20 @@ void ostream_init_log() {
     }
     gclog_or_tty = gclog;
   }
+
+  #ifdef TERA_LOG 
+  if (Arguments::th_log_filename() != NULL) {
+	  fileStream *thlog = new(ResourceObj::C_HEAP, mtInternal)
+								thLogFileStream(Arguments::th_log_filename());
+
+	  if (thlog->is_open()) {
+		  // now we update the time stamp of the TC log to be synced up with tty
+		  thlog->time_stamp().update_to(tty->time_stamp().ticks());
+	  }
+
+	  thlog_or_tty = thlog;
+  }
+  #endif // TERA_LOG
 
 #if INCLUDE_CDS
   // For -XX:DumpLoadedClassList=<file> option
@@ -1390,6 +1467,11 @@ void ostream_exit() {
   if (gclog_or_tty != tty) {
       delete gclog_or_tty;
   }
+#ifdef TERA_LOG
+  if (thlog_or_tty != tty) {
+	  delete thlog_or_tty;
+  }
+#endif // TERA_LOG
   {
       // we temporaly disable PrintMallocFree here
       // as otherwise it'll lead to using of almost deleted
@@ -1406,6 +1488,9 @@ void ostream_exit() {
   tty = NULL;
   xtty = NULL;
   gclog_or_tty = NULL;
+#ifdef TERA_LOG
+  thlog_or_tty = NULL;
+#endif // TERA_LOG
   defaultStream::instance = NULL;
 }
 
@@ -1413,6 +1498,9 @@ void ostream_exit() {
 void ostream_abort() {
   // Here we can't delete gclog_or_tty and tty, just flush their output
   if (gclog_or_tty) gclog_or_tty->flush();
+#ifdef TERA_LOG
+  if (thlog_or_tty) thlog_or_tty->flush();
+#endif // TERA_LOG
   if (tty) tty->flush();
 
   if (defaultStream::instance != NULL) {

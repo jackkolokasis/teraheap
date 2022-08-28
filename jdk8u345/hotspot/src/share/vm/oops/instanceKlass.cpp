@@ -2118,15 +2118,27 @@ template <class T> void assert_is_in(T *p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop o = oopDesc::decode_heap_oop_not_null(heap_oop);
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in(o)
+           || Universe::teraHeap()->is_obj_in_h2(o),
+           "should be in heap");
+#else
     assert(Universe::heap()->is_in(o), "should be in heap");
+#endif
   }
 }
 template <class T> void assert_is_in_closed_subset(T *p) {
   T heap_oop = oopDesc::load_heap_oop(p);
   if (!oopDesc::is_null(heap_oop)) {
     oop o = oopDesc::decode_heap_oop_not_null(heap_oop);
+#ifdef TERA_MAJOR_GC
+    assert(Universe::heap()->is_in_closed_subset(o)
+           || Universe::teraHeap()->is_obj_in_h2(o),
+           err_msg("should be in closed *p " INTPTR_FORMAT " " INTPTR_FORMAT, (address)p, (address)o));
+#else
     assert(Universe::heap()->is_in_closed_subset(o),
            err_msg("should be in closed *p " INTPTR_FORMAT " " INTPTR_FORMAT, (address)p, (address)o));
+#endif
   }
 }
 template <class T> void assert_is_in_reserved(T *p) {
@@ -2204,6 +2216,66 @@ template <class T> void assert_nothing(T *p) {}
   }                                         \
 }
 
+#ifdef SPARK_POLICY
+
+bool InstanceKlass::find_transient_local_field_from_offset(int offset, fieldDescriptor* fd) const {
+  for (JavaFieldStream fs(this); !fs.done(); fs.next()) {
+    if (fs.offset() == offset) {
+      fd->reinitialize(const_cast<InstanceKlass*>(this), fs.index());
+	  if (fd->is_transient()) 
+		  return true;
+	  else
+		  return false;
+    }
+  }
+  return false;
+}
+
+bool InstanceKlass::find_transient_field_from_offset(int offset, fieldDescriptor* fd) const {
+  Klass* klass = const_cast<InstanceKlass*>(this);
+  while (klass != NULL) {
+	  if (InstanceKlass::cast(klass)->find_transient_local_field_from_offset(offset, fd))
+		  return true;
+	  klass = klass->super();
+  }
+  return false;
+}
+
+// The following macros call specialized macros, passing either oop or
+// narrowOop as the specialization type.  These test the UseCompressedOops
+// flag.
+// This is special iterator for TeraCache objects
+#define InstanceKlass_TERA_OOP_MAP_ITERATE(obj, do_oop, assert_fn)              \
+{                                                                             \
+  /* Compute oopmap block range. The common case                              \
+     is nonstatic_oop_map_size == 1. */                                       \
+  OopMapBlock* map           = start_of_nonstatic_oop_maps();                 \
+  OopMapBlock* const end_map = map + nonstatic_oop_map_count();               \
+  if (UseCompressedOops) {                                                    \
+    while (map < end_map) {                                                   \
+      InstanceKlass_SPECIALIZED_OOP_ITERATE(narrowOop,                        \
+        obj->obj_field_addr<narrowOop>(map->offset()), map->count(),          \
+        do_oop, assert_fn)                                                    \
+      ++map;                                                                  \
+    }                                                                         \
+  } else {                                                                    \
+	  fieldDescriptor fd;                                                       \
+	  while (map < end_map) {                                                   \
+		  if (find_transient_field_from_offset(map->offset(), &fd)) {             \
+			  InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                            \
+					  obj->obj_field_addr<oop>(map->offset()), map->count(),            \
+					  MarkSweep::mark_and_push(p), assert_fn)                           \
+		  }																                                        \
+		  else {														                                      \
+			  InstanceKlass_SPECIALIZED_OOP_ITERATE(oop,                            \
+					  obj->obj_field_addr<oop>(map->offset()), map->count(),            \
+					  MarkSweep::tera_mark_and_push(p), assert_fn)                      \
+		  }																                                        \
+		  ++map;                                                                  \
+	  }                                                                         \
+  }                                                                           \
+}
+#endif // SPARK_POLICY
 
 // The following macros call specialized macros, passing either oop or
 // narrowOop as the specialization type.  These test the UseCompressedOops
@@ -2283,11 +2355,50 @@ template <class T> void assert_nothing(T *p) {}
 void InstanceKlass::oop_follow_contents(oop obj) {
   assert(obj != NULL, "can't follow the content of NULL object");
   MarkSweep::follow_klass(obj->klass());
+
+#ifdef TERA_MAJOR_GC
+  DEBUG_ONLY( if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object should not be in H2"); });
+
+  if (EnableTeraHeap && obj->is_marked_move_h2()) {
+    Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
+    Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
+
+#ifdef SPARK_POLICY
+    InstanceKlass_TERA_OOP_MAP_ITERATE( \
+                                       obj, \
+                                       MarkSweep::tera_mark_and_push(p), \
+                                       assert_is_in_closed_subset)
+#else
+    InstanceKlass_OOP_MAP_ITERATE( \
+                                  obj, \
+                                  MarkSweep::tera_mark_and_push(p), \
+                                  assert_is_in_closed_subset)
+#endif // SPARK_POLICY
+  } 
+  else {
+    InstanceKlass_OOP_MAP_ITERATE( \
+                                  obj, \
+                                  MarkSweep::mark_and_push(p), \
+                                  assert_is_in_closed_subset)
+  }
+#else
   InstanceKlass_OOP_MAP_ITERATE( \
-    obj, \
-    MarkSweep::mark_and_push(p), \
-    assert_is_in_closed_subset)
+                                obj, \
+                                MarkSweep::mark_and_push(p), \
+                                assert_is_in_closed_subset)
+#endif // TERA_MAJOR_GC
 }
+
+#ifdef TERA_MAJOR_GC
+void InstanceKlass::h2_oop_follow_contents(oop obj) {
+  assert(obj != NULL, "can't follow the content of NULL object");
+	
+  InstanceKlass_OOP_MAP_ITERATE( \
+                                obj, \
+                                MarkSweep::h2_liveness_analysis(p), \
+                                assert_is_in_closed_subset)
+}
+#endif
 
 #if INCLUDE_ALL_GCS
 void InstanceKlass::oop_follow_contents(ParCompactionManager* cm,
@@ -2371,10 +2482,21 @@ ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceKlass_OOP_OOP_ITERATE_BACKWARDS_DEFN)
 
 int InstanceKlass::oop_adjust_pointers(oop obj) {
   int size = size_helper();
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap &&  Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+	  Universe::teraHeap()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+#endif
+
   InstanceKlass_OOP_MAP_ITERATE( \
     obj, \
     MarkSweep::adjust_pointer(p), \
     assert_is_in)
+
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(oop(obj->mark()->decode_pointer())))
+    Universe::teraHeap()->disable_groups();
+#endif
+  
   return size;
 }
 
@@ -2387,6 +2509,28 @@ void InstanceKlass::oop_push_contents(PSPromotionManager* pm, oop obj) {
     }, \
     assert_nothing )
 }
+
+#ifdef TERA_CARDS
+void InstanceKlass::h2_oop_push_contents(PSPromotionManager* pm, oop obj) {
+
+	InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
+			obj, \
+			if (PSScavenge::h2_should_scavenge(p)) { \
+			pm->h2_claim_or_forward_depth(p); \
+			}, \
+			assert_nothing )
+}
+
+void InstanceKlass::h2_oop_trace_contents(PSPromotionManager* pm, oop obj) {
+
+	InstanceKlass_OOP_MAP_REVERSE_ITERATE( \
+			obj, \
+			if (PSScavenge::h2_should_trace(p)) { \
+			pm->h2_claim_or_forward_depth(p); \
+			}, \
+			assert_nothing )
+}
+#endif // TERA_CARDS
 
 int InstanceKlass::oop_update_pointers(ParCompactionManager* cm, oop obj) {
   int size = size_helper();
