@@ -24,7 +24,7 @@ public class Test_WeakHashMap {
         Map weakmap = new WeakHashMap();  
 
 		// Mark this weakmap to be moved in H2
-		_UNSAFE.tcMarkObjectWithId(weakmap, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(weakmap, 0, 0);
 
         Map map = new HashMap();  
         map.put(a, "aaa");  

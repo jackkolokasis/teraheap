@@ -47,7 +47,7 @@ public class Clone
 		System.out.println(Runtime.getRuntime().maxMemory());
 
         ArrayList<String> arrayListObject = new ArrayList<>(); 
-		_UNSAFE.tcMarkObjectWithId(arrayListObject, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(arrayListObject, 0, 0);
 
 		for (int i = 0; i < num_elements/2; i++)
 		{

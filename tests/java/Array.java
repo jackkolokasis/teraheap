@@ -44,10 +44,10 @@ public class Array {
 	  long sum;
 
 	  int[] array1 = new int[2000000];
-	  _UNSAFE.tcMarkObjectWithId(array1, 0, 0);
+	  _UNSAFE.h2TagAndMoveRoot(array1, 0, 0);
 
 	  int[] array2 = new int[2000000];
-	  _UNSAFE.tcMarkObjectWithId(array2, 1, 0);
+	  _UNSAFE.h2TagAndMoveRoot(array2, 1, 0);
 
 	  gc();
 

@@ -59,7 +59,7 @@ public class Array_List_Int {
 		mem_info("Memory Before");
 
 		ArrayList<Integer> arl = new ArrayList<Integer>();
-		_UNSAFE.tcMarkObjectWithId(arl, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(arl, 0, 0);
 
 		for (int i = 0; i < num_elements; i++)
 			arl.add(new Integer(i));
@@ -77,7 +77,7 @@ public class Array_List_Int {
 		gc();
 
 		ArrayList<Integer> arl2 = new ArrayList<Integer>();
-		_UNSAFE.tcMarkObjectWithId(arl2, 1, 0);
+		_UNSAFE.h2TagAndMoveRoot(arl2, 1, 0);
 
 		for (int i = 0; i < num_elements; i++)
 			arl2.add(new Integer(i));
