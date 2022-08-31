@@ -55,7 +55,7 @@ void ObjArrayKlass::objarray_follow_contents(oop obj, int index) {
   T* const end = base + end_index;
 
 #ifdef TERA_MAJOR_GC
-	if (EnableTeraHeap && obj->is_marked_move_h2()) {
+	if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(obj)) {
 		Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 		Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 

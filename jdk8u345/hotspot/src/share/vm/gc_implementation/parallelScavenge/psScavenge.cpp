@@ -389,7 +389,7 @@ bool PSScavenge::invoke_no_policy() {
     if (TeraHeapCardStatistics) {
       modBS->th_num_dirty_cards(
           (HeapWord*)Universe::teraHeap()->h2_start_addr(),
-          (HeapWord *) Universe::teraHeap()->h2_top_addr(), 1);
+          (HeapWord *) Universe::teraHeap()->h2_top_addr(), true);
     }
   }
 #endif // TERA_MINOR_GC
@@ -830,7 +830,7 @@ bool PSScavenge::invoke_no_policy() {
     if (TeraHeapCardStatistics) {
       modBS->th_num_dirty_cards(
           (HeapWord*)Universe::teraHeap()->h2_start_addr(),
-          (HeapWord *) Universe::teraHeap()->h2_top_addr(), 0);
+          (HeapWord *) Universe::teraHeap()->h2_top_addr(), false);
     }
   }
 

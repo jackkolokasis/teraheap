@@ -2359,7 +2359,7 @@ void InstanceKlass::oop_follow_contents(oop obj) {
 #ifdef TERA_MAJOR_GC
   DEBUG_ONLY( if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object should not be in H2"); });
 
-  if (EnableTeraHeap && obj->is_marked_move_h2()) {
+  if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(obj)) {
     Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
     Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 

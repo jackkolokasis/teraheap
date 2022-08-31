@@ -476,7 +476,7 @@ public:
 #ifdef TERA_CARDS
   virtual void th_write_ref_field(void *obj);
   virtual void th_clean_cards(HeapWord *start, HeapWord *end);
-  virtual bool th_num_dirty_cards(HeapWord *start, HeapWord *end, bool before);
+  virtual void th_num_dirty_cards(HeapWord *start, HeapWord *end, bool before);
 #endif
 
   void clear(MemRegion mr);

@@ -78,11 +78,6 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
   void compact(bool mangle_free_space);
 
 #ifdef TERA_MAJOR_GC
-  // Implementation of policies that move objects to the H2 - TeraHeap
-  // This function takes as argument the position `q` of the object
-  // and its `size` in the Java heap and return `true` if the policy
-  // is satisfied, and `false` otherwise.
-  bool h2_policy(HeapWord *q, size_t size);
   void moveObjToH2(HeapWord *q, HeapWord *compaction_top, size_t size);
 #endif
 

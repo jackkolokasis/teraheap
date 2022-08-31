@@ -60,15 +60,32 @@ private:
                                     // object to promote this id
                                     // to their reference objects
 
-  HeapWord *obj_h1_addr; // We need to check this
-                         // object that will be moved
-                         // to H2 if it has back ptrs
-                         // to H1
+  HeapWord *obj_h1_addr;            // We need to check this
+                                    // object that will be moved
+                                    // to H2 if it has back ptrs
+                                    // to H1
 
-  HeapWord *obj_h2_addr; // We need to check this
-                         // object that will be moved
-                         // to H2 if it has back ptrs
-                         // to H1
+  HeapWord *obj_h2_addr;            // We need to check this
+                                    // object that will be moved
+                                    // to H2 if it has back ptrs
+                                    // to H1
+
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+  size_t total_marked_obj_for_h2;   // Total marked objects to be moved in H2
+
+  size_t h2_low_promotion_threshold;    // Promotion threshold
+#endif
+  
+  long non_promote_tag;             // Object with this label cannot be promoted to H2
+
+  long promote_tag;                 // Objects with labels less than
+                                    // the promote_tag can be moved to
+                                    // H2 during major GC
+
+  bool direct_promotion;            // Indicate to move tagged objects
+                                    // to H2 without waiting any hint
+                                    // from the framework
+ 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
   // references (H2 to H1)
@@ -166,9 +183,9 @@ public:
   // Add new object in the region
   char *h2_add_object(oop obj, size_t size);
 
-// Pop the objects that are in `_tc_stack` and mark them as live
-// object. These objects are located in the Java Heap and we need to
-// ensure that they will be kept alive.
+  // Pop the objects that are in `_tc_stack` and mark them as live
+  // object. These objects are located in the Java Heap and we need to
+  // ensure that they will be kept alive.
   void h2_mark_back_references();
 
   // Increase forward ptrs from JVM heap to TeraHeap
@@ -275,7 +292,6 @@ public:
 
   void h2_mark_live_objects_per_region();
 
-
   // Check if backward adjust stack is empty
   bool h2_is_empty_back_ref_stacks();
 
@@ -307,8 +323,36 @@ public:
   // Add a new entry to the histogram for forward reference that start from
   // H1 and results in 'obj' in H2
   void h2_add_fwd_ref_stat(oop obj);
-
 #endif
+		
+  // Set non promote label value
+  void set_non_promote_tag(long val);
+
+  // Set promote label value
+  void set_promote_tag(long val);
+
+  // Get non promote label value
+  long get_non_promote_tag();
+
+  // Get promote label value
+  long get_promote_tag();
+
+  bool h2_promotion_policy(oop obj, bool is_direct = false);
+
+  void set_direct_promotion(size_t old_live, size_t max_old_gen_size);
+
+  bool is_direct_promote();
+
+#if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
+  void h2_incr_total_marked_obj_size(size_t size);
+
+  void h2_reset_total_marked_obj_size();
+
+  bool check_low_promotion_threshold(size_t sz);
+
+  void set_low_promotion_threshold();
+#endif
+
 };
 
 #endif

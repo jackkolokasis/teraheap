@@ -770,8 +770,7 @@ void CardTableModRefBS::th_clean_cards(HeapWord *start, HeapWord* end) {
   memset(cur, clean_card, (last-cur)-1);
 }
 
-bool CardTableModRefBS::th_num_dirty_cards(HeapWord *start, HeapWord* end,
-		bool before) {
+void CardTableModRefBS::th_num_dirty_cards(HeapWord *start, HeapWord* end, bool before) {
 	assert((HeapWord*)align_size_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
 	assert((HeapWord*)align_size_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
 	jbyte* cur  = byte_for(start);
@@ -796,23 +795,19 @@ bool CardTableModRefBS::th_num_dirty_cards(HeapWord *start, HeapWord* end,
 	}
 
 	if (before)
-		fprintf(stderr, "BEFORE\n");
+		thlog_or_tty->print_cr("BEFORE\n");
 	else 
-		fprintf(stderr, "AFTER\n");
+		thlog_or_tty->print_cr("AFTER\n");
 
 
-	fprintf(stderr, "\t\t DIRTY_CARDS  = %d\n", num_dirty_card);
-	fprintf(stderr, "\t\t YOUNGEN_CARD = %d\n", num_youngen_card);
-	fprintf(stderr, "\t\t OLDGEN_CARD  = %d\n", num_oldgen_card);
-	fprintf(stderr, "\t\t CLEAN_CARD   = %d\n", num_clean_card);
+	thlog_or_tty->print_cr("\t\t DIRTY_CARDS  = %d\n", num_dirty_card);
+	thlog_or_tty->print_cr("\t\t YOUNGEN_CARD = %d\n", num_youngen_card);
+	thlog_or_tty->print_cr("\t\t OLDGEN_CARD  = %d\n", num_oldgen_card);
+	thlog_or_tty->print_cr("\t\t CLEAN_CARD   = %d\n", num_clean_card);
 	
-    // After minor gc the number of dirty cards should be zero
-	if (!before && num_dirty_card != 0)
-		return false;
-
-	return true;
+  // After minor gc the number of dirty cards should be zero
+  DEBUG_ONLY(if (!before) { assert(num_dirty_card == 0, "Dirty cards exists after minor gc");});
 }
-
 #endif
 
 

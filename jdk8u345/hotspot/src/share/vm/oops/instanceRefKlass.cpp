@@ -79,7 +79,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 			if (EnableTeraHeap && obj->is_marked_move_h2())
 				obj->init_obj_state();
 #endif
-			if (EnableTeraHeap && obj->is_marked_move_h2() && !Universe::teraHeap()->is_obj_in_h2(referent))
+			if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(obj) && !Universe::teraHeap()->is_obj_in_h2(referent))
 				referent->mark_move_h2(obj->get_obj_group_id(), obj->get_obj_part_id());
 
       ref->InstanceKlass::oop_follow_contents(obj);

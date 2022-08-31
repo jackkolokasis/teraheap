@@ -72,19 +72,6 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
   return _destination_decorator;
 }
 
-#ifdef TERA_MAJOR_GC
-// Implementation of policies that move objects to the TeraCache This function
-// takes as argument the position `q` of the object and its `size` in the Java
-// heap and return `true` if the policy is satisfied, and `false` otherwise.
-bool PSMarkSweepDecorator::h2_policy(HeapWord *q, size_t size) {
-#ifdef P_NO_TRANSFER
-	return false;
-#else
-	return oop(q)->is_marked_move_h2();
-#endif
-}
-#endif
-
 // FIX ME FIX ME FIX ME FIX ME!!!!!!!!!
 // The object forwarding code is duplicated. Factor this out!!!!!
 //
@@ -141,7 +128,7 @@ void PSMarkSweepDecorator::precompact() {
 #ifdef TERA_MAJOR_GC
     // Check if the object needs to be moved in TeraCache based on the
     // current policy
-    if (EnableTeraHeap && h2_policy(q, size)) {
+    if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(oop(q), Universe::teraHeap()->is_direct_promote())) {
       // Take a pointer from the region
       HeapWord* h2_obj_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(oop(q), size);
       assert(Universe::teraHeap()->is_obj_in_h2(oop(h2_obj_addr)), "Pointer from H2 is not valid");
@@ -473,14 +460,10 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
             Copy::aligned_conjoint_words(q, compaction_top, size);
             /* Initialize mark word of the destination */
             oop(compaction_top)->init_mark();
-            // If the object is transient field then keep it state
-            // without change it to the default value
-            oop(compaction_top)->init_obj_state();
           }
         }
         else {
           oop(q)->init_mark();
-          oop(q)->init_obj_state();
         }
         /* Move to the next object */
         q += size;
@@ -524,7 +507,6 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			  Copy::aligned_conjoint_words(q, compaction_top, size);
 			  // Change the value of teraflag in the new location of the object
 			  oop(compaction_top)->init_mark();
-        oop(compaction_top)->init_obj_state();
 		  }
 #else
 		  Copy::aligned_conjoint_words(q, compaction_top, size);

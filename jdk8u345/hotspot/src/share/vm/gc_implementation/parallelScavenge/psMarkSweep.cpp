@@ -387,6 +387,18 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
       }
     }
 
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+      size_t old_live = old_gen->used_in_bytes();
+      size_t max_old_gen_size = old_gen->max_gen_size(); 
+      Universe::teraHeap()->set_direct_promotion(old_live, max_old_gen_size);
+
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+      Universe::teraHeap()->h2_reset_total_marked_obj_size();
+#endif
+    }
+#endif // TERA_MAJOR_GC
+
     if (UsePerfData) {
       heap->gc_policy_counters()->update_counters();
       heap->gc_policy_counters()->update_old_capacity(
@@ -713,6 +725,11 @@ void PSMarkSweep::mark_sweep_phase2() {
 
   // Begin compacting into the old gen
   PSMarkSweepDecorator::set_destination_decorator_tenured();
+
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+  if (EnableTeraHeap)
+    Universe::teraHeap()->set_low_promotion_threshold();
+#endif
 
   // This will also compact the young gen spaces.
   old_gen->precompact();
