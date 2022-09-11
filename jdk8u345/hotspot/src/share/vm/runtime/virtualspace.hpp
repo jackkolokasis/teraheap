@@ -33,17 +33,20 @@
 class ReservedSpace VALUE_OBJ_CLASS_SPEC {
   friend class VMStructs;
 
-private:
+protected:
   char *_base;
   size_t _size;
   size_t _noaccess_prefix;
   size_t _alignment;
   bool _special;
+  int _fd_for_heap;
+private:
   bool _executable;
 
   // ReservedSpace
   ReservedSpace(char *base, size_t size, size_t alignment, bool special,
                 bool executable);
+protected:
   void initialize(size_t size, size_t alignment, bool large,
                   char *requested_address, const size_t noaccess_prefix,
                   bool executable);
@@ -107,10 +110,24 @@ ReservedSpace ReservedSpace::last_part(size_t partition_size) {
 
 // Class encapsulating behavior specific of memory space reserved for Java heap
 class ReservedHeapSpace : public ReservedSpace {
+private:
+  void try_reserve_heap(size_t size, size_t alignment, bool
+                        large, char *requested_address);
+
+  void try_reserve_range(char *highest_start, char
+                         *lowest_start, size_t attach_point_aligment, char *aligned_HBMA,
+                         char *upper_bound, size_t size, size_t alignment, bool large);
+  void initialize_compressed_heap(const size_t size, size_t alignment, bool large);
+        
+  // Create protection page at the begining of the page
+  void establish_noaccess_prefix();
 public:
   // Constructor
+  // heap_allocation_directory is the path to the backing memory for
+  // Java heap. When set, Java heap will be allocated on the device
+  // which is managed by the file system where the directory resides.
   ReservedHeapSpace(size_t size, size_t forced_base_alignment, bool large,
-                    char *requested_address);
+                    char *requested_address, const char* heap_allocation_directory = NULL);
 };
 
 // Class encapsulating behavior specific memory space for Code

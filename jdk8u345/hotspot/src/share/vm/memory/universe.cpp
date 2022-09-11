@@ -746,7 +746,7 @@ jint universe_init() {
 // HeapBased - Use compressed oops with heap base + encoding.
 
 // 4Gb
-static const uint64_t UnscaledOopHeapMax = (uint64_t(max_juint) + 1);
+//static const uint64_t UnscaledOopHeapMax = (uint64_t(max_juint) + 1);
 // 32Gb
 // OopEncodingHeapMax == UnscaledOopHeapMax << LogMinObjAlignmentInBytes;
 
@@ -1002,7 +1002,7 @@ ReservedSpace Universe::reserve_heap(size_t heap_size, size_t alignment) {
   char *addr = Universe::preferred_heap_base(total_reserved, alignment,
                                              Universe::UnscaledNarrowOop);
 
-  ReservedHeapSpace total_rs(total_reserved, alignment, use_large_pages, addr);
+  ReservedHeapSpace total_rs(total_reserved, alignment, use_large_pages, addr, AllocateHeapAt);
 
   if (UseCompressedOops) {
     if (addr != NULL && !total_rs.is_reserved()) {
@@ -1043,6 +1043,11 @@ ReservedSpace Universe::reserve_heap(size_t heap_size, size_t alignment) {
     address base = (address)(total_rs.base() - os::vm_page_size());
     Universe::set_narrow_oop_base(base);
   }
+
+  if (AllocateHeapAt != NULL) {
+    debug_only(fprintf(stderr, "Successfully allocated Java heap at location %s", AllocateHeapAt));
+  }
+
   return total_rs;
 }
 

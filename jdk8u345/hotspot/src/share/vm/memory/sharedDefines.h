@@ -61,6 +61,8 @@
 
 #define TERA_ASSERT               // Extended assertions for TeraHeap
 
+//#define FASTMAP
+
 /**********************************
  * Write Mode to H2
  **********************************/

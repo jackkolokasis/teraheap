@@ -525,6 +525,11 @@ class CommandLineFlags {
   notproduct(bool, CheckCompressedOops, true,                               \
           "Generate checks in encoding/decoding code in debug VM")          \
                                                                             \
+  product(uintx, HeapSearchSteps, 3 PPC64_ONLY(+17),                        \
+          "Heap allocation steps through preferred address regions to find" \
+          " where it can allocate the heap. Number of steps to take per "   \
+          "region.")                                                        \
+                                                                            \
   product_pd(uintx, HeapBaseMinAddress,                                     \
           "OS specific low limit for heap base address")                    \
                                                                             \
@@ -2517,7 +2522,7 @@ class CommandLineFlags {
   product(bool, H2ObjectPlacement, false,                                   \
           "Print the objects labels in H2 regions")                         \
 		                                                                    \
-  product(bool, H2LivenessAnalysis, false,                                 \
+  product(bool, H2LivenessAnalysis, false,                                  \
           "Liveness analysis per H2 region objects")                        \
 		                                                                    \
   product(uintx, TeraHeapSize, 0,                                           \
@@ -2525,6 +2530,10 @@ class CommandLineFlags {
 																		    \
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
+																		    \
+  product(ccstr, AllocateHeapAt, NULL,                                      \
+          "Path to the directory where a temporary file will be created "   \
+          "to use as a banking store for Java heap.")                       \
                                                                             \
   /* GC log rotation setting */                                             \
                                                                             \

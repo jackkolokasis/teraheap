@@ -127,6 +127,7 @@ PRAGMA_FORMAT_MUTE_WARNINGS_FOR_GCC
 #define ALL_64_BITS CONST64(0xFFFFFFFFFFFFFFFF)
 
 #define LARGEPAGES_BIT (1 << 6)
+#define DAX_SHARED_BIT (1 << 8)
 ////////////////////////////////////////////////////////////////////////////////
 // global variables
 julong os::Linux::_physical_memory = 0;
@@ -3471,10 +3472,13 @@ bool os::Linux::hugetlbfs_sanity_check(bool warn, size_t page_size) {
 *           effective only if the bit 2 is cleared)
 * - (bit 5) hugetlb private memory
 * - (bit 6) hugetlb shared memory
+* - (bit 7) dax private memory
+* - (bit 8) dax shared memory
 */
-static void set_coredump_filter(void) {
+static void set_coredump_filter(bool largepages, bool dax_shared) {
   FILE *f;
   long cdm;
+  bool filter_changed = false;
 
   if ((f = fopen("/proc/self/coredump_filter", "r+")) == NULL) {
     return;
@@ -3487,10 +3491,18 @@ static void set_coredump_filter(void) {
 
   rewind(f);
 
-  if ((cdm & LARGEPAGES_BIT) == 0) {
+  if (largepages && (cdm & LARGEPAGES_BIT) == 0) {
     cdm |= LARGEPAGES_BIT;
-    fprintf(f, "%#lx", cdm);
+    filter_changed = true;
   }
+
+  if (dax_shared && (cdm & DAX_SHARED_BIT) == 0) {
+    cdm |= DAX_SHARED_BIT;
+    filter_changed = true;
+  }
+
+  if (filter_changed)
+    fprintf(f, "%#lx", cdm);
 
   fclose(f);
 }
@@ -3620,7 +3632,7 @@ void os::large_page_init() {
   size_t large_page_size = Linux::setup_large_page_size();
   UseLargePages          = Linux::setup_large_page_type(large_page_size);
 
-  set_coredump_filter();
+  set_coredump_filter(true /*largepages*/, false /*dax_shared*/);
 }
 
 #ifndef SHM_HUGETLB
@@ -3978,6 +3990,17 @@ bool os::can_commit_large_page_memory() {
 
 bool os::can_execute_large_page_memory() {
   return UseTransparentHugePages || UseHugeTLBFS;
+}
+
+char* os::pd_attempt_reserve_memory_at(size_t bytes, char* requested_addr, int file_desc) {
+  assert(file_desc >= 0, "file_desc is not valid");
+  char* result = pd_attempt_reserve_memory_at(bytes, requested_addr);
+  if (result != NULL) {
+    if (replace_existing_mapping_with_file_mapping(result, bytes, file_desc) == NULL) {
+      vm_exit_during_initialization(err_msg("Error in mapping Java heap at the given filesystem directory"));
+    }
+  }
+  return result;
 }
 
 // Reserve memory at an arbitrary address, only if that area is
@@ -5265,6 +5288,10 @@ jint os::init_2(void)
 
   // initialize thread priority policy
   prio_init();
+
+  if (!FLAG_IS_DEFAULT(AllocateHeapAt)) {
+    set_coredump_filter(false /*largepages*/, true /*dax_shared*/);
+  }
 
   return JNI_OK;
 }

@@ -415,6 +415,10 @@ const int KlassAlignment           = KlassAlignmentInBytes / HeapWordSize;
 // Klass encoding metaspace max size
 const uint64_t KlassEncodingMetaspaceMax = (uint64_t(max_juint) + 1) << LogKlassAlignmentInBytes;
 
+// Maximal size of heap where unscaled compression can be used. Also
+// upper bound for heap placement: 4GB
+const uint64_t UnscaledOopHeapMax = (uint64_t(max_juint) + 1);
+
 // Machine dependent stuff
 
 #if defined(X86) && defined(COMPILER2) && !defined(JAVASE_EMBEDDED)
