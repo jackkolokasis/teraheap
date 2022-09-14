@@ -20,11 +20,14 @@ setup:
 $(BINDIR)/test: $(LIBPATH) ./test/main.c
 	$(CC) $(CFLAGS) ./test/main.c -o $(BINDIR)/test $(UMAPFLAG)
 
-$(LIBPATH): $(OBJDIR)/ummap.o 
+$(LIBPATH): $(OBJDIR)/ummap.o $(OBJDIR)/futex.o
 	@$(CC) $(OBJDIR)/*.o -shared -fPIC -o $(LIBPATH) $(LDFLAGS)
 
-$(OBJDIR)/ummap.o: ./src/ummap.c ./include/ummap.h ./include/common.h
+$(OBJDIR)/ummap.o: ./src/ummap.c ./include/ummap.h ./include/common.h ./include/ummap_types.h
 	@$(CC) $(CFLAGS) -c -fPIC ./src/ummap.c -o $(OBJDIR)/ummap.o
+
+$(OBJDIR)/futex.o: ./src/futex.c ./include/futex.h
+	$(CC) $(CFLAGS) -c -fPIC ./src/futex.c -o $(OBJDIR)/futex.o
 
 clean:
 	@rm -rf $(BUILDDIR)
