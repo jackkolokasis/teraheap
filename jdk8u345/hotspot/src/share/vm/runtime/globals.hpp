@@ -2521,20 +2521,23 @@ class CommandLineFlags {
                                                                             \
   product(bool, H2ObjectPlacement, false,                                   \
           "Print the objects labels in H2 regions")                         \
-		                                                                    \
+								                                    										    \
   product(bool, H2LivenessAnalysis, false,                                  \
           "Liveness analysis per H2 region objects")                        \
-		                                                                    \
+								                                    										    \
   product(uintx, TeraHeapSize, 0,                                           \
           "Initial TeraHeap total size (in bytes)")                         \
-																		    \
+								                                    										    \
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
-																		    \
+								                                    										    \
   product(ccstr, AllocateHeapAt, NULL,                                      \
           "Path to the directory where a temporary file will be created "   \
           "to use as a banking store for Java heap.")                       \
                                                                             \
+  product(ccstr, AllocateOldGenAt, NULL,                                    \
+          "Path to the directory where a temporary file will be created "   \
+          "to use as a banking store for Java heap.")                       \
   /* GC log rotation setting */                                             \
                                                                             \
   product(bool, UseGCLogFileRotation, false,                                \

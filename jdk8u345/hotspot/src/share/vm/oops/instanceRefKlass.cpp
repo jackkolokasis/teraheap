@@ -99,7 +99,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 #ifdef P_SD_REF_EXCLUDE_CLOSURE
       MarkSweep::mark_and_push(referent_addr);
 #else
-		  if (EnableTeraHeap && obj->is_marked_move_h2()) {
+		  if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(obj)) {
 			  Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 			  Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 			  MarkSweep::tera_mark_and_push(referent_addr);
@@ -125,7 +125,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 #ifdef P_SD_REF_EXCLUDE_CLOSURE
 			MarkSweep::mark_and_push(discovered_addr);
 #else
-      if (EnableTeraHeap && obj->is_marked_move_h2()) {
+      if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(obj)) {
         Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
         Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
         MarkSweep::tera_mark_and_push(discovered_addr);
@@ -156,7 +156,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 	MarkSweep::mark_and_push(next_addr);
 #else
 		// Process the next attribute  
-		if (EnableTeraHeap && obj->is_marked_move_h2()) {
+		if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(obj)) {
 			Universe::teraHeap()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 			Universe::teraHeap()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 			MarkSweep::tera_mark_and_push(next_addr);

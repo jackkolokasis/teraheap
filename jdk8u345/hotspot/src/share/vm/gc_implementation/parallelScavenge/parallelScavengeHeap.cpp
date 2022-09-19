@@ -24,10 +24,12 @@
 
 #include "precompiled.hpp"
 #include "gc_implementation/parallelScavenge/adjoiningGenerations.hpp"
+#include "gc_implementation/parallelScavenge/adjoiningGenerationsForHeteroHeap.hpp"
 #include "gc_implementation/parallelScavenge/adjoiningVirtualSpaces.hpp"
 #include "gc_implementation/parallelScavenge/cardTableExtension.hpp"
 #include "gc_implementation/parallelScavenge/gcTaskManager.hpp"
 #include "gc_implementation/parallelScavenge/generationSizer.hpp"
+#include "gc_implementation/parallelScavenge/heterogeneousGenerationSizer.hpp"
 #include "gc_implementation/parallelScavenge/parallelScavengeHeap.inline.hpp"
 #include "gc_implementation/parallelScavenge/psAdaptiveSizePolicy.hpp"
 #include "gc_implementation/parallelScavenge/psMarkSweep.hpp"
@@ -57,7 +59,12 @@ jint ParallelScavengeHeap::initialize() {
   CollectedHeap::pre_initialize();
 
   // Initialize collector policy
-  _collector_policy = new GenerationSizer();
+ if (AllocateOldGenAt != NULL) {
+    _collector_policy = new HeterogeneousGenerationSizer();
+  } else {
+    _collector_policy = new GenerationSizer();
+  }
+
   _collector_policy->initialize_all();
 
   const size_t heap_size = _collector_policy->max_heap_byte_size();
@@ -113,6 +120,10 @@ jint ParallelScavengeHeap::initialize() {
       "Could not reserve enough space for barrier set");
     return JNI_ENOMEM;
   }
+  
+  // Need to initialize _psh before the creation of the adjoining
+  // generations
+  _psh = this;
 
   // Make up the generations
   // Calculate the maximum size that a generation can grow.  This
@@ -122,8 +133,8 @@ jint ParallelScavengeHeap::initialize() {
   // _max_gen_size is still used as that value.
   double max_gc_pause_sec = ((double) MaxGCPauseMillis)/1000.0;
   double max_gc_minor_pause_sec = ((double) MaxGCMinorPauseMillis)/1000.0;
-
-  _gens = new AdjoiningGenerations(heap_rs, _collector_policy, generation_alignment());
+    
+  _gens = AdjoiningGenerations::create_adjoining_generations(heap_rs, _collector_policy, generation_alignment());
 
   _old_gen = _gens->old_gen();
   _young_gen = _gens->young_gen();
@@ -141,14 +152,14 @@ jint ParallelScavengeHeap::initialize() {
                              GCTimeRatio
                              );
 
-  assert(!UseAdaptiveGCBoundary ||
-    (old_gen()->virtual_space()->high_boundary() ==
-     young_gen()->virtual_space()->low_boundary()),
-    "Boundaries must meet");
+  assert(_collector_policy->is_hetero_heap() ||
+         !UseAdaptiveGCBoundary ||
+         (old_gen()->virtual_space()->high_boundary() ==
+         young_gen()->virtual_space()->low_boundary()),
+         "Boundaries must meet");
   // initialize the policy counters - 2 collectors, 3 generations
   _gc_policy_counters =
     new PSGCAdaptivePolicyCounters("ParScav:MSC", 2, 3, _size_policy);
-  _psh = this;
 
   // Set up the GCTaskManager
   _gc_task_manager = GCTaskManager::create(ParallelGCThreads);

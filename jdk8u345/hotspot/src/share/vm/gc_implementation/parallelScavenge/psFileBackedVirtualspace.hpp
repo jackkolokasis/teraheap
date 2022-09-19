@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,30 +22,24 @@
  *
  */
 
-#ifndef SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_GENERATIONSIZER_HPP
-#define SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_GENERATIONSIZER_HPP
+#ifndef SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSFILEBACKEDVIRTUALSPACE_HPP
+#define SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSFILEBACKEDVIRTUALSPACE_HPP
 
-#include "memory/collectorPolicy.hpp"
+#include "gc_implementation/parallelScavenge/psVirtualspace.hpp"
 
-// There is a nice batch of tested generation sizing code in
-// TwoGenerationCollectorPolicy. Lets reuse it!
-
-class GenerationSizer : public TwoGenerationCollectorPolicy {
- private:
-
-  void trace_gen_sizes(const char* const str);
-
-  // The alignment used for boundary between young gen and old gen
-  static size_t default_gen_alignment() { return 64 * K * HeapWordSize; }
-
- protected:
-
-  void initialize_alignments();
-  void initialize_flags();
-  void initialize_size_info();
-
+class PSFileBackedVirtualSpace : public PSVirtualSpace {
+private:
+  const char* _file_path;
+  int _fd;
+  bool _mapping_succeeded;
 public:
-  virtual size_t heap_reserved_size_bytes() const;
-  virtual bool is_hetero_heap() const;
+  PSFileBackedVirtualSpace(ReservedSpace rs, size_t alignment, const char* file_path);
+  PSFileBackedVirtualSpace(ReservedSpace rs, const char* file_path);
+
+  bool   initialize();
+  bool   expand_by(size_t bytes);
+  bool   shrink_by(size_t bytes);
+  size_t expand_into(PSVirtualSpace* space, size_t bytes);
+  void   release();
 };
-#endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_GENERATIONSIZER_HPP
+#endif // SHARE_VM_GC_IMPLEMENTATION_PARALLELSCAVENGE_PSFILEBACKEDVIRTUALSPACE_HPP

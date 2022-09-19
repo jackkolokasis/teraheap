@@ -61,7 +61,10 @@
 
 #define TERA_ASSERT               // Extended assertions for TeraHeap
 
-//#define FASTMAP
+//#define FASTMAP                 // Enable this define when you run
+                                  // with fastmap with enabled
+                                  // -XX:AllocateHeapAt="/mnt/dir"
+                                  // or -XX:AllocateOldGenAt="/mnt/dir"
 
 /**********************************
  * Write Mode to H2

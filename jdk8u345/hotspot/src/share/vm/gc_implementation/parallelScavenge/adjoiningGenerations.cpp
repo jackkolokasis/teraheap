@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "gc_implementation/parallelScavenge/adjoiningGenerations.hpp"
+#include "gc_implementation/parallelScavenge/adjoiningGenerationsForHeteroHeap.hpp"
 #include "gc_implementation/parallelScavenge/adjoiningVirtualSpaces.hpp"
 #include "gc_implementation/parallelScavenge/generationSizer.hpp"
 #include "gc_implementation/parallelScavenge/parallelScavengeHeap.hpp"
@@ -35,8 +36,11 @@
 AdjoiningGenerations::AdjoiningGenerations(ReservedSpace old_young_rs,
                                            GenerationSizer* policy,
                                            size_t alignment) :
-  _virtual_spaces(old_young_rs, policy->min_gen1_size(),
-                  policy->min_gen0_size(), alignment) {
+  _virtual_spaces(new AdjoiningVirtualSpaces(
+                    old_young_rs,
+                    policy->min_gen1_size(), /* Old Generation*/
+                    policy->min_gen0_size(), /* Young Generation */
+                    alignment)) {
   size_t init_low_byte_size = policy->initial_gen1_size();
   size_t min_low_byte_size = policy->min_gen1_size();
   size_t max_low_byte_size = policy->max_gen1_size();
@@ -56,21 +60,21 @@ AdjoiningGenerations::AdjoiningGenerations(ReservedSpace old_young_rs,
     // generation.
 
     // Does the actual creation of the virtual spaces
-    _virtual_spaces.initialize(max_low_byte_size,
+    _virtual_spaces->initialize(max_low_byte_size,
                                init_low_byte_size,
                                init_high_byte_size);
 
     // Place the young gen at the high end.  Passes in the virtual space.
-    _young_gen = new ASPSYoungGen(_virtual_spaces.high(),
-                                  _virtual_spaces.high()->committed_size(),
+    _young_gen = new ASPSYoungGen(_virtual_spaces->high(),
+                                  _virtual_spaces->high()->committed_size(),
                                   min_high_byte_size,
-                                  _virtual_spaces.high_byte_size_limit());
+                                  _virtual_spaces->high_byte_size_limit());
 
     // Place the old gen at the low end. Passes in the virtual space.
-    _old_gen = new ASPSOldGen(_virtual_spaces.low(),
-                              _virtual_spaces.low()->committed_size(),
+    _old_gen = new ASPSOldGen(_virtual_spaces->low(),
+                              _virtual_spaces->low()->committed_size(),
                               min_low_byte_size,
-                              _virtual_spaces.low_byte_size_limit(),
+                              _virtual_spaces->low_byte_size_limit(),
                               "old", 1);
 
     young_gen()->initialize_work();
@@ -87,8 +91,10 @@ AdjoiningGenerations::AdjoiningGenerations(ReservedSpace old_young_rs,
   } else {
 
     // Layout the reserved space for the generations.
+    // If OldGen is allocated on NVMe SSD or NVM, we need to split the
+    // reservation (this is required for windows)
     ReservedSpace old_rs   =
-      virtual_spaces()->reserved_space().first_part(max_low_byte_size);
+      virtual_spaces()->reserved_space().first_part(max_low_byte_size, policy->is_hetero_heap() /* split */);
     ReservedSpace heap_rs  =
       virtual_spaces()->reserved_space().last_part(max_low_byte_size);
     ReservedSpace young_rs = heap_rs.first_part(max_high_byte_size);
@@ -111,6 +117,8 @@ AdjoiningGenerations::AdjoiningGenerations(ReservedSpace old_young_rs,
     assert(old_gen()->gen_size_limit() == old_rs.size(), "Consistency check");
   }
 }
+
+AdjoiningGenerations::AdjoiningGenerations() {}
 
 size_t AdjoiningGenerations::reserved_byte_size() {
   return virtual_spaces()->reserved_space().size();
@@ -279,5 +287,15 @@ void AdjoiningGenerations::adjust_boundary_for_young_gen_needs(size_t eden_size,
     if (desired_size > committed) {
       request_young_gen_expansion(desired_size - committed);
     }
+  }
+}
+
+AdjoiningGenerations* AdjoiningGenerations::create_adjoining_generations(ReservedSpace old_young_rs,
+                                                                         GenerationSizer* policy,
+                                                                         size_t alignment) {
+  if (policy->is_hetero_heap() && UseAdaptiveGCBoundary) {
+    return new AdjoiningGenerationsForHeteroHeap(old_young_rs, policy, alignment);
+  } else {
+    return new AdjoiningGenerations(old_young_rs, policy, alignment);
   }
 }

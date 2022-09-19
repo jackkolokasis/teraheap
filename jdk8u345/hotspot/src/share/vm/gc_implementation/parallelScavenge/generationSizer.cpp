@@ -84,3 +84,11 @@ void GenerationSizer::initialize_size_info() {
 
   trace_gen_sizes("ps heap rnd");
 }
+
+bool GenerationSizer::is_hetero_heap() const {
+  return false;
+}
+
+size_t GenerationSizer::heap_reserved_size_bytes() const {
+  return _max_heap_byte_size;
+}

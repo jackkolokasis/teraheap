@@ -27,6 +27,7 @@
 #include "gc_implementation/parallelScavenge/psAdaptiveSizePolicy.hpp"
 #include "gc_implementation/parallelScavenge/psMarkSweepDecorator.hpp"
 #include "gc_implementation/parallelScavenge/psOldGen.hpp"
+#include "gc_implementation/parallelScavenge/psFileBackedVirtualspace.hpp"
 #include "gc_implementation/shared/spaceDecorator.hpp"
 #include "memory/cardTableModRefBS.hpp"
 #include "memory/gcLocker.inline.hpp"
@@ -69,7 +70,15 @@ void PSOldGen::initialize(ReservedSpace rs, size_t alignment,
 
 void PSOldGen::initialize_virtual_space(ReservedSpace rs, size_t alignment) {
 
-  _virtual_space = new PSVirtualSpace(rs, alignment);
+  if(ParallelScavengeHeap::heap()->ps_collector_policy()->is_hetero_heap()) {
+    _virtual_space = new PSFileBackedVirtualSpace(rs, alignment, AllocateOldGenAt);
+    if (!(static_cast <PSFileBackedVirtualSpace*>(_virtual_space))->initialize()) {
+      vm_exit_during_initialization("Could not map space for PSOldGen at given AllocateOldGenAt path");
+    }
+  } else {
+    _virtual_space = new PSVirtualSpace(rs, alignment);
+  }
+
   if (!_virtual_space->expand_by(_init_gen_size)) {
     vm_exit_during_initialization("Could not reserve enough space for "
                                   "object heap");
