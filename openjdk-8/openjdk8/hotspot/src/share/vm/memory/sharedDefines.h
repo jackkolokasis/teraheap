@@ -136,6 +136,12 @@
 
 #define P_SD_REF_EXCLUDE_CLOSURE 1  //< Exclude reference objects from the closure
 
+#define P_GIRAPH_NOHINT_HIGH_WATERMARK 0 //< No hint with high watermark policy
+
+#define P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK 0 //< No hint with hihg + low threshold
+
+#define P_GIRAPH_HINT_HIGH_LOW_WATERMARK 1 //< Hint with high and low watermark
+
 /**********************************
  * States of TeraFlag  
  **********************************/
@@ -175,7 +181,6 @@
 #define DISABLE_TRAVERSE_OLD_GEN  1  //< Disable backward reference traversal
 									 // from H2 to old generation (H1) during
 									 // minor GC
-
 #define GC_ANALYSIS               0
 
 /************************************

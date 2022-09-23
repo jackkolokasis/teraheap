@@ -36,6 +36,11 @@ uint64_t TeraCache::obj_distr_size[3];
 long int TeraCache::cur_obj_group_id;
 long int TeraCache::cur_obj_part_id;
 
+#if P_GIRAPH_HINT_HIGH_LOW_WATERMARK || P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK
+size_t TeraCache::mark_obj_size;
+size_t TeraCache::promotion_threshold;
+#endif
+
 // Constructor of TeraCache
 TeraCache::TeraCache() {
 	
@@ -76,6 +81,14 @@ TeraCache::TeraCache() {
 
 	obj_h1_addr = NULL;
 	obj_h2_addr = NULL;
+
+	non_promote_tag = 0;
+	promote_tag = -1;
+	direct_promotion = false;
+
+#if P_GIRAPH_HINT_HIGH_LOW_WATERMARK || P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK
+	mark_obj_size = 0;
+#endif
 }
 		
 void TeraCache::tc_shutdown() {
@@ -811,5 +824,103 @@ void TeraCache::tc_print_fwd_ref_stat() {
 	fwd_ref_histo.clear();
 }
 
+#endif
+		
+// Set non promote tag value
+void TeraCache::set_non_promote_tag(long val) {
+	non_promote_tag = val;
+}
+
+// Set promote tag value
+void TeraCache::set_promote_tag(long val) {
+	promote_tag = val;
+}
+
+// Get non promote tag value
+long TeraCache::get_non_promote_tag() {
+	return non_promote_tag;
+}
+
+// Get promote tag value
+long TeraCache::get_promote_tag() {
+	return promote_tag;
+}
+
+bool TeraCache::tc_policy(oop obj, bool is_direct) {
+#if P_NO_TRANSFER
+	return false;
+
+#elif SPARK_POLICY
+	return ((oop(q)->is_tera_cache() && size >= TeraCacheThreshold));
+
+#elif P_GIRAPH_HINT_HIGH_LOW_WATERMARK
+	if (is_direct)
+		return check_promotion_threshold(obj->size());
+	
+	if (direct_promotion)
+		return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold);
+
+	return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold 
+			&& obj->get_obj_group_id() <=  promote_tag);
+
+#elif P_GIRAPH_NOHINT_HIGH_WATERMARK
+	if (direct_promotion)
+		return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold);
+
+	return false;
+
+#elif P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK
+	if (is_direct)
+		return check_promotion_threshold(obj->size());
+	
+	if (direct_promotion)
+		return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold);
+
+	return false;
+
+#else 
+	// In case we are in the loadInput superstep and there is a lot of pressure
+	// in the heap then we need to promote edges to H2 
+	if (direct_promotion && promote_tag == -1)
+		return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold);
+
+	if (direct_promotion)
+		return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold);
+
+	return (obj->is_tera_cache() && (size_t) obj->size() >= TeraCacheThreshold 
+			&& obj->get_obj_group_id() <=  promote_tag);
+#endif
+}
+		
+void TeraCache::set_direct_promotion(size_t old_live, size_t max_old_gen_size) {
+	direct_promotion = ((float) old_live / (float) max_old_gen_size) >= 0.85 ? true : false;
+}
+
+bool TeraCache::is_direct_promote() {
+	return direct_promotion;
+}
+		
+#if P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK || P_GIRAPH_HINT_HIGH_LOW_WATERMARK
+void TeraCache::marked_obj_size(size_t sz) {
+	mark_obj_size += sz;
+}
+		
+void TeraCache::reset_marked_obj_size() {
+	mark_obj_size = 0;
+}
+		
+bool TeraCache::check_promotion_threshold(size_t sz) {
+	if (promotion_threshold == 0 || sz > promotion_threshold)
+		return false;
+
+	promotion_threshold -= sz;
+	return true;
+}
+
+void TeraCache::set_promotion_threshold() {
+	// promotion_threshold = (Universe::heap()->capacity() * 0.6) / HeapWordSize;
+	//fprintf(stderr, "Promotion Threshold: %lu", promotion_threshold);
+	promotion_threshold = mark_obj_size * 0.5;
+}
 #endif
 

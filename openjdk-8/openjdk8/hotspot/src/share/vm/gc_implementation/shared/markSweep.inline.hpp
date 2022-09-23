@@ -115,6 +115,9 @@ template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 				uint64_t groupId = Universe::teraCache()->tc_get_region_groupId((void *) p);
 				uint64_t partId = Universe::teraCache()->tc_get_region_partId((void *) p);
 				obj->set_tera_cache(groupId, partId);
+#if P_GIRAPH_HINT_HIGH_LOW_WATERMARK || P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK
+				Universe::teraCache()->marked_obj_size(obj->size());
+#endif
 			}
 
 			_marking_stack.push(obj);
@@ -257,9 +260,12 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 			_marking_stack.push(obj);
 		}
 #else
-		if (!obj->is_tera_cache()) {
+		if (!(obj->is_tera_cache() || obj->is_instanceMirror() || obj->is_instanceRef())) {
 			obj->set_tera_cache(Universe::teraCache()->get_cur_obj_group_id(),
 					Universe::teraCache()->get_cur_obj_part_id());
+#if P_GIRAPH_HINT_HIGH_LOW_WATERMARK || P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK
+			Universe::teraCache()->marked_obj_size(obj->size());
+#endif
 		}
 		
 		if (!obj->mark()->is_marked()) {

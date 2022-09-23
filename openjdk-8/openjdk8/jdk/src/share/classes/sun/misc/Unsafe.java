@@ -1163,4 +1163,38 @@ public final class Unsafe {
      * @param part_id partition id
      */
     public native void tcPrefetchPartitionData(Object o, long rdd_id, long part_id);
+	
+	/**
+	 * Mark objects to be moved to TeraHeap in the next major GC
+	 *
+     * @param o object/array to update tera mark word
+     * @param tag tag of the object group
+     * @param part_id partition id
+     */
+    public native void directPromoteToTeraHeap(Object o, long tag, long part_id);
+
+	/**
+     * Mark objects as candidates to be moved to TeraHeap when a
+	 * moveObjectsToTeraHeap() is called. 
+	 *
+     * @param o object/array to update tera mark word
+     * @param tag tag of the object group
+     * @param part_id partition id
+     */
+    public native void lazyPromoteToTeraHeap(Object o, long tag, long part_id);
+
+	/**
+	 * Move objects with certain tag in TeraHeap in the next major GC.
+	 *
+     * @param tag tag of the object group
+     * @param part_id partition id
+     */
+    public native void moveObjectsToTeraHeap(long tag);
+	
+	/**
+	 * Objects with this tag will not be promote to TeraHeap
+	 *
+     * @param tag tag of the object group
+     */
+    public native void setNonPromoteTag(long tag);
 }
