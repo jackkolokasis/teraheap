@@ -76,20 +76,6 @@ PSMarkSweepDecorator* PSMarkSweepDecorator::destination_decorator() {
   return _destination_decorator;
 }
 
-#if TC_POLICY
-// Implementation of policies that move objects to the TeraCache This function
-// takes as argument the position `q` of the object and its `size` in the Java
-// heap and return `true` if the policy is satisfied, and `false` otherwise.
-bool PSMarkSweepDecorator::tc_policy(HeapWord *q, size_t size) {
-#if P_NO_TRANSFER
-	return false;
-#else
-	return ((oop(q)->is_tera_cache() && size >= TeraCacheThreshold));
-#endif
-}
-#endif
-
-
 // FIX ME FIX ME FIX ME FIX ME!!!!!!!!!
 // The object forwarding code is duplicated. Factor this out!!!!!
 //
@@ -179,7 +165,7 @@ void PSMarkSweepDecorator::precompact() {
 #if !DISABLE_PRECOMPACT
 			// Check if the object needs to be moved in TeraCache based on the
 			// current policy
-			if (EnableTeraCache && tc_policy(q, size)) {
+			if (EnableTeraCache && Universe::teraCache()->tc_policy(oop(q), Universe::teraCache()->is_direct_promote())) {
 				// Take a pointer from the region
 				HeapWord* region_top = (HeapWord*) tc->tc_region_top(oop(q), size);
 				assertf(tc->tc_check(oop(region_top)), "Pointer from teraCache is not valid");
@@ -601,10 +587,12 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 					Copy::aligned_conjoint_words(q, compaction_top, size);
 					/* Initialize mark word of the destination */
 					oop(compaction_top)->init_mark();
-					// If the object is transient field then keep it state
-					// without change it to the default value
+#if 0
+					// If the object is transient field or move to TeraHeap then
+					// keep it state without change it to the default value
 					if (oop(compaction_top)->get_obj_state() != TRANSIENT_FIELD)
 						oop(compaction_top)->set_obj_state();
+#endif
 				}
 
 #if DEBUG_VECTORS
@@ -614,10 +602,12 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			}
 			else {
 				oop(q)->init_mark();
+#if 0
 				// If the object is transient field then keep it state
 				// without change it to the default value
 				if (oop(q)->get_obj_state() != TRANSIENT_FIELD)
 					oop(q)->set_obj_state();
+#endif
 #if DEBUG_VECTORS
 				_verify_objects.push_back(q);
 				verify_compacted_objects();
@@ -709,13 +699,17 @@ void PSMarkSweepDecorator::compact(bool mangle_free_space ) {
 			  Copy::aligned_conjoint_words(q, compaction_top, size);
 			  // Change the value of teraflag in the new location of the object
 			  oop(compaction_top)->init_mark();
+#if 0
 			  if (oop(compaction_top)->get_obj_state() != TRANSIENT_FIELD)
 				  oop(compaction_top)->set_obj_state();
+#endif
 		  }
 #else
 		  Copy::aligned_conjoint_words(q, compaction_top, size);
 		  oop(compaction_top)->init_mark();
+#if 0
 		  oop(compaction_top)->set_obj_state();
+#endif
 #endif
 
 #if DEBUG_VECTORS

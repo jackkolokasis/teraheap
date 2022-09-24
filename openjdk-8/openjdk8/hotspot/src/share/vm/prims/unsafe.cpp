@@ -606,8 +606,8 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObject(JNIEnv *env, jobject unsafe, jobject obj)
   oop o = JNIHandles::resolve_non_null(obj);
   int i;
 
-  if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
-	return;
+//  if (strstr(o->klass()->internal_name(), "SerializableConfiguration"))
+//	return;
 
   o->set_tera_cache(0, 0);
 UNSAFE_END
@@ -619,9 +619,11 @@ UNSAFE_ENTRY(void, Unsafe_TcMarkObjectWithId(JNIEnv *env, jobject unsafe,
   oop o = JNIHandles::resolve_non_null(obj);
 
   // If the object is already in TeraCache then do not mark its teraflag
-  if (Universe::teraCache()->tc_check(o) || 
-  		strstr(o->klass()->internal_name(), "SerializableConfiguration"))
-  	return;
+  //if (Universe::teraCache()->tc_check(o) || 
+  //		strstr(o->klass()->internal_name(), "SerializableConfiguration"))
+  //	return;
+  if (Universe::teraCache()->tc_check(o))
+	return;
 
   // Initialize object's teraflag
   o->set_tera_cache(rdd_id, part_id);
@@ -644,6 +646,49 @@ UNSAFE_ENTRY(void, Unsafe_TcPrefetchPartitionData(JNIEnv *env, jobject unsafe,
   Universe::teraCache()->tc_prefetch_data((HeapWord *) o, rdd_id, part_id);
 
 #endif
+
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_DirectPromoteToTeraHeap(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong tag, jlong part_id))
+  UnsafeWrapper("Unsafe_DirectPromoteToTeraHeap");
+  
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  if (Universe::teraCache()->tc_check(o))
+	return;
+
+  // Initialize object's teraflag
+  o->set_tera_cache(tag, part_id);
+
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_LazyPromoteToTeraHeap(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong tag, jlong part_id))
+  UnsafeWrapper("Unsafe_LazyPromoteToTeraHeap");
+  
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  if (Universe::teraCache()->tc_check(o))
+	return;
+  
+  o->set_tera_cache(Universe::teraCache()->get_non_promote_tag(), part_id);
+
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_MoveObjectsToTeraHeap(JNIEnv *env, jobject unsafe,
+			jlong tag))
+  UnsafeWrapper("Unsafe_MoveObjectsToTeraHeap");
+  
+  Universe::teraCache()->set_promote_tag(tag);
+
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_SetNonPromoteTag(JNIEnv *env, jobject unsafe,
+			jlong tag))
+  UnsafeWrapper("Unsafe_SetNonPromoteTag");
+  
+  Universe::teraCache()->set_non_promote_tag(tag);
 
 UNSAFE_END
 
@@ -1647,6 +1692,11 @@ static JNINativeMethod methods_18[] = {
     {CC"tcMarkObjectWithId", CC"("OBJ"JJ)V",              FN_PTR(Unsafe_TcMarkObjectWithId)},
 	// Prefetch partition data
     {CC"tcPrefetchPartitionData", CC"("OBJ"JJ)V",        FN_PTR(Unsafe_TcPrefetchPartitionData)},
+
+    {CC"directPromoteToTeraHeap", CC"("OBJ"JJ)V",        FN_PTR(Unsafe_DirectPromoteToTeraHeap)},
+    {CC"lazyPromoteToTeraHeap",   CC"("OBJ"JJ)V",        FN_PTR(Unsafe_LazyPromoteToTeraHeap)},
+    {CC"moveObjectsToTeraHeap",   CC"(J)V",              FN_PTR(Unsafe_MoveObjectsToTeraHeap)},
+    {CC"setNonPromoteTag",        CC"(J)V",              FN_PTR(Unsafe_SetNonPromoteTag)},
 
     {CC"reallocateMemory",   CC"("ADR"J)"ADR,            FN_PTR(Unsafe_ReallocateMemory)},
     {CC"freeMemory",         CC"("ADR")V",               FN_PTR(Unsafe_FreeMemory)},

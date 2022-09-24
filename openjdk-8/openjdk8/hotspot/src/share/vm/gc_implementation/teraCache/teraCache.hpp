@@ -85,6 +85,23 @@ class TeraCache {
 		threadpool thpool[8];
 #endif
 
+#if P_GIRAPH_HINT_HIGH_LOW_WATERMARK || P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK
+		static size_t mark_obj_size;
+		
+		static size_t promotion_threshold;
+#endif
+
+		// Objects with this tag cannot be promoted to H2
+		long non_promote_tag;
+
+		// Objects with tags that are less than the promote tag can be moved to
+		// H2 during major GC
+		long promote_tag;
+
+		// Indicate to move tagged objects directly to H2 without wating any
+		// hint from the framework 
+		bool direct_promotion;
+
 	public:
 		// Constructor
 		TeraCache(); 
@@ -304,6 +321,34 @@ class TeraCache {
 		
 		// Print the histogram
 		void tc_print_fwd_ref_stat();
+#endif
+
+		// Set non promote tag value
+		void set_non_promote_tag(long val);
+		
+		// Set promote tag value
+		void set_promote_tag(long val);
+		
+		// Get non promote tag value
+		long get_non_promote_tag();
+		
+		// Get promote tag value
+		long get_promote_tag();
+
+		bool tc_policy(oop obj, bool is_direct = false);
+
+		void set_direct_promotion(size_t old_live, size_t max_old_gen_size);
+		
+		bool is_direct_promote();
+		
+#if P_GIRAPH_NOHINT_HIGH_LOW_WATERMARK || P_GIRAPH_HINT_HIGH_LOW_WATERMARK
+		void marked_obj_size(size_t size);
+		
+		void reset_marked_obj_size();
+		
+		bool check_promotion_threshold(size_t sz);
+		
+		void set_promotion_threshold();
 #endif
 };
 

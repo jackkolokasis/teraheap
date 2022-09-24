@@ -190,7 +190,7 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
 			MarkSweep::mark_and_push(p),                   \
 			assert_is_in_closed_subset)
 #else
-	if (EnableTeraCache && obj->is_tera_cache()) {
+	if (EnableTeraCache && Universe::teraCache()->tc_policy(obj)) {
 		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 		Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 
@@ -257,11 +257,14 @@ void InstanceMirrorKlass::oop_follow_contents(ParCompactionManager* cm,
 
 int InstanceMirrorKlass::oop_adjust_pointers(oop obj) {
 	int size = oop_size(obj);
+	bool flag = false;
 	InstanceKlass::oop_adjust_pointers(obj);
 
 #if REGIONS
-  if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer())))
+  if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer()))) {
 	  Universe::teraCache()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+	  flag = true;
+  }
 #endif
 
 	InstanceMirrorKlass_OOP_ITERATE(                                                    \
@@ -269,7 +272,7 @@ int InstanceMirrorKlass::oop_adjust_pointers(oop obj) {
 			MarkSweep::adjust_pointer(p),                                                     \
 			assert_nothing)
 #if REGIONS
-	if (EnableTeraCache && obj->is_tera_cache())
+	if (EnableTeraCache && flag)
 		Universe::teraCache()->disable_groups();
 #endif
 

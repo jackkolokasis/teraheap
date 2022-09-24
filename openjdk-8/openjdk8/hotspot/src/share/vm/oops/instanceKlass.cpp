@@ -2227,7 +2227,7 @@ void InstanceKlass::oop_follow_contents(oop obj) {
 	if (EnableTeraCache && Universe::teraCache()->tc_check(obj))
 		assertf(false, "Object is in TeraCache");
 
-	if (EnableTeraCache && obj->is_tera_cache()) {
+	if (EnableTeraCache &&  Universe::teraCache()->tc_policy(obj)) {
 		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 		Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 
@@ -2367,9 +2367,12 @@ ALL_OOP_OOP_ITERATE_CLOSURES_2(InstanceKlass_OOP_OOP_ITERATE_BACKWARDS_DEFN)
 
 int InstanceKlass::oop_adjust_pointers(oop obj) {
   int size = size_helper();
+  bool flag = false;
 #if REGIONS
-  if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer())))
+  if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer()))) {
 	  Universe::teraCache()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+	  flag = true;
+  }
 #endif
 
   InstanceKlass_OOP_MAP_ITERATE( \
@@ -2378,7 +2381,7 @@ int InstanceKlass::oop_adjust_pointers(oop obj) {
     assert_is_in)
 
 #if REGIONS
-  if (EnableTeraCache && obj->is_tera_cache())
+  if (EnableTeraCache && flag)
 	  Universe::teraCache()->disable_groups();
 #endif
 

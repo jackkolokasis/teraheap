@@ -88,13 +88,6 @@ class PSMarkSweepDecorator: public CHeapObj<mtGC> {
   void precompact();
   void compact(bool mangle_free_space);
 
-#if TC_POLICY
-  // Implementation of policies that move objects to the TeraCache This function
-  // takes as argument the position `q` of the object and its `size` in the Java
-  // heap and return `true` if the policy is satisfied, and `false` otherwise.
-  bool tc_policy(HeapWord *q, size_t size);
-#endif
-
 #if DEBUG_VECTORS
   // Debugging
   void verify_compacted_objects();

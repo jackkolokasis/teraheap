@@ -61,7 +61,7 @@ void ObjArrayKlass::objarray_follow_contents(oop obj, int index) {
 	T* const end = base + end_index;
 
 #if CLOSURE
-	if (EnableTeraCache && obj->is_tera_cache()) {
+	if (EnableTeraCache && Universe::teraCache()->tc_policy(obj)) {
 		Universe::teraCache()->set_cur_obj_group_id((long int) obj->get_obj_group_id());
 		Universe::teraCache()->set_cur_obj_part_id((long int) obj->get_obj_part_id());
 

@@ -89,7 +89,7 @@ void specialized_oop_follow_contents(InstanceRefKlass* ref, oop obj) {
 			if (EnableTeraCache && obj->is_tera_cache())
 				obj->set_obj_state();
 #endif
-			if (EnableTeraCache && obj->is_tera_cache() && !Universe::teraCache()->tc_check(referent)) {
+			if (EnableTeraCache && Universe::teraCache()->tc_policy(obj) && !Universe::teraCache()->tc_check(referent)) {
 				referent->set_tera_cache(obj->get_obj_group_id(), obj->get_obj_part_id());
 			}
 
@@ -335,9 +335,12 @@ template <class T> void trace_reference_gc(const char *s, oop obj,
 #endif
 
 template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, oop obj) {
+	bool flag = false;
 #if REGIONS
-	if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer())))
+	if (EnableTeraCache &&  Universe::teraCache()->tc_check(oop(obj->mark()->decode_pointer()))) {
 		Universe::teraCache()->enable_groups((HeapWord *) obj, (HeapWord*) obj->mark()->decode_pointer());
+		flag = true;
+	}
 #endif
 	T* referent_addr = (T*)java_lang_ref_Reference::referent_addr(obj);
 	MarkSweep::adjust_pointer(referent_addr);
@@ -349,7 +352,7 @@ template <class T> void specialized_oop_adjust_pointers(InstanceRefKlass *ref, o
 	MarkSweep::adjust_pointer(discovered_addr);
 
 #if REGIONS
-	if (EnableTeraCache && obj->is_tera_cache())
+	if (EnableTeraCache && flag)
 		Universe::teraCache()->disable_groups();
 #endif
 
