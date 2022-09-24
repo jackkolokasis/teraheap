@@ -1,3 +1,0 @@
-dd ..
-mkswap <file>
-swapon <file>

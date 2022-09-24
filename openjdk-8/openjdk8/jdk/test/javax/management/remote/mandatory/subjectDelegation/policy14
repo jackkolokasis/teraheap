@@ -1,5 +1,0 @@
-grant codebase "file:/-" {
-};
-
-grant principal javax.management.remote.JMXPrincipal "monitorRole" {
-};

@@ -1,3 +1,0 @@
-test/script/error/JDK-8020437.js:36:3 Expected comma but found )
-EOF);  // missing "}" to end object literal
-   ^

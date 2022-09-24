@@ -1,3 +1,0 @@
-SyntaxError: Invalid JSON: <json>:1:12 Expected number but found ident
-{ "test" : -xxx }
-            ^

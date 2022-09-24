@@ -1,7 +1,0 @@
-grant codeBase "file:${java.home}/lib/ext/*" {
-    permission java.security.AllPermission;
-};
-
-grant {
-    permission java.util.logging.LoggingPermission "control";
-};
