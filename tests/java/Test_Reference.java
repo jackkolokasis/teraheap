@@ -44,7 +44,7 @@ public class Test_Reference {
 		Bean bean = new Bean("songli", 67);
 
 		Bean[] referent = new Bean[20000]; 
-		_UNSAFE.tcMarkObjectWithId(referent, 1, 0);
+		_UNSAFE.h2TagAndMoveRoot(referent, 1, 0);
 
 		for (int i=0; i < referent.length; i++)
 			referent[i] = new Bean("mybean:" + i, 100);// Throw Exception 
@@ -57,7 +57,7 @@ public class Test_Reference {
 			soft_referent[i] = new SoftReference<Bean>(new Bean("mybean:" + i, 100)); 
 
 		WeakReference<Bean>[] weakReference = new WeakReference[2000];
-		_UNSAFE.tcMarkObjectWithId(weakReference, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(weakReference, 0, 0);
 
 		System.gc();
 	}

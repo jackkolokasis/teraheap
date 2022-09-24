@@ -1,5 +1,8 @@
 # TeraCache Region-Based Allocator
 
+## Prepare TeraHeap Allocator
+Before you
+
 ## Build
 '''
 make clean
@@ -8,12 +11,7 @@ make
 '''
 
 ## Install and Uninstall Allocator Library
-Install allocator library to the /usr/lib.
-'''
-sudo make install
-sudo make uninstall
-'''
-More easily just run (you need to have sudo priveledges):
+More easily just run (you need do not need sudo priveledges):
 '''
 ./build.sh
 '''
@@ -21,11 +19,12 @@ More easily just run (you need to have sudo priveledges):
 ## Export Enviroment Variables
 Add the following enviroment variables in to your ~/.bashrc file.
 '''
-export LIBRARY_PATH=/your/path/sparkPersistentMemory/allocator/lib/:$LIBRARY_PATH                                                                                                 
-export LD_LIBRARY_PATH=/your/path/kolokasis/sparkPersistentMemory/allocator/lib/:$LD_LIBRARY_PATH                                                                                           
-export PATH=/your/path/sparkPersistentMemory/allocator/include/:$PATH                                                                                                             
-export C_INCLUDE_PATH=/your/path/sparkPersistentMemory/allocator/include/:$C_INCLUDE_PATH                                                                                         
-export CPLUS_INCLUDE_PATH=/your/path/sparkPersistentMemory/allocator/include/:$CPLUS_INCLUDE_PATH
+export LIBRARY_PATH=/your/path/teraHeap/allocator/lib/:$LIBRARY_PATH                                                                                                 
+export LD_LIBRARY_PATH=/your/path/teraHeap/allocator/lib/:$LD_LIBRARY_PATH                                                                                           
+
+export PATH=/your/path/teraheap/allocator/include/:$PATH                                                                                                             
+export C_INCLUDE_PATH=/your/path/teraheap/allocator/include/:$C_INCLUDE_PATH                                                                                         
+export CPLUS_INCLUDE_PATH=/your/path/teraheap/allocator/include/:$CPLUS_INCLUDE_PATH
 '''
 
 ## Run Tests

@@ -11,10 +11,8 @@
 #
 ####################################################
 
-JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../openjdk-8/openjdk8/
+JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../jdk8u345/
 JAVAC=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javac
-JAVAP=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javap
-JAVA=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/java
 GDB=gdb
 
 TARGET=Array.class Array_List.class Array_List_Int.class List_Large.class \
@@ -73,9 +71,6 @@ Test_WeakHashMap.class: Test_WeakHashMap.java
 ClassInstance.class: ClassInstance.java
 	$(JAVAC) $<
 
-debug:
-	-$(GDB) $(JAVA) $f
-
 clean:
 	-rm core.*
 	-rm hs_err_pid*
@@ -86,6 +81,3 @@ clean:
 
 distclean: clean
 	-rm -f *.class
-
-analysis:
-	-${JAVAP} -c -p -v $f

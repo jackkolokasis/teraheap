@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
 PARALLEL_GC_THREADS=16
-PLATFORM=""
 STRIPE_SIZE=32768
 
-JAVA="$(pwd)/../openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/java"
-JDB="$(pwd)/../openjdk-8/openjdk8/build/linux-x86_64-normal-server-release/jdk/bin/jdb"
+JAVA="$(pwd)/../jdk8u345/build/linux-x86_64-normal-server-release/jdk/bin/java"
 
 EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
 	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
@@ -39,13 +37,14 @@ function interpreter_mode() {
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
 		-XX:-UseCompiler \
-		-XX:+EnableTeraCache \
-		-XX:TeraCacheSize=${TERACACHE_SIZE} \
+		-XX:+EnableTeraHeap \
+		-XX:TeraHeapSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${XMS}m \
+		-Xms${XMS}g \
 		-XX:-UseCompressedOops \
-		-XX:+TeraCacheStatistics \
-		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
+		-XX:+TeraHeapStatistics \
+		-XX:TeraStripeSize=${STRIPE_SIZE} \
+		-Xlogth:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 
 # Run tests using only C1 compiler
@@ -59,13 +58,13 @@ function c1_mode() {
 		-XX:+UseParallelGC \
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
-		-XX:+EnableTeraCache \
-		-XX:TeraCacheSize=${TERACACHE_SIZE} \
+		-XX:+EnableTeraHeap \
+		-XX:TeraHeapSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
-		-Xms${XMS}m \
+		-Xms${XMS}g \
 		-XX:-UseCompressedOops \
-		-XX:+TeraCacheStatistics \
-		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
+		-XX:+TeraHeapStatistics \
+		-Xlogth:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 	 
 # Run tests using C2 compiler
@@ -96,15 +95,14 @@ function run_tests() {
 		-XX:+UseParallelGC \
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
-		-XX:+EnableTeraCache \
-		-XX:TeraCacheSize=${TERACACHE_SIZE} \
+		-XX:+EnableTeraHeap \
+		-XX:TeraHeapSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
 		-Xms${XMS}g \
-		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
-		-XX:+TeraCacheStatistics \
+		-XX:+TeraHeapStatistics \
 		-XX:TeraStripeSize=${STRIPE_SIZE} \
-		-Xlogtc:llarge_teraCache.txt $1 > err 2>&1 > out
+		-Xlogth:llarge_teraCache.txt $1 > err 2>&1 > out
 }
 
 # Run tests using gdb
@@ -115,18 +113,17 @@ function run_tests_debug() {
 		-XX:+UseParallelGC \
 		-XX:ParallelGCThreads=${PARALLEL_GC_THREADS} \
 		-XX:-UseParallelOldGC \
-		-XX:+EnableTeraCache \
-		-XX:TeraCacheSize=${TERACACHE_SIZE} \
+		-XX:+EnableTeraHeap \
+		-XX:TeraHeapSize=${TERACACHE_SIZE} \
 		-Xmx${MAX}g \
 		-Xms${XMS}g \
-		-XX:TeraCacheThreshold=0 \
 		-XX:-UseCompressedOops \
-		-XX:+TeraCacheStatistics \
+		-XX:+TeraHeapStatistics \
 		-XX:TeraStripeSize=${STRIPE_SIZE} \
-		-Xlogtc:llarge_teraCache.txt $1
+		-Xlogth:llarge_teraCache.txt $1
 }
 
-cd java
+cd java || exit
 make clean;
 
 clear
@@ -150,7 +147,7 @@ do
 	case $1 in
 		1)
 			export_env_vars
-			interpreter_mode $exec_file
+			interpreter_mode "$exec_file"
 			;;
 		2)
 			export_env_vars
@@ -166,7 +163,7 @@ do
 			;;
 		*)
 			export_env_vars
-			run_tests $exec_file
+			run_tests "$exec_file"
 			;;
 	esac
 

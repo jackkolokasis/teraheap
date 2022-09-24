@@ -62,7 +62,7 @@ class Simple_Lambda
 		// functional interface. This interface 
 		// by default implements abstractFun() 
 		FuncInterface fobj = (int x)->System.out.println(2*x); 
-		_UNSAFE.tcMarkObjectWithId(fobj, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(fobj, 0, 0);
 		
 		mem_info("Memory Before");
 		gc();

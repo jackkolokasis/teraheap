@@ -75,13 +75,13 @@ class Extend_Lambda
 		LinkedList<Integer> linkedList = new LinkedList<Integer>(); 
 		int num_elements = 100000;
 		
-		//_UNSAFE.tcMarkObjectWithId(fobj, 0, 0);
+		//_UNSAFE.h2TagAndMoveRoot(fobj, 0, 0);
 		
 		gc();
 	
 		fobj.abstractFun(5); 
 
-		_UNSAFE.tcMarkObjectWithId(linkedList, 1, 0);
+		_UNSAFE.h2TagAndMoveRoot(linkedList, 1, 0);
 
 		gc();
 
@@ -97,7 +97,7 @@ class Extend_Lambda
 		linkedList = null;
 
 		LinkedList<Integer> linkedList2 = new LinkedList<Integer>(); 
-		_UNSAFE.tcMarkObjectWithId(linkedList2, 2, 0);
+		_UNSAFE.h2TagAndMoveRoot(linkedList2, 2, 0);
 
 		for (int i = 0; i < num_elements; i++)
 			linkedList2.add(new Integer(i));

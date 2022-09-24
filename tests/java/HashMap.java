@@ -42,13 +42,13 @@ public class HashMap {
 
 	public static void main(String[] args) {
 
-		int num_elements = 1000000;
+		int num_elements = 2000000;
 		long check = 0;
 
 		System.out.println(Runtime.getRuntime().maxMemory());
 
 		ConcurrentHashMap<String, String> h_map = new ConcurrentHashMap<String, String>();
-		_UNSAFE.tcMarkObjectWithId(h_map, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(h_map, 0, 0);
 
 		for (int i = 0; i < num_elements/2; i++)
 			h_map.put("Bangalore" + i, "22");
