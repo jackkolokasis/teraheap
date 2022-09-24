@@ -43,15 +43,15 @@ public class MultiHashMap {
 	}
 
 	public static void main(String[] args) {
-		int num_elements = 10000;
+		int num_elements = 100000;
 
 		HashMap<String, ArrayList<Integer>> h_map = new HashMap<String, ArrayList<Integer>>();
-		_UNSAFE.tcMarkObjectWithId(h_map, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(h_map, 0, 0);
 
 		for (int i = 0; i < num_elements/2; i++)
 		{
-			String str = new @Cache String("Iacovos Kolokasis " + i);
-			_UNSAFE.tcMarkObjectWithId(str, 1, 0);
+			String str = new String("Iacovos Kolokasis " + i);
+			_UNSAFE.h2TagAndMoveRoot(str, 1, 0);
 
 			ArrayList<Integer> array = new ArrayList<Integer>();
 			for (int j = 0; j < 5000; j++) {

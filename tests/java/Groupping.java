@@ -61,7 +61,7 @@ public class Groupping
 		mem_info("Memory Before");
 
 		LinkedList<Integer> list = new LinkedList<Integer>();
-		_UNSAFE.tcMarkObjectWithId(list, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(list, 0, 0);
 
 		gc();
         
@@ -77,7 +77,7 @@ public class Groupping
 
         gc();
 		LinkedList<String> list2 = new LinkedList<String>();
-		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
+		_UNSAFE.h2TagAndMoveRoot(list2, 1, 0);
         
         for (int i = 0; i < num_elements_2; i++)
             list2.add(new String("Hello World " + i));

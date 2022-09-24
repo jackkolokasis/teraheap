@@ -104,22 +104,27 @@ unsigned int get_cont_regions(unsigned int cont_regions){
  * Bytes)
  */
 char* new_region(size_t size){
-    unsigned int i;
-    unsigned int cont_regions = (size / REGION_SIZE) + 1;
-    uint64_t cur_region = get_cont_regions(cont_regions) % REGION_ARRAY_SIZE;
-	assertf(size <= REGION_SIZE, "ERROR");
-    if (cur_region == -1)
-        return NULL;
+  unsigned int i;
+  unsigned int cont_regions = (size / REGION_SIZE) + 1;
+  uint64_t cur_region = get_cont_regions(cont_regions) % REGION_ARRAY_SIZE;
 
-    for (i = cur_region ; i < cur_region + cont_regions ; i++){
-        references(region_array[cur_region].start_address, region_array[i].start_address);
-        mark_used(region_array[i].start_address);
-        region_array[i].last_allocated_start = region_array[cur_region].start_address;
-        region_array[i].first_allocated_start = region_array[cur_region].start_address;
-        region_array[i].last_allocated_end = region_array[cur_region].start_address + size;
-    }
+  if (!(size <= REGION_SIZE)) {
+    perror("[Error] - H2 Allocator - Size should be less than region size");
+    exit(EXIT_FAILURE);
+  }
 
-    return region_array[cur_region].start_address;
+  if (cur_region == -1)
+    return NULL;
+
+  for (i = cur_region ; i < cur_region + cont_regions ; i++){
+    references(region_array[cur_region].start_address, region_array[i].start_address);
+    mark_used(region_array[i].start_address);
+    region_array[i].last_allocated_start = region_array[cur_region].start_address;
+    region_array[i].first_allocated_start = region_array[cur_region].start_address;
+    region_array[i].last_allocated_end = region_array[cur_region].start_address + size;
+  }
+
+  return region_array[cur_region].start_address;
 }
 
 uint64_t get_id(uint64_t rdd_id, uint64_t partition_id){

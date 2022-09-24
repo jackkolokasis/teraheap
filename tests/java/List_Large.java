@@ -55,10 +55,10 @@ public class List_Large {
 		mem_info("Memory Before");
 
 		LinkedList<Integer> list1 = new LinkedList<Integer>(); 
-		_UNSAFE.tcMarkObjectWithId(list1, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(list1, 0, 0);
 		
 		LinkedList<Integer> list2 = new LinkedList<Integer>(); 
-		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
+		_UNSAFE.h2TagAndMoveRoot(list2, 1, 0);
 
 		for (int i = 0; i < num_elements; i++)
 			list1.add(i);

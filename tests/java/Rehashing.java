@@ -42,7 +42,7 @@ public class Rehashing {
 		long sum;
 
 		HashMap<String, Integer> people = new HashMap<String, Integer>(2, 0.75f);
-		_UNSAFE.tcMarkObjectWithId(people, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(people, 0, 0);
 
 		for (int i = 0; i < num_elements/2; i++)
 			people.put("Jack " + i, 100);

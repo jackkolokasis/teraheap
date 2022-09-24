@@ -66,9 +66,9 @@ public class MultiList {
         LinkedList<String> list2 = new LinkedList<String>(); 
         LinkedList<Integer> list3 = new LinkedList<Integer>(); 
 
-		_UNSAFE.tcMarkObjectWithId(list, 0, 0);
-		_UNSAFE.tcMarkObjectWithId(list2, 1, 0);
-		_UNSAFE.tcMarkObjectWithId(list3, 2, 0);
+		_UNSAFE.h2TagAndMoveRoot(list, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(list2, 1, 0);
+		_UNSAFE.h2TagAndMoveRoot(list3, 2, 0);
 
 		for (int i = 0; i < num_elements; i++)
 			list.add(i);

@@ -60,7 +60,7 @@ public class Array_List {
 
 		// Create the array list
 		ArrayList<String> arl = new ArrayList<String>();
-		_UNSAFE.tcMarkObjectWithId(arl, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(arl, 0, 0);
 
 		for (int i = 0; i < num_elements; i++)
 			arl.add(new String("Hello World for the first time " + i));

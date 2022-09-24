@@ -68,7 +68,7 @@ class Test_Reflection
 	{ 
 		// Creating object whose property is to be checked 
 		Test obj = new Test(); 
-		_UNSAFE.tcMarkObjectWithId(obj, 0, 0);
+		_UNSAFE.h2TagAndMoveRoot(obj, 0, 0);
 
 		// Creating class object from the object using 
 		// getclass method 

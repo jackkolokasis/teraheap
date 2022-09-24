@@ -26,17 +26,17 @@ class ClassInstance {
 
 	  System.gc();
 
-	  _UNSAFE.tcMarkObjectWithId(arrayLaptop[0], 0, 0);
+	  _UNSAFE.h2TagAndMoveRoot(arrayLaptop[0], 0, 0);
 
 	  Object obj = arrayLaptop[0].getClass();
-	  _UNSAFE.tcMarkObjectWithId(obj, 0, 0);
+	  _UNSAFE.h2TagAndMoveRoot(obj, 0, 0);
 
 	  System.gc();
 	  arrayLaptop[0].add_new_element();
 	  arrayLaptop[40].add_new_element();
 	  arrayLaptop[41].add_new_element();
 	  System.gc();
-	  _UNSAFE.tcMarkObjectWithId(arrayLaptop[10], 1, 0);
+	  _UNSAFE.h2TagAndMoveRoot(arrayLaptop[10], 1, 0);
 
 	  System.gc();
 
@@ -47,7 +47,7 @@ class ClassInstance {
 
 	  System.gc();
 
-	  _UNSAFE.tcMarkObjectWithId(arrayLaptop[20], 2, 0);
+	  _UNSAFE.h2TagAndMoveRoot(arrayLaptop[20], 2, 0);
 
 	  for (int i=500; i < 1000; i++)
 		  arrayLaptop[i].add_new_element();
