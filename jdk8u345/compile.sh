@@ -90,27 +90,6 @@ function clean_make()
   make
 }
 
-function update()
-{
-	export_env_vars
-	make
-
-	if [ $? -ne 0 ]; then
-		echo "[${BRED}COMPILE${ESC}] Compilation failed"
-		exit
-	fi
-
-	clear
-	echo -e "[${BGREEN}COMPILE${RESET}] JVM"
-
-	cd /usr/lib/jvm/java-8-kolokasis/build || exit
-	sudo rm -rf linux-x86_64-normal-server-release
-	cd - > /dev/null || exit
-	sudo cp -r build/linux-x86_64-normal-server-release /usr/lib/jvm/java-8-kolokasis/build
-
-	echo -e "[${BYELLOW}INSTALL${RESET}] JVM"
-}
-
 export_env_vars()
 {
 	local PROJECT_DIR="$(pwd)/../"
@@ -123,16 +102,9 @@ export_env_vars()
 	export PATH=${PROJECT_DIR}/allocator/include/:$PATH
 	export C_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$C_INCLUDE_PATH                                                                                         
 	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$CPLUS_INCLUDE_PATH
-
-	### CThread Pool Library
-	export LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LIBRARY_PATH
-	export LD_LIBRARY_PATH=${PROJECT_DIR}/C-Thread-Pool/lib/:$LD_LIBRARY_PATH
-	export PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$PATH
-	export C_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$C_INCLUDE_PATH
-	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/C-Thread-Pool/include/:$CPLUS_INCLUDE_PATH
 }
 
-while getopts ":drcmhu" opt
+while getopts ":drcmh" opt
 do
   case "${opt}" in
     r)
@@ -147,10 +119,6 @@ do
       echo "Clean and make"
       export_env_vars
       clean_make
-      ;;
-    u)
-      echo "Update JVM in root directory"
-      update
       ;;
     m)
       echo "Make"

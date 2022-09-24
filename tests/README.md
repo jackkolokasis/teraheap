@@ -1,39 +1,31 @@
-# TeraCache Test Files
+# TeraHeap Test Files
 
 ## Description
-TeraCache test files are used to test TeraCache functionalities during
+TeraHeap test files are used to test TeraHeap functionalities during
 implementation. All these test files are implemented in JAVA. 
 
 ## Build
-To build and run all test files for TeraCache:
+To build and run all test files for TeraHeap:
+
+```sh
+cd ./java
+./compile.sh
+cd -
+```
+## Run Tests
+There are different modes that you can run the TeraHeap tests.
+
+```sh
+# Run tests in interpreter mode
+./run.sh 1
+
+# Run tests using only C1 JIT compiler
+./run.sh 2
+
+# Run tests using only C2 JIT compiler
+./run.sh 3
+
+# Run tests using gdb
+./run.sh 4
 
 ```
-$ make all  
-$ make run
-```
-## List of Tests
-1.  Array_List.......................(updated)
-2.  Array_List_Int._..................(updated)
-3.  Array_List_Float._.................(updated)
-4.  Array_List_Double._................(updated)
-5.  ArrayList__Scalar.java............(updated)
-5.  Simple_Array.....................(updated)
-6.  List_Small.......................(updated)
-7.  List_Large.......................(updated)
-8.  MultiList........................(updated)
-9.  Simple_Lambda....................(updated)
-10. Extend_Lambda.java...............(updated)
-11. Test_Reflection.java.............(updated)
-12. Test_String.java.................(updated)
-
-## Validation Scripts
-There are two validation tests.
-1. check_memmove.py: Check if all precompacted objects has been moved to their
-   new destination place
-2. check_teracache.py: Check if all marked Tera Cache objects has been moved to the
-   TeraCache.
-
-
-## Authors
-Iacovos G. Kolokasis,
-
