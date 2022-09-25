@@ -44,6 +44,7 @@ cd -
 ```
 
 ## Benchmarks
-To run benchmarks please clone the repository "tera_applications" and
-read the README.md files in each application directory. There are
+To run benchmarks please clone the repository
+[tera_applications](https://github.com/jackkolokasis/tera_applications)
+and read the README.md files in each application directory. There are
 instructions about how to compile and run the different applications.
