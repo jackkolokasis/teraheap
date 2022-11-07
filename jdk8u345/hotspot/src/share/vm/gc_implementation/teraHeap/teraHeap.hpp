@@ -353,6 +353,11 @@ public:
   void set_low_promotion_threshold();
 #endif
 
+  // Check if the object with `addr` span multiple regions
+  int h2_continuous_regions(HeapWord *addr);
+
+  // Check where the object starts
+  bool h2_object_starts_in_region(HeapWord *obj);
 };
 
 #endif

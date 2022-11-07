@@ -663,7 +663,7 @@ UNSAFE_ENTRY(void, Unsafe_h2TagAndMoveRoot(JNIEnv *env, jobject unsafe,
   	return;
 
   // Initialize object's teraflag
-  o->mark_move_h2(label, partId);
+  o->mark_move_h2(label, 0);
 UNSAFE_END
 
 UNSAFE_ENTRY(void, Unsafe_h2TagRoot(JNIEnv *env, jobject unsafe,
@@ -680,7 +680,7 @@ UNSAFE_ENTRY(void, Unsafe_h2TagRoot(JNIEnv *env, jobject unsafe,
   	return;
 
   // Initialize object's teraflag
-  o->mark_move_h2(Universe::teraHeap()->get_non_promote_tag(), partId);
+  o->mark_move_h2(Universe::teraHeap()->get_non_promote_tag(), 0);
 UNSAFE_END
 
 UNSAFE_ENTRY(void, Unsafe_h2Move(JNIEnv *env, jobject unsafe,

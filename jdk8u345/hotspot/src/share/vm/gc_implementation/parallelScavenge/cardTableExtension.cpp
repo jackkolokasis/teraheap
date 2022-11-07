@@ -372,7 +372,8 @@ void CardTableExtension::h2_scavenge_contents_parallel(ObjectStartArray* start_a
 		if (worker_start_card >= end_card)
 			return; // We're done.
 
-		jbyte* worker_end_card = worker_start_card + ssize;
+    jbyte* worker_end_card = worker_start_card + 
+      Universe::teraHeap()->h2_continuous_regions(addr_for(worker_start_card)) * ssize;
 		if (worker_end_card > end_card) {
 			worker_end_card = end_card;
 		}
@@ -391,7 +392,8 @@ void CardTableExtension::h2_scavenge_contents_parallel(ObjectStartArray* start_a
 			continue;
 
 		// Update our beginning addr
-    if (!Universe::teraHeap()->check_if_valid_object(slice_start))
+    if (!Universe::teraHeap()->check_if_valid_object(slice_start) || 
+      !Universe::teraHeap()->is_start_of_region(slice_start))
       continue;
 
     HeapWord* first_object = Universe::teraHeap()->get_first_object_in_region(slice_start);

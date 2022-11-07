@@ -342,89 +342,95 @@ void TeraHeap::h2_print_objects_per_region() {
 }
 
 void TeraHeap::h2_count_marked_objects(){
-	HeapWord *next_region;
-	HeapWord *obj_addr;
-	oop obj;
+  HeapWord *next_region;
+  HeapWord *obj_addr;
+  oop obj;
 
-	start_iterate_regions();
+  start_iterate_regions();
 
-	next_region = (HeapWord *) get_next_region();
-    int region_num = 0;
-    unsigned int live_objects = 0;
-    unsigned int total_objects = 0;
-	while(next_region != NULL) {
-        int r_live_objects = 0;
-        int r_total_objects = 0;
+  next_region = (HeapWord *) get_next_region();
+  int region_num = 0;
+  unsigned int live_objects = 0;
+  unsigned int total_objects = 0;
+  while(next_region != NULL) {
+    int r_live_objects = 0;
+    int r_total_objects = 0;
+    size_t r_live_objects_size = 0;
+    size_t r_total_objects_size = 0;
 
-		obj_addr = next_region;
-        
-		while (1) {
-			obj = oop(obj_addr);
-            r_total_objects++;
-            total_objects++;
-            if (obj->is_live()){
-                r_live_objects++;
-                live_objects++;
-            }
-			if (!check_if_valid_object(obj_addr + obj->size()))
-				break;
-			obj_addr += obj->size();
-		}
-        printf("Region %d has %d live objects out of a total of %d\n",region_num,r_live_objects,r_total_objects);
-        region_num++;
-		next_region = (HeapWord *) get_next_region();
-	}
-    printf("GLOBAL: %d live objects out of a total of %d\n",live_objects,total_objects);
-    fflush(stdout);
+    obj_addr = next_region;
+
+    while (1) {
+      obj = oop(obj_addr);
+      r_total_objects++;
+      r_total_objects_size += obj->size();
+      total_objects++;
+      if (obj->is_live()) {
+        r_live_objects++;
+        r_live_objects_size += obj->size();
+        live_objects++;
+      } 
+
+      if (!check_if_valid_object(obj_addr + obj->size()))
+        break;
+
+      obj_addr += obj->size();
+    }
+    fprintf(stderr, "Region %d has %d live objects out of a total of %d\n", region_num, r_live_objects, r_total_objects);
+    fprintf(stderr, "Region %d has %ld GB live objects out of a total of %ld GB\n", region_num, r_live_objects_size, r_total_objects_size);
+    region_num++;
+    next_region = (HeapWord *) get_next_region();
+  }
+  fprintf(stderr, "GLOBAL: %d live objects out of a total of %d\n", live_objects, total_objects);
 }
 
 void TeraHeap::h2_reset_marked_objects() {
-	HeapWord *next_region;
-	HeapWord *obj_addr;
-	oop obj;
+  HeapWord *next_region;
+  HeapWord *obj_addr;
+  oop obj;
 
-	start_iterate_regions();
+  start_iterate_regions();
 
-	next_region = (HeapWord *) get_next_region();
+  next_region = (HeapWord *) get_next_region();
 
-	while(next_region != NULL) {
-		obj_addr = next_region;
+  while(next_region != NULL) {
+    obj_addr = next_region;
 
-		while (1) {
-			obj = oop(obj_addr);
-            obj->reset_live();
-			if (!check_if_valid_object(obj_addr + obj->size()))
-				break;
-			obj_addr += obj->size();
-		}
-		next_region = (HeapWord *) get_next_region();
-	}
+    while (1) {
+      obj = oop(obj_addr);
+      obj->reset_live();
+      if (!check_if_valid_object(obj_addr + obj->size()))
+        break;
+      obj_addr += obj->size();
+    }
+    next_region = (HeapWord *) get_next_region();
+  }
 }
 
 void TeraHeap::h2_mark_live_objects_per_region() {
-	HeapWord *next_region;
-	HeapWord *obj_addr;
-	oop obj;
+  HeapWord *next_region;
+  HeapWord *obj_addr;
+  oop obj;
 
-	start_iterate_regions();
+  start_iterate_regions();
 
-	next_region = (HeapWord *) get_next_region();
-	while(next_region != NULL) {
-		obj_addr = next_region;
+  next_region = (HeapWord *) get_next_region();
+  while(next_region != NULL) {
+    obj_addr = next_region;
 
-		while (1) {
-			obj = oop(obj_addr);
-            if (obj->is_live()){
-                obj->klass()->h2_oop_follow_contents(obj);
-            }
-			if (!check_if_valid_object(obj_addr + obj->size()))
-				break;
-			obj_addr += obj->size();
-		}
-		next_region = (HeapWord *) get_next_region();
-	}
-    h2_count_marked_objects();
-    h2_reset_marked_objects();
+    while (1) {
+      obj = oop(obj_addr);
+      if (obj->is_live()) {
+        obj->h2_follow_contents();
+      }
+      if (!check_if_valid_object(obj_addr + obj->size()))
+        break;
+      obj_addr += obj->size();
+    }
+    next_region = (HeapWord *) get_next_region();
+  }
+  h2_count_marked_objects();
+  h2_reset_marked_objects();
 }
 
 // Frees all unused regions
@@ -639,24 +645,24 @@ char* TeraHeap::h2_add_object(oop obj, size_t size) {
 
 	// Update Statistics
 	total_objects_size += size;
-	total_objects++;
-	trans_per_fgc++;
+	++total_objects;
+	++trans_per_fgc;
 
 	if (TeraHeapStatistics) {
-		size_t obj_size = (size * HeapWordSize) / 1024;
+		size_t obj_size = (size * HeapWordSize) / 1024UL;
 		int count = 0;
 
 		while (obj_size > 0) {
 			count++;
-			obj_size/=1024;
+			obj_size/=1024UL;
 		}
 
 		assert(count <=2, "Array out of range");
 
-		obj_distr_size[count]++;
+		++obj_distr_size[count];
 	}
 
-	pos = allocate(size,(uint64_t)obj->get_obj_group_id(),(uint64_t)obj->get_obj_part_id());
+  pos = allocate(size, (uint64_t)obj->get_obj_group_id(), (uint64_t)obj->get_obj_part_id());
 
 	_start_array.th_allocate_block((HeapWord *)pos);
 
@@ -748,11 +754,15 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
 	return obj->is_marked_move_h2();
 
 #elif defined(HINT_HIGH_LOW_WATERMARK)
-	if (is_direct)
-		return check_low_promotion_threshold(obj->size());
+  if (is_direct) {
+    if (!obj->is_marked_move_h2())
+      return false;
+
+    return check_low_promotion_threshold(obj->size());
+  }
 	
-	if (direct_promotion)
-		return obj->is_marked_move_h2(); 
+  if (direct_promotion)
+    return obj->is_marked_move_h2();
 
 	return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
 
@@ -804,3 +814,11 @@ void TeraHeap::set_low_promotion_threshold() {
   h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
 }
 #endif
+
+int TeraHeap::h2_continuous_regions(HeapWord *addr){
+  return get_num_of_continuous_regions((char *)addr);
+}
+
+bool TeraHeap::h2_object_starts_in_region(HeapWord *obj) {
+  return object_starts_from_region((char *)obj);
+}

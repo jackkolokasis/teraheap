@@ -90,9 +90,12 @@ char* allocate(size_t size, uint64_t rdd_id, uint64_t partition_id) {
 
 	assertf(size > 0, "Object should be > 0");
 
-    alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id, partition_id);
+  alloc_ptr = allocate_to_region(size * HEAPWORD, rdd_id, partition_id);
 
-    assertf(alloc_ptr != NULL, "No free space in H2");
+  if (alloc_ptr == NULL) {
+    perror("[Error] - H2 Allocator is full");
+    exit(EXIT_FAILURE);
+  }
 
     tc_mem_pool.size += size;
     tc_mem_pool.cur_alloc_ptr = (char *) (((uint64_t) alloc_ptr) + size * HEAPWORD);

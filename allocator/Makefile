@@ -14,7 +14,7 @@ include ./makefile.colors
 #rules
 .PHONY: all lib tc_allocate tc_group tc_free tc_sync tc_async clean distclean test depedencies
 
-all: tc_allocate tc_group tc_free tc_sync tc_async
+all: tc_allocate tc_group tc_free tc_sync tc_async tc_multi_region
 
 lib: $(REGIONSLIBRARY)
 
@@ -27,6 +27,12 @@ tc_free: $(TC_FREE_EXE)
 tc_sync: $(TC_SYNC_EXE)
 
 tc_async: $(TC_ASYNC_EXE)
+
+tc_multi_region: $(TC_ALLOCATE_MULTI_REGION_EXE)
+
+$(TC_ALLOCATE_MULTI_REGION_EXE): $(TC_ALLOCATE_MULTI_REGION) $(REGIONSLIBRARY)
+	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
+	@$(CC) $< $(REGIONSLIBRARY) $(OFLAG) $@ 
 
 $(TC_ALLOCATE_EXE): $(TC_ALLOCATE_OBJ) $(REGIONSLIBRARY)
 	@echo -e '[$(BYELLOW)LNK$(RESET)]' $^
@@ -82,11 +88,11 @@ uninstall:
 
 clean:
 	@echo -e '[$(BRED)RM$(RESET)]' $(TC_ALLOCATE_OBJ) $(TC_SYNC_OBJ) $(TC_ASYNC_OBJ) $(TC_GROUP_OBJ) $(TC_FREE_OBJ)
-	@$(RM) $(LIBREGIONSOBJS) $(TC_ALLOCATE_OBJ) $(TC_SYNC_OBJ) $(TC_ASYNC_OBJ) $(TC_GROUP_OBJ) $(TC_FREE_OBJ)
+	@$(RM) $(LIBREGIONSOBJS) $(TC_ALLOCATE_OBJ) $(TC_SYNC_OBJ) $(TC_ASYNC_OBJ) $(TC_GROUP_OBJ) $(TC_FREE_OBJ) $(TC_ALLOCATE_MULTI_REGION)
 
 distclean: clean
 	@echo -e '[$(BRED)RM$(RESET)]' $(TC_ALLOCATE_EXE) $(TC_SYNC_EXE) $(TC_ASYNC_EXE) $(TC_GROUP_EXE) $(TC_FREE_EXE)
-	@$(RM) $(TC_ALLOCATE_EXE) $(TC_SYNC_EXE) $(TC_ASYNC_EXE) $(TC_GROUP_EXE) $(TC_FREE_EXE)
+	@$(RM) $(TC_ALLOCATE_EXE) $(TC_SYNC_EXE) $(TC_ASYNC_EXE) $(TC_GROUP_EXE) $(TC_FREE_EXE) $(TC_ALLOCATE_MULTI_REGION_EXE)
 	@echo -e '[$(BRED)RM$(RESET)]' $(REGIONSLIBRARY)
 	@$(RM) $(REGIONSLIBRARY)
 	@echo -e '[$(BRED)RM$(RESET)]' $(LIBDIR)
