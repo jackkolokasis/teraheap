@@ -100,7 +100,7 @@ template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 
 			mark_object(obj);
 
-			if (!obj->is_marked_move_h2()) {
+			if (!(obj->is_marked_move_h2() || obj->is_instanceMirror() || obj->is_instanceRef() || obj->is_instanceClassLoader())) {
 				uint64_t groupId = Universe::teraHeap()->h2_get_region_groupId((void *) p);
 				uint64_t partId = Universe::teraHeap()->h2_get_region_partId((void *) p);
 				obj->mark_move_h2(groupId, partId);
@@ -152,7 +152,7 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
       _marking_stack.push(obj);
     }
 #else
-    if (!(obj->is_marked_move_h2() || obj->is_instanceMirror() || obj->is_instanceRef())) {
+    if (!(obj->is_marked_move_h2() || obj->is_instanceMirror() || obj->is_instanceRef() || obj->is_instanceClassLoader())) {
       obj->mark_move_h2(Universe::teraHeap()->get_cur_obj_group_id(),
                           Universe::teraHeap()->get_cur_obj_part_id());
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
@@ -171,17 +171,17 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
 // This function is used for h2 liveness analysis. We detect the live
 // objects in each H2 regions
 template <class T> inline void MarkSweep::h2_liveness_analysis(T* p) {
-    //oop obj = oop(p);
-	T heap_oop = oopDesc::load_heap_oop(p);
-	if (oopDesc::is_null(heap_oop))
-        return;
-    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
-    if (!Universe::teraHeap()->is_obj_in_h2(obj))
-        return;
-    if (obj->is_visited())
-        return;
-    obj->set_visited();
-    obj->klass()->h2_oop_follow_contents(obj);
+  //oop obj = oop(p);
+  T heap_oop = oopDesc::load_heap_oop(p);
+  if (oopDesc::is_null(heap_oop))
+    return;
+  oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
+  if (!Universe::teraHeap()->is_obj_in_h2(obj))
+    return;
+  if (obj->is_visited())
+    return;
+  obj->set_visited();
+  obj->h2_follow_contents();
 }
 
 #endif // TERA_MAJOR_GC
@@ -196,6 +196,10 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		{
       //Mark active region
       Universe::teraHeap()->mark_used_region((HeapWord*)obj);
+
+      if (H2LivenessAnalysis)
+        obj->set_live();
+
       if (TeraHeapStatistics)
         Universe::teraHeap()->h2_increase_fwd_ref();
 

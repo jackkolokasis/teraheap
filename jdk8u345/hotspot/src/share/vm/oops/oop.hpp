@@ -138,7 +138,9 @@ class oopDesc {
   }
 
   bool is_live(){
-	  return ((_tera_flag & 0xffffffff) == LIVE_TERA_OBJ || (_tera_flag & 0xffffffff) == VISITED_TERA_OBJ || (_tera_flag & 0xffffffff) == MOVE_TO_TERA );
+    return (get_obj_state() == LIVE_TERA_OBJ || 
+            get_obj_state() == VISITED_TERA_OBJ || 
+            get_obj_state() == MOVE_TO_TERA);
   }
 
   void reset_live(){
@@ -166,7 +168,7 @@ class oopDesc {
   }
 
   bool is_visited(){
-	  return (_tera_flag & 0xffffffff) == VISITED_TERA_OBJ;
+	  return (get_obj_state() == VISITED_TERA_OBJ);
   }
 
 #endif // TERA_FLAG
