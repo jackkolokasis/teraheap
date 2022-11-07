@@ -125,6 +125,12 @@ void InstanceClassLoaderKlass::oop_follow_contents(oop obj) {
 	DEBUG_ONLY(if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object is in TeraHeap"); });
 #endif
 
+#ifdef P_SD_EXCLUDE_CLOSURE
+  if (EnableTeraHeap && obj->is_marked_move_h2()) {
+    obj->init_obj_state();
+  }
+#endif
+
   InstanceKlass::oop_follow_contents(obj);
   ClassLoaderData * const loader_data = java_lang_ClassLoader::loader_data(obj);
 

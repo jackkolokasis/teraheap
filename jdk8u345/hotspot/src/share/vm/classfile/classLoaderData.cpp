@@ -146,6 +146,13 @@ void ClassLoaderData::oops_do(OopClosure* f, KlassClosure* klass_closure, bool m
     return;
   }
 
+#ifdef P_SD_EXCLUDE_CLOSURE
+  if (EnableTeraHeap && _class_loader != NULL) {
+    if (_class_loader->is_marked_move_h2())
+      _class_loader->init_obj_state();
+  }
+#endif
+
   f->do_oop(&_class_loader);
   _dependencies.oops_do(f);
   _handles.oops_do(f);
