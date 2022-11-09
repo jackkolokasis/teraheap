@@ -502,7 +502,7 @@ void TeraHeap::h2_mark_back_references()
 		if (TeraHeapStatistics)
 			back_ptrs_per_fgc++;
 
-#if defined(P_SD_BACK_REF_CLOSURE) && !defined(SPARK_POLICY)
+#if defined(P_SD_BACK_REF_CLOSURE)
 		MarkSweep::tera_back_ref_mark_and_push(obj);
 #else
 		MarkSweep::mark_and_push(obj);

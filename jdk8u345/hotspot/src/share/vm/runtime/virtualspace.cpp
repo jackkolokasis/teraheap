@@ -384,8 +384,6 @@ void ReservedHeapSpace::establish_noaccess_prefix() {
             if (!os::protect_memory(_base, _noaccess_prefix, os::MEM_PROT_NONE, _special)) {
                 fatal("cannot protect protection page");
             }    
-            assert(CompressedOops::use_implicit_null_checks() == true, "not initialized?");
-            assert(CompressedOops::use_implicit_null_checks() == true, "not initialized?");
         } else {
              //CompressedOops::set_use_implicit_null_checks(false);
         }    

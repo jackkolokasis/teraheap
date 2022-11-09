@@ -66,10 +66,10 @@ void HeterogeneousGenerationSizer::initialize_flags() {
 
   if (MaxNewSize > reasonable_max) {
     if (FLAG_IS_CMDLINE(MaxNewSize)) {
-      debug_only(fprintf(stdeer, "Setting MaxNewSize to " SIZE_FORMAT " based on dram available (calculation = align(%s))",
+      debug_only(fprintf(stderr, "Setting MaxNewSize to " SIZE_FORMAT " based on dram available (calculation = align(%s))",
                             (size_t)reasonable_max, calc_str.buffer()));
     } else {
-      debug_only(fprintf(stdeer, "Setting MaxNewSize to " SIZE_FORMAT " based on dram available (calculation = align(%s)). "
+      debug_only(fprintf(stderr, "Setting MaxNewSize to " SIZE_FORMAT " based on dram available (calculation = align(%s)). "
                          "Dram usage can be lowered by setting MaxNewSize to a lower value", (size_t)reasonable_max, calc_str.buffer()));
     }
     MaxNewSize = reasonable_max;

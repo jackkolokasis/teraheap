@@ -260,12 +260,12 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     deallocate_stacks();
 
 #ifdef TERA_MINOR_GC
+    if (TeraHeapStatistics)
+      Universe::teraHeap()->h2_print_stats();
+
     // Deallocate stacks for TeraCache
     if (EnableTeraHeap) {
       Universe::teraHeap()->h2_clear_back_ref_stacks();
-
-      if (TeraHeapStatistics)
-        Universe::teraHeap()->h2_print_stats();
     }
 #endif
 

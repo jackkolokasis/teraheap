@@ -324,8 +324,7 @@ bool PSMarkSweepDecorator::insert_deadspace(size_t& allowed_deadspace_words,
     CollectedHeap::fill_with_object(q, deadlength);
     oop(q)->set_mark(oop(q)->mark()->set_marked());
 #ifdef TERA_FLAG
-	assert(oop(q)->get_obj_state() == INIT_TF,
-        err_msg("Object state is wrong %lu", oop(q)->get_obj_state()));
+	DEBUG_ONLY(if (EnableTeraHeap) { assert(oop(q)->get_obj_state() == INIT_TF, err_msg("Object state is wrong %lu", oop(q)->get_obj_state())); });
 #endif
     assert((int) deadlength == oop(q)->size(), "bad filler object size");
     // Recall that we required "q == compaction_top".

@@ -483,8 +483,20 @@ void DiscoveredListIterator::load_ptrs(DEBUG_ONLY(bool allow_null_referent)) {
   _next = discovered;
   _referent_addr = java_lang_ref_Reference::referent_addr(_ref);
   _referent = java_lang_ref_Reference::referent(_ref);
+#ifdef TERA_ASSERT
+  debug_only(if (EnableTeraHeap) {
+             assert(Universe::heap()->is_in_reserved_or_null(_referent)
+                    || Universe::teraHeap()->is_obj_in_h2(_referent),
+                    "Wrong oop found in java.lang.Reference object");
+             }
+             else {
+               assert(Universe::heap()->is_in_reserved_or_null(_referent),
+                      "Wrong oop found in java.lang.Reference object");
+             });
+#else
   assert(Universe::heap()->is_in_reserved_or_null(_referent),
          "Wrong oop found in java.lang.Reference object");
+#endif
   assert(allow_null_referent ?
              _referent->is_oop_or_null()
            : _referent->is_oop(),
