@@ -8,7 +8,7 @@ regular heap. TeraHeap provides direct access to objects on the second
 heap (no S/D). It also reduces GC cost by fencing the garbage
 collector from scanning the second heap. TeraHeap leverages
 frameworks’ property of choosing specific objects for off-heap
-placement and offers frameworks a hint-based inter- face for moving
+placement and offers frameworks a hint-based interface for moving
 such objects to the second heap. 
 
 ### Install Prerequisites
