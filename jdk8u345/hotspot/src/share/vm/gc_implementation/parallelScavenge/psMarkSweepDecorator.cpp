@@ -424,6 +424,9 @@ void PSMarkSweepDecorator::moveObjToH2(HeapWord *q, HeapWord *compaction_top, si
   if (!H2LivenessAnalysis)
     // Change the value of teraflag in the new location of the object
     oop(compaction_top)->set_in_h2();
+  else {
+      oop(compaction_top)->set_live();
+    }
 
   /* Initialize mark word of the destination */
   oop(compaction_top)->init_mark();

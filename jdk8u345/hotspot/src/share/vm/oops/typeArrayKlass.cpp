@@ -212,6 +212,8 @@ void TypeArrayKlass::oop_follow_contents(oop obj) {
 
 #ifdef TERA_MAJOR_GC
 void TypeArrayKlass::h2_oop_follow_contents(oop obj) {
+  if (H2LivenessAnalysis)
+    obj->set_live();
   assert(obj->is_typeArray(),"must be a type array");
   // Performance tweak: We skip iterating over the klass pointer since we
   // know that Universe::TypeArrayKlass never moves.
