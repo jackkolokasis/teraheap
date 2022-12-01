@@ -427,7 +427,7 @@ struct region_list* free_regions() {
 #endif
   int32_t i;
   struct region_list *head = NULL;
-  for (i = 0; i < REGION_ARRAY_SIZE ; i++){
+  for (i = 0; i < REGION_ARRAY_SIZE; i++){
     if (region_array[i].used == 0 && region_array[i].last_allocated_end != region_array[i].start_address){
       struct group *ptr = region_array[i].dependency_list;
       struct group *next = NULL;
