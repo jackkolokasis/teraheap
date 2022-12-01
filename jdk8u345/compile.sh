@@ -51,7 +51,7 @@ function usage()
 function release() 
 {
   make dist-clean
-  #CC=gcc-7.2.0 CXX=g++-7.2.0 bash ./configure \
+  CC=gcc-7.2.0 CXX=g++-7.2.0 \
   bash ./configure \
     --with-jobs=32 \
     --disable-debug-symbols \
