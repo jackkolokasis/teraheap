@@ -29,16 +29,22 @@ cd -
 Read the README.md file in allocator directory to export the specific
 environment variables
 
-2. Build JVM (release mode)
+2. Set your gcc/g++ path/alias 
 ```sh
-cd jdk8u345
+cd jdk8u345 
+```
+and set CC and CXX variables inside compile.sh to your gcc path/alias
+
+3. Build JVM (release mode)
+```sh
 ./compile.sh -r
 cd -
 ```
 
-3. Build JVM (fastdebug mode)
+or
+
+Build JVM (fastdebug mode)
 ```sh
-cd jdk8u345
 ./compile.sh -d
 cd -
 ```

@@ -30,6 +30,9 @@ BGREEN=${ESC}${BOLD}';'${GREEN_FG}'m'
 BYELLOW=${ESC}${BOLD}';'${YELLOW_FG}'m'
 RESET=${ESC}${NORMAL}'m'
 
+CC=gcc-7.2.0
+CXX=g++-7.2.0
+
 function usage()
 {
     echo
@@ -51,7 +54,7 @@ function usage()
 function release() 
 {
   make dist-clean
-  CC=gcc-7.2.0 CXX=g++-7.2.0 \
+  CC=$CC CXX=$CXX \
   bash ./configure \
     --with-jobs=32 \
     --disable-debug-symbols \
@@ -59,7 +62,6 @@ function release()
     --with-extra-cxxflags='-O3' \
     --with-target-bits=64 \
     --with-extra-ldflags=-lregions
-  
   intercept-build make
   cd ../ 
   compdb -p jdk8u345 list > compile_commands.json
@@ -71,6 +73,7 @@ function release()
 function debug_symbols_on() 
 {
   make dist-clean
+  CC=$CC CXX=$CXX \
   bash ./configure \
     --with-debug-level=fastdebug \
     --with-native-debug-symbols=internal \
