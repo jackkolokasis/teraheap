@@ -327,6 +327,7 @@ void PSScavenge::h2_scavenge_back_references() {
     thlog_or_tty->print_cr("[STATISTICS] | PHASE0 = %llu\n",
                            (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
                            (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+    thlog_or_tty->flush();
   }
 }
 #endif //TERA_MINOR_GC
