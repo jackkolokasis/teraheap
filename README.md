@@ -18,6 +18,21 @@ sudo yum install python3-pip
 pip3 install scan-build --user
 pip3 install compdb --user
 ```
+OpeJDK1.8 can be compiled with OpenJDK1.8. So, you need first to download
+OpenJDK1.8.
+```sh
+# For Ubuntu
+sudo apt-get install openjdk-8-jdk
+
+# For Centos
+sudo yum install java-1.8.0-openjdk
+```
+Edit the compile.sh script in jdk8u345/ directory by changing the
+JAVA_HOME variable to point to the installation directory of openjdk8 as follows:
+
+```sh
+export JAVA_HOME="/path/to/openjdk8"
+```
 
 ### Build
 1. Build allocator.
