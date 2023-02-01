@@ -69,3 +69,19 @@ To run benchmarks please clone the repository
 [tera_applications](https://github.com/jackkolokasis/tera_applications)
 and read the README.md files in each application directory. There are
 instructions about how to compile and run the different applications.
+
+## Acknowledgements
+We thank the anonymous reviewers for their insightful comments and
+their help in preparing the final version of the paper. We
+thankfully acknowledge the support of the European Commission under
+the Horizon 2020 Framework Programme for Research and Innovation
+through the projects EVOLVE (grant agreement No 825061). This
+research is also partly supported by project EUPEX, which has
+received funding from the European High-Performance Computing Joint
+Undertaking (JU) under grant agreement No 101033975. The JU receives
+support from the European Union's Horizon 2020 re-search and
+innovation programme and France, Germany, Italy, Greece, United
+Kingdom, Czech Republic, Croatia. Iacovos G. Kolokasis is also
+supported by the Meta Research PhD Fellowship and the State
+Scholarship Foundation of Cyprus.  
+
