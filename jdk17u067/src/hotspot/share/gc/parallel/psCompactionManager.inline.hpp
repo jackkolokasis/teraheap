@@ -32,6 +32,7 @@
 #include "gc/parallel/parMarkBitMap.hpp"
 #include "gc/parallel/psParallelCompact.inline.hpp"
 #include "gc/shared/taskqueue.inline.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/arrayOop.hpp"
 #include "oops/compressedOops.inline.hpp"
@@ -99,11 +100,76 @@ void ParCompactionManager::push_region(size_t index)
   region_stack()->push(index);
 }
 
+#ifdef TERA_MAJOR_GC
+
+template <typename T>
+inline void ParCompactionManager::tera_mark_and_push(T* p) {
+  T heap_oop = RawAccess<>::oop_load(p);
+  if (!CompressedOops::is_null(heap_oop)) {
+    oop obj = CompressedOops::decode_not_null(heap_oop);
+
+    assert(ParallelScavengeHeap::heap()->is_in(obj), "should be in heap");
+
+    if (!Universe::teraHeap()->is_metadata(obj) && 
+      mark_bitmap()->is_h2_unmarked(obj) && PSParallelCompact::mark_h2_candidate_obj(obj)) {
+
+      uint64_t group_id = Universe::teraHeap()->h2_get_region_groupId((void *) p);
+      uint64_t part_id = Universe::teraHeap()->h2_get_region_partId((void *) p);
+      obj->mark_move_h2(group_id, part_id);
+    }
+
+    if (mark_bitmap()->is_unmarked(obj) && PSParallelCompact::mark_obj(obj)) {
+      push(obj);
+    }
+  }
+}
+
 template <typename T>
 inline void ParCompactionManager::mark_and_push(T* p) {
   T heap_oop = RawAccess<>::oop_load(p);
   if (!CompressedOops::is_null(heap_oop)) {
     oop obj = CompressedOops::decode_not_null(heap_oop);
+
+    DEBUG_ONLY(if (EnableTeraHeap) {
+                 assert(ParallelScavengeHeap::heap()->is_in(obj) 
+                        || Universe::teraHeap()->is_obj_in_h2(obj), "should be in heap or in H2 (TeraHeap)"); 
+               } else {
+                 assert(ParallelScavengeHeap::heap()->is_in(obj), "should be in heap");
+               });
+
+    if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj)) {
+      Universe::teraHeap()->mark_used_region(cast_from_oop<HeapWord *>(obj));
+      if (TeraHeapStatistics)
+        increase_fwd_ptrs();
+      return;
+    }
+
+    if (!_is_h2_candidate) {
+      if (mark_bitmap()->is_unmarked(obj) && PSParallelCompact::mark_obj(obj)) {
+        push(obj);
+      }
+      return;
+    }
+
+    if (!Universe::teraHeap()->is_metadata(obj) && mark_bitmap()->is_h2_unmarked(obj)
+        && PSParallelCompact::mark_h2_candidate_obj(obj)) {
+      obj->mark_move_h2(_h2_group_id, _h2_part_id);
+    }
+    
+    if (mark_bitmap()->is_unmarked(obj) && PSParallelCompact::mark_obj(obj)) {
+      push(obj);
+    }
+  }
+}
+
+#else 
+
+template <typename T>
+inline void ParCompactionManager::mark_and_push(T* p) {
+  T heap_oop = RawAccess<>::oop_load(p);
+  if (!CompressedOops::is_null(heap_oop)) {
+    oop obj = CompressedOops::decode_not_null(heap_oop);
+
     assert(ParallelScavengeHeap::heap()->is_in(obj), "should be in heap");
 
     if (mark_bitmap()->is_unmarked(obj) && PSParallelCompact::mark_obj(obj)) {
@@ -111,6 +177,7 @@ inline void ParCompactionManager::mark_and_push(T* p) {
     }
   }
 }
+#endif // TERA_MAJOR_GC
 
 inline void ParCompactionManager::follow_klass(Klass* klass) {
   oop holder = klass->class_loader_data()->holder_no_keepalive();

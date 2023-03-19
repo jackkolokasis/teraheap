@@ -689,6 +689,31 @@
   product(uintx, GCDrainStackTargetSize, 64,                                \
           "Number of entries we will try to leave on the stack "            \
           "during parallel gc")                                             \
+          range(0, max_juint)                                               \
+                                                                            \
+  product(bool, EnableTeraHeap, false,                                      \
+            "Enable TeraHeap. Works only with ParallelScavenge Collector")  \
+                                                                            \
+  product(bool, TeraHeapStatistics, false,                                  \
+          "Print TeraHeap statistics")                                      \
+                                                                            \
+  product(bool, TeraHeapAllocatorStatistics, false,                         \
+          "Print TeraHeap allocator statistics")                            \
+                                                                            \
+  product(bool, TeraHeapCardStatistics, false,                              \
+          "Count the number of dirty cards in H2")                          \
+                                                                            \
+  product(bool, H2ObjectPlacement, false,                                   \
+          "Print the objects labels in H2 regions")                         \
+								                                    										    \
+  product(bool, H2LivenessAnalysis, false,                                  \
+          "Liveness analysis per H2 region objects")                        \
+								                                    										    \
+  product(uintx, TeraHeapSize, 0,                                           \
+          "Initial TeraHeap total size (in bytes)")                         \
+								                                    										    \
+  product(uintx, TeraStripeSize, 512,                                       \
+          "Size of TeraHeap stripe size (e.g 128)")                         \
           range(0, max_juint)
 
 // end of GC_FLAGS

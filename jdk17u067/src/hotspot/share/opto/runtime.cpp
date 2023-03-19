@@ -542,6 +542,21 @@ const TypeFunc *OptoRuntime::multianewarrayN_Type() {
   return TypeFunc::make(domain, range);
 }
 
+#ifdef TERA_C2
+const TypeFunc *OptoRuntime::h2_wb_post_Type() {
+
+  const Type **fields = TypeTuple::fields(1);
+  fields[TypeFunc::Parms+0] = TypeRawPtr::NOTNULL;  // Card addr
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+1, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(0);
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
+
+  return TypeFunc::make(domain, range);
+}
+#endif // TERA_C2
+
 const TypeFunc *OptoRuntime::uncommon_trap_Type() {
   // create input type (domain)
   const Type **fields = TypeTuple::fields(1);

@@ -198,7 +198,12 @@ template <class T, MEMFLAGS F> void Hashtable<T, F>::print_table_statistics(outp
 }
 
 #ifndef PRODUCT
+
+#ifdef TERA_MAJOR_GC
+template <class T> static void print_literal(T const& l) { }
+#else
 template <class T> static void print_literal(T const& l) { l.print(); }
+#endif // TERA_MAJOR_GC
 template <class T> static void print_literal(T* l) { print_literal(*l); }
 
 template <class T, MEMFLAGS F> void Hashtable<T, F>::print() {
@@ -286,3 +291,7 @@ template void BasicHashtable<mtModule>::verify_table<ModuleEntry>(char const*);
 template void BasicHashtable<mtModule>::verify_table<PackageEntry>(char const*);
 template void BasicHashtable<mtClass>::verify_table<ProtectionDomainCacheEntry>(char const*);
 template void BasicHashtable<mtClass>::verify_table<PlaceholderEntry>(char const*);
+
+#ifdef TERA_MAJOR_GC
+template class Hashtable<HeapWord *, mtGC>;
+#endif

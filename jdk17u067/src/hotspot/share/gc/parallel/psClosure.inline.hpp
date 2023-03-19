@@ -87,6 +87,10 @@ public:
   void do_oop(oop* p)       {
     ParallelScavengeHeap* psh = ParallelScavengeHeap::heap();
     assert(!psh->is_in_reserved(p), "GC barrier needed");
+
+#ifdef TERA_MINOR_GC
+    DEBUG_ONLY(if (EnableTeraHeap) {assert(!Universe::teraHeap()->is_field_in_h2(p), "Error");});
+#endif
     if (PSScavenge::should_scavenge(p)) {
       assert(PSScavenge::should_scavenge(p, true), "revisiting object?");
 

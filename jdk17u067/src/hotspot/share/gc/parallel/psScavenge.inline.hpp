@@ -45,6 +45,69 @@ template <class T> inline bool PSScavenge::should_scavenge(T* p) {
   return PSScavenge::is_obj_in_young(heap_oop);
 }
 
+#ifdef TERA_MINOR_GC
+template <class T> 
+inline bool PSScavenge::h2_should_scavenge(T* p) {
+  T heap_oop = RawAccess<>::oop_load(p);
+
+  if (CompressedOops::is_null(heap_oop))
+    return false;
+
+  oop obj = CompressedOops::decode_not_null(heap_oop);
+
+	if (Universe::teraHeap()->is_obj_in_h2(obj)) {
+    // Check if we have references between two different individual regions
+    Universe::teraHeap()->group_regions((HeapWord *)p, cast_from_oop<HeapWord*>(obj));
+#ifdef BACK_REF_STAT
+		Universe::teraHeap()->h2_update_back_ref_stats(false, true);
+#endif
+		return false;
+	}
+	else if (PSScavenge::is_obj_in_young(heap_oop)) {
+#ifdef BACK_REF_STAT
+		Universe::teraHeap()->h2_update_back_ref_stats(false, false);
+#endif
+		return true;
+	}
+	else {
+		assert(Universe::teraHeap()->is_field_in_h2((void *)p), "Sanity check");
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj, true);
+#ifdef BACK_REF_STAT
+		Universe::teraHeap()->h2_update_back_ref_stats(true, false);
+#endif
+		return false;
+	}
+}
+
+template <class T> 
+inline bool PSScavenge::h2_should_trace(T* p) {
+  T heap_oop = RawAccess<>::oop_load(p);
+
+  if (CompressedOops::is_null(heap_oop))
+    return false;
+
+  oop obj = CompressedOops::decode_not_null(heap_oop);
+
+	if (Universe::teraHeap()->is_obj_in_h2(obj)) {
+		// Group regions if the references belong to two individual groups
+		Universe::teraHeap()->group_regions((HeapWord *)p, cast_from_oop<HeapWord *>(obj));
+		return false;
+	}
+	else if (PSScavenge::is_obj_in_young(heap_oop)) {
+		Universe::teraHeap()->h2_push_backward_reference((void *)p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj, false);
+		return false;
+	}
+	else {
+		assert(Universe::teraHeap()->is_field_in_h2((void *)p), "Error");
+		Universe::teraHeap()->h2_push_backward_reference((void *)p, obj);
+		PSScavenge::card_table()->inline_write_ref_field_gc(p, obj, true);
+		return false;
+	}
+}
+
+#endif // TERA_MINOR_GC
+
 template <class T>
 inline bool PSScavenge::should_scavenge(T* p, MutableSpace* to_space) {
   if (should_scavenge(p)) {

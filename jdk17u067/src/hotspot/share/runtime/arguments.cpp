@@ -73,6 +73,11 @@ int    Arguments::_num_jvm_args                 = 0;
 char*  Arguments::_java_command                 = NULL;
 SystemProperty* Arguments::_system_properties   = NULL;
 const char*  Arguments::_gc_log_filename        = NULL;
+
+#ifdef TERA_LOG
+const char*  Arguments::_th_log_filename        = NULL;
+#endif //TERA_LOG
+
 size_t Arguments::_conservative_max_heap_alignment = 0;
 Arguments::Mode Arguments::_mode                = _mixed;
 bool   Arguments::_java_compiler                = false;
@@ -2517,6 +2522,15 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
       if (FLAG_SET_CMDLINE(InitialHeapSize, (size_t)size) != JVMFlag::SUCCESS) {
         return JNI_EINVAL;
       }
+#ifdef TERA_MINOR_GC
+      if (EnableTeraHeap) {
+        assert(TeraHeapSize != 0, "Initialize TeraHeap size -XX:TeraHeapSize=<num>");
+        MaxHeapSize = MaxHeapSize - TeraHeapSize;
+        if (FLAG_SET_CMDLINE(MaxHeapSize, (size_t)MaxHeapSize) != JVMFlag::SUCCESS) {
+          return JNI_EINVAL;
+        }
+      }
+#endif // TERA_MINOR_GC
     // -Xmx
     } else if (match_option(option, "-Xmx", &tail) || match_option(option, "-XX:MaxHeapSize=", &tail)) {
       julong long_max_heap_size = 0;
@@ -2733,7 +2747,19 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
       // Deprecated flag to redirect GC output to a file. -Xloggc:<filename>
       log_warning(gc)("-Xloggc is deprecated. Will use -Xlog:gc:%s instead.", tail);
       _gc_log_filename = os::strdup_check_oom(tail);
-    } else if (match_option(option, "-Xlog", &tail)) {
+    } 
+#ifdef TERA_LOG
+      // TeraHepa log file
+    else if (match_option(option, "-Xlogth:", &tail)) {
+      // Redirect TeraHeap output to the file. -Xlogth:<filename>
+      // ostream_init_log(), when called will use this filename to initialize
+      // a fileStream)
+      _th_log_filename = strdup(tail);
+
+      // JNI hooks
+    } 
+#endif //TERA_LOG
+    else if (match_option(option, "-Xlog", &tail)) {
       bool ret = false;
       if (strcmp(tail, ":help") == 0) {
         fileStream stream(defaultStream::output_stream());

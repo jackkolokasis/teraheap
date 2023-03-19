@@ -419,6 +419,9 @@ stringStream::~stringStream() {
 
 xmlStream*   xtty;
 outputStream* tty;
+#ifdef TERA_LOG
+outputStream* thlog_or_tty;
+#endif
 extern Mutex* tty_lock;
 
 #define EXTRACHARLEN   32
@@ -618,6 +621,58 @@ void fdStream::write(const char* s, size_t len) {
     update_position(s, len);
   }
 }
+
+#ifdef TERA_LOG
+// dump vm version, os version, platform info, build id,
+// memory usage and command line flags into header
+void thLogFileStream::dump_logth_header() {
+  if (is_open()) {
+    print_cr("%s", Abstract_VM_Version::internal_vm_info_string());
+    os::print_memory_info(this);
+  }
+}
+
+thLogFileStream::~thLogFileStream() {
+  if (_file != NULL) {
+    if (_need_close) fclose(_file);
+    _file = NULL;
+  }
+  if (_file_name != NULL) {
+    FREE_C_HEAP_ARRAY(char, _file_name);
+    _file_name = NULL;
+  }
+}
+
+thLogFileStream::thLogFileStream(const char* file_name) {
+  _cur_file_num = 0;
+  _bytes_written = 0L;
+  _file_name = make_log_name(file_name, NULL);
+
+  _file = fopen(_file_name, "w");
+
+  if (_file != NULL) {
+    _need_close = true;
+    dump_logth_header();
+  } else {
+    warning("Cannot open file %s due to %s\n", _file_name, strerror(errno));
+    _need_close = false;
+  }
+}
+
+void thLogFileStream::write(const char* s, size_t len) {
+  if (_file != NULL) {
+    size_t count = fwrite(s, 1, len, _file);
+    _bytes_written += count;
+  }
+  update_position(s, len);
+}
+
+// XX TODO Complete this function later
+void thLogFileStream::rotate_log(bool force, outputStream* out) {
+	return;
+}
+
+#endif // TERA_LOG
 
 defaultStream* defaultStream::instance = NULL;
 int defaultStream::_output_fd = 1;
@@ -944,6 +999,20 @@ void ostream_init_log() {
 
   ClassListWriter::init();
 
+#ifdef TERA_LOG
+  if (Arguments::th_log_filename() != NULL) {
+    fileStream *thlog = new(ResourceObj::C_HEAP, mtInternal)
+      thLogFileStream(Arguments::th_log_filename());
+
+    if (thlog->is_open()) {
+      // now we update the time stamp of the TC log to be synced up with tty
+      thlog->time_stamp().update_to(tty->time_stamp().ticks());
+    }
+
+    thlog_or_tty = thlog;
+  }
+#endif // TERA_LOG
+
   // If we haven't lazily initialized the logfile yet, do it now,
   // to avoid the possibility of lazy initialization during a VM
   // crash, which can affect the stability of the fatal error handler.
@@ -963,6 +1032,14 @@ void ostream_exit() {
   if (defaultStream::instance != NULL) {
     delete defaultStream::instance;
   }
+
+#ifdef TERA_LOG
+  if (thlog_or_tty != NULL) {
+    delete thlog_or_tty;
+  }
+  thlog_or_tty = NULL;
+#endif //TERA_LOG
+
   tty = NULL;
   xtty = NULL;
   defaultStream::instance = NULL;
@@ -972,6 +1049,10 @@ void ostream_exit() {
 void ostream_abort() {
   // Here we can't delete tty, just flush its output
   if (tty) tty->flush();
+
+#ifdef TERA_LOG
+  if (thlog_or_tty) thlog_or_tty->flush();
+#endif //TERA_LOG
 
   if (defaultStream::instance != NULL) {
     static char buf[4096];

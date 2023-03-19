@@ -30,6 +30,7 @@
 #include "gc/parallel/parallelScavengeHeap.hpp"
 #include "gc/parallel/parMarkBitMap.inline.hpp"
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/klass.hpp"
@@ -106,6 +107,50 @@ inline bool PSParallelCompact::mark_obj(oop obj) {
   }
 }
 
+#ifdef TERA_MAJOR_GC
+inline bool PSParallelCompact::mark_h2_candidate_obj(oop obj) {
+  if (mark_bitmap()->mark_h2_candidate_obj(obj)) {
+    return true;
+  }
+  return false;
+}
+#endif // TERA_MAJOR_GC
+
+#ifdef TERA_MAJOR_GC
+template <class T>
+inline void PSParallelCompact::adjust_pointer(T* p, ParCompactionManager* cm) {
+  T heap_oop = RawAccess<>::oop_load(p);
+  if (!CompressedOops::is_null(heap_oop)) {
+    oop obj = CompressedOops::decode_not_null(heap_oop);
+
+    DEBUG_ONLY(if (EnableTeraHeap) {
+               assert(ParallelScavengeHeap::heap()->is_in(obj) || Universe::teraHeap()->is_obj_in_h2(obj), "should be in H1 or in H2");
+               } else {
+               assert(ParallelScavengeHeap::heap()->is_in(obj), "should be in heap");
+               });
+
+    oop new_obj = (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj)) ? 
+      obj : cast_to_oop(summary_data().calc_new_pointer(obj, cm));
+		
+    if (EnableTeraHeap)
+			Universe::teraHeap()->group_region_enabled(cast_from_oop<HeapWord *>(new_obj), (void *) p);
+
+    assert(new_obj != NULL, "non-null address for live objects");
+    // Is it actually relocated at all?
+    if (new_obj != obj) {
+      DEBUG_ONLY(if (EnableTeraHeap) {
+                   assert(ParallelScavengeHeap::heap()->is_in_reserved(new_obj) ||
+                          Universe::teraHeap()->is_obj_in_h2(new_obj), "should be in object space");
+                 } else {
+                   assert(ParallelScavengeHeap::heap()->is_in_reserved(new_obj), "should be in object space");
+                 });
+
+      RawAccess<IS_NOT_NULL>::oop_store(p, new_obj);
+    }
+  }
+}
+
+#else
 template <class T>
 inline void PSParallelCompact::adjust_pointer(T* p, ParCompactionManager* cm) {
   T heap_oop = RawAccess<>::oop_load(p);
@@ -123,6 +168,7 @@ inline void PSParallelCompact::adjust_pointer(T* p, ParCompactionManager* cm) {
     }
   }
 }
+#endif // TERA_MAJOR_GC
 
 class PCAdjustPointerClosure: public BasicOopIterateClosure {
 public:

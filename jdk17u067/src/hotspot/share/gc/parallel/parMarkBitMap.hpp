@@ -47,16 +47,40 @@ public:
   // Atomically mark an object as live.
   bool mark_obj(HeapWord* addr, size_t size);
   inline bool mark_obj(oop obj, int size);
+#ifdef TERA_MAJOR_GC
+    // Unmak H2 candidate object from the begin bitmap and end bitmap.
+    // We exclude these objects from the summary phase and compactions
+    void unmark_obj(HeapWord* addr, size_t size);
+    inline void unmark_obj(oop obj, int size);
+#endif // TERA_MAJOR_GC
+
+#ifdef TERA_MAJOR_GC
+  // Atomically mark the object as a candidate to be moved to H2
+  bool mark_h2_candidate_obj(HeapWord* addr);
+  inline bool mark_h2_candidate_obj(oop obj);
+#endif // TERA_MAJOR_GC
 
   // Return whether the specified begin or end bit is set.
   inline bool is_obj_beg(idx_t bit) const;
   inline bool is_obj_end(idx_t bit) const;
 
-  // Traditional interface for testing whether an object is marked or not (these
-  // test only the begin bits).
+  // Traditional interface for testing whether an object is marked or
+  // not (these test only the begin bits).
   inline bool is_marked(idx_t bit)      const;
   inline bool is_marked(HeapWord* addr) const;
   inline bool is_marked(oop obj)        const;
+
+#ifdef TERA_MAJOR_GC
+  // Traditional interface for testing whether an h2 candidate object
+  // is marked or not (this test only the _h2_candidate_bits
+  inline bool is_h2_marked(idx_t bit) const;
+  inline bool is_h2_marked(HeapWord* addr) const;
+  inline bool is_h2_marked(oop obj) const;
+
+  inline bool is_h2_unmarked(idx_t addr) const;
+  inline bool is_h2_unmarked(HeapWord* addr) const;
+  inline bool is_h2_unmarked(oop obj) const;
+#endif
 
   inline bool is_unmarked(idx_t bit)      const;
   inline bool is_unmarked(HeapWord* addr) const;
@@ -147,8 +171,16 @@ public:
   inline idx_t find_obj_beg(idx_t beg, idx_t end) const;
   inline idx_t find_obj_end(idx_t beg, idx_t end) const;
 
+#ifdef TERA_MAJOR_GC
+  inline idx_t find_h2_candidate(idx_t beg, idx_t end) const;
+#endif // TERA_MAJOR_GC
+
   inline HeapWord* find_obj_beg(HeapWord* beg, HeapWord* end) const;
   inline HeapWord* find_obj_end(HeapWord* beg, HeapWord* end) const;
+
+#ifdef TERA_MAJOR_GC
+  inline HeapWord* find_h2_candidate(HeapWord* beg, HeapWord* end) const;
+#endif // TERA_MAJOR_GC
 
   // Clear a range of bits or the entire bitmap (both begin and end bits are
   // cleared).
@@ -188,6 +220,9 @@ private:
   size_t          _region_size;
   BitMapView      _beg_bits;
   BitMapView      _end_bits;
+#ifdef TERA_MAJOR_GC
+  BitMapView      _h2_candidate_bits;
+#endif
   PSVirtualSpace* _virtual_space;
   size_t          _reserved_byte_size;
 };

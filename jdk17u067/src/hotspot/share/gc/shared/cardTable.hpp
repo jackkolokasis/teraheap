@@ -27,6 +27,7 @@
 
 #include "memory/allocation.hpp"
 #include "memory/memRegion.hpp"
+#include "memory/sharedDefines.h"
 #include "oops/oopsHierarchy.hpp"
 #include "utilities/align.hpp"
 
@@ -53,6 +54,18 @@ protected:
   CardValue*      _byte_map;         // the card marking array
   CardValue*      _byte_map_base;
 
+#ifdef TERA_CARDS
+  const MemRegion _th_whole_heap;       // the TeraHeap region covered by card table
+  size_t          _th_guard_index;      // index of very last element in the card
+                                        // table; it is set to a guard value
+                                        // (last_card) and should never be modified
+  size_t          _th_last_valid_index; // index of the last valid element
+  const size_t    _th_page_size;        // page size used when mapping _byte_map
+  size_t          _th_byte_map_size;    // in bytes
+  CardValue*      _th_byte_map;         // the h2 card marking array
+  CardValue*      _th_byte_map_base;         // the h2 card marking array
+#endif
+
   int _cur_covered_regions;
 
   // The covered regions should be in address order.
@@ -70,7 +83,18 @@ protected:
   // uncommit the MemRegion for that page.
   MemRegion _guard_region;
 
+#ifdef TERA_CARDS
+  // The last card is a guard card, and we commit the page for it so
+  // we can use the card for verification purposes. We make sure we never
+  // uncommit the MemRegion for that page.
+  MemRegion _th_guard_region;
+#endif // TERA_CARDS
+
   inline size_t compute_byte_map_size();
+
+#ifdef TERA_CARDS
+  inline size_t th_compute_byte_map_size();
+#endif //TERA_CARDS
 
   // Finds and return the index of the region, if any, to which the given
   // region would be contiguous.  If none exists, assign a new region and
@@ -113,8 +137,14 @@ protected:
 
 public:
   CardTable(MemRegion whole_heap);
+#ifdef TERA_CARDS
+  CardTable(MemRegion whole_heap, MemRegion whole_tera_heap);
+#endif //TERA_CARDS
   virtual ~CardTable();
   virtual void initialize();
+#ifdef TERA_CARDS
+  virtual void th_card_table_initialize();
+#endif //TERA_CARDS
 
   // The kinds of precision a CardTable may offer.
   enum PrecisionStyle {
@@ -137,6 +167,14 @@ public:
     return words / card_size_in_words + 1;
   }
 
+#ifdef TERA_CARDS
+  inline size_t th_cards_required(size_t covered_words) {
+    // Add one for a guard card, used to detect errors.
+    const size_t words = align_up(covered_words, th_card_size_in_words);
+    return words / th_card_size_in_words + 1;
+  }
+#endif // TERA_CARDS
+
   // Dirty the bytes corresponding to "mr" (not all of which must be
   // covered.)
   void dirty_MemRegion(MemRegion mr);
@@ -151,8 +189,39 @@ public:
     return (addr_for(pcard) == p);
   }
 
+#ifdef TERA_CARDS
+  // Mapping from address to card marking array entry
+  CardValue* byte_for(const void *p) const {
+    assert(
+        _whole_heap.contains(p) || _th_whole_heap.contains(p),
+            "Attempt to access p = " PTR_FORMAT
+            " out of bounds of card marking arrays _whole_heap = [" PTR_FORMAT
+            "," PTR_FORMAT "] and _tc_whole_heap = [" PTR_FORMAT "," PTR_FORMAT
+            "]",
+            p2i(p), p2i(_whole_heap.start()), p2i(_whole_heap.end()),
+            p2i(_th_whole_heap.start()), p2i(_th_whole_heap.end()));
+
+    if (_whole_heap.contains(p)) {
+      CardValue *result = &_byte_map_base[uintptr_t(p) >> card_shift];
+
+      assert(result >= _byte_map && result < _byte_map + _byte_map_size,
+             "out of bounds accessor for card marking array");
+
+      return result;
+
+    } else {
+      CardValue *result = &_th_byte_map_base[uintptr_t(p) >> th_card_shift];
+
+      assert(result >= _th_byte_map && result < _th_byte_map + _th_byte_map_size,
+             "out of bounds accessor for tc_card marking array");
+
+      return result;
+    }
+  }
+#else
   // Mapping from address to card marking array entry
   CardValue* byte_for(const void* p) const {
+
     assert(_whole_heap.contains(p),
            "Attempt to access p = " PTR_FORMAT " out of bounds of "
            " card marking array's _whole_heap = [" PTR_FORMAT "," PTR_FORMAT ")",
@@ -162,6 +231,22 @@ public:
            "out of bounds accessor for card marking array");
     return result;
   }
+#endif //TERA_CARDS
+
+#ifdef TERA_CARDS
+  bool is_field_in_tera_heap(const void *p) const {
+    assert(
+        _whole_heap.contains(p) || _th_whole_heap.contains(p),
+            "Attempt to access p = " PTR_FORMAT
+            " out of bounds of card marking arrays _whole_heap = [" PTR_FORMAT
+            "," PTR_FORMAT "] and _tc_whole_heap = [" PTR_FORMAT "," PTR_FORMAT
+            "]",
+            p2i(p), p2i(_whole_heap.start()), p2i(_whole_heap.end()),
+            p2i(_th_whole_heap.start()), p2i(_th_whole_heap.end()));
+
+    return !_whole_heap.contains(p);
+  }
+#endif //TERA_CARDS
 
   // The card table byte one after the card marking array
   // entry for argument address. Typically used for higher bounds
@@ -171,6 +256,11 @@ public:
   }
 
   virtual void invalidate(MemRegion mr);
+#ifdef TERA_CARDS
+  virtual void th_write_ref_field(void *obj);
+  virtual void th_clean_cards(HeapWord *start, HeapWord *end);
+  virtual void th_num_dirty_cards(HeapWord *start, HeapWord *end, bool before);
+#endif //TERA_CARDS
   void clear(MemRegion mr);
   void dirty(MemRegion mr);
 
@@ -182,6 +272,34 @@ public:
     return byte_after(p);
   }
 
+#ifdef TERA_CARDS
+  // Mapping from card marking array entry to address of first word
+  HeapWord* addr_for(const CardValue* p) const {
+    assert((p >= _byte_map && p < _byte_map + _byte_map_size) ||
+           (p >= _th_byte_map && p < _th_byte_map + _th_byte_map_size),
+           "out of bounds access to card marking array. p: " PTR_FORMAT
+           " _byte_map: " PTR_FORMAT " _byte_map + _byte_map_size: " PTR_FORMAT,
+           p2i(p), p2i(_byte_map), p2i(_byte_map + _byte_map_size));
+
+    if (p >= _byte_map && p < _byte_map + _byte_map_size) {
+      size_t delta = pointer_delta(p, _byte_map_base, sizeof(CardValue));
+      HeapWord* result = (HeapWord*) (delta << card_shift);
+      assert(_whole_heap.contains(result),
+             "Returning result = " PTR_FORMAT " out of bounds of "
+             " card marking array's _whole_heap = [" PTR_FORMAT "," PTR_FORMAT ")",
+             p2i(result), p2i(_whole_heap.start()), p2i(_whole_heap.end()));
+      return result;
+    } else {
+      size_t delta = pointer_delta(p, _th_byte_map_base, sizeof(CardValue));
+      HeapWord* result = (HeapWord*) (delta << th_card_shift);
+      assert(_th_whole_heap.contains(result),
+             "Returning result = " PTR_FORMAT " out of bounds of "
+             " card marking array's _whole_heap = [" PTR_FORMAT "," PTR_FORMAT ")",
+             p2i(result), p2i(_th_whole_heap.start()), p2i(_th_whole_heap.end()));
+      return result;
+    }
+  }
+#else
   // Mapping from card marking array entry to address of first word
   HeapWord* addr_for(const CardValue* p) const {
     assert(p >= _byte_map && p < _byte_map + _byte_map_size,
@@ -196,6 +314,7 @@ public:
            p2i(result), p2i(_whole_heap.start()), p2i(_whole_heap.end()));
     return result;
   }
+#endif //TERA_CARDS
 
   // Mapping from address to card marking array index.
   size_t index_for(void* p) {
@@ -217,6 +336,10 @@ public:
 
   static uintx ct_max_alignment_constraint();
 
+#ifdef TERA_CARDS
+  static uint64_t th_ct_max_alignment_constraint();
+#endif //TERA_CARDS
+
   // Apply closure "cl" to the dirty cards containing some part of
   // MemRegion "mr".
   void dirty_card_iterate(MemRegion mr, MemRegionClosure* cl);
@@ -233,6 +356,12 @@ public:
     card_shift                  = 9,
     card_size                   = 1 << card_shift,
     card_size_in_words          = card_size / sizeof(HeapWord)
+#ifdef TERA_CARDS
+    ,
+    th_card_shift = TERA_CARD_SIZE,
+    th_card_size = 1 << th_card_shift,
+    th_card_size_in_words = th_card_size / sizeof(HeapWord)
+#endif //TERA_CARDS
   };
 
   static CardValue clean_card_val()          { return clean_card; }
@@ -244,6 +373,10 @@ public:
   // But since the heap starts at some higher address, this points to somewhere
   // before the beginning of the actual _byte_map.
   CardValue* byte_map_base() const { return _byte_map_base; }
+  
+#ifdef TERA_CARDS
+  CardValue* th_byte_map_base() const { return _th_byte_map_base; }
+#endif
 
   virtual bool is_in_young(oop obj) const = 0;
 

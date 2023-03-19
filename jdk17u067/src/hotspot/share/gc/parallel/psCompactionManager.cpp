@@ -63,6 +63,10 @@ ParCompactionManager::ParCompactionManager() {
   _region_stack.initialize();
 
   reset_bitmap_query_cache();
+
+#ifdef TERA_MAJOR_GC
+  _fwd_ptrs_h1_h2 = 0;
+#endif // TERA_MAJOR_GC
 }
 
 void ParCompactionManager::initialize(ParMarkBitMap* mbm) {
@@ -115,20 +119,39 @@ ParCompactionManager::gc_thread_compaction_manager(uint index) {
   return _manager_array[index];
 }
 
+#ifdef TERA_MAJOR_GC
+void ParCompactionManager::set_h2_candidate_flags(oop obj) {
+  _is_h2_candidate = (EnableTeraHeap 
+                      && !Universe::teraHeap()->is_metadata(obj)
+                      && Universe::teraHeap()->h2_promotion_policy(obj)) ? true : false;
+  _h2_group_id     = (EnableTeraHeap && _is_h2_candidate) ? obj->get_obj_group_id() : 0;
+  _h2_part_id      = (EnableTeraHeap && _is_h2_candidate) ? obj->get_obj_part_id() : 0;
+
+  // Note: I think the following code is not necessary!
+  // We should delete t
+  //if (EnableTeraHeap && Universe::teraHeap()->is_metadata(obj) && obj->is_marked_move_h2()) {
+  //  obj->init_obj_state();
+  //}
+}
+#endif // TERA_MAJOR_GC
+
 void ParCompactionManager::follow_marking_stacks() {
   do {
     // Drain the overflow stack first, to allow stealing from the marking stack.
     oop obj;
     while (marking_stack()->pop_overflow(obj)) {
+      set_h2_candidate_flags(obj);
       follow_contents(obj);
     }
     while (marking_stack()->pop_local(obj)) {
+      set_h2_candidate_flags(obj);
       follow_contents(obj);
     }
 
     // Process ObjArrays one at a time to avoid marking stack bloat.
     ObjArrayTask task;
     if (_objarray_stack.pop_overflow(task) || _objarray_stack.pop_local(task)) {
+      set_h2_candidate_flags(task.obj());
       follow_array((objArrayOop)task.obj(), task.index());
     }
   } while (!marking_stacks_empty());

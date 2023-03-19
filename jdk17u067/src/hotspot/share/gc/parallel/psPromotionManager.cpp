@@ -303,6 +303,11 @@ template <class T> void PSPromotionManager::process_array_chunk_work(
   T* p               = base + start;
   T* const chunk_end = base + end;
   while (p < chunk_end) {
+#ifdef TERA_MINOR_GC
+    DEBUG_ONLY(if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty()
+                   && Universe::teraHeap()->is_field_in_h2((void *)p)) {
+                 assert(false, "Implement this case");});
+#endif // TERA_MINOR_GC
     if (PSScavenge::should_scavenge(p)) {
       claim_or_forward_depth(p);
     }

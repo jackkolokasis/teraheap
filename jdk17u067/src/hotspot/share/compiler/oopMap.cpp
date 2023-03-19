@@ -29,6 +29,7 @@
 #include "code/scopeDesc.hpp"
 #include "compiler/oopMap.hpp"
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/iterator.hpp"
 #include "memory/resourceArea.hpp"
@@ -713,7 +714,16 @@ void DerivedPointerTable::clear() {
 }
 
 void DerivedPointerTable::add(derived_pointer* derived_loc, oop *base_loc) {
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(if (EnableTeraHeap) {
+               assert(Universe::heap()->is_in_or_null(*base_loc)
+                      || Universe::teraHeap()->is_obj_in_h2(*base_loc), "not an oop");
+             } else {
+               assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
+             })
+#else
   assert(Universe::heap()->is_in_or_null(*base_loc), "not an oop");
+#endif
   assert(derived_loc != (void*)base_loc, "Base and derived in same location");
   derived_pointer base_loc_as_derived_pointer =
     static_cast<derived_pointer>(reinterpret_cast<intptr_t>(base_loc));
@@ -749,7 +759,16 @@ void DerivedPointerTable::update_pointers() {
     intptr_t offset  = entry->offset();
     // The derived oop was setup to point to location of base
     oop base = **reinterpret_cast<oop**>(derived_loc);
+#ifdef TERA_ASSERT
+     DEBUG_ONLY(if (EnableTeraHeap) {
+                  assert(Universe::heap()->is_in_or_null(base) || 
+                         Universe::teraHeap()->is_obj_in_h2(base), "must be an oop");
+                } else {
+                  assert(Universe::heap()->is_in_or_null(base), "must be an oop");
+                })
+#else
     assert(Universe::heap()->is_in_or_null(base), "must be an oop");
+#endif
 
     derived_pointer derived_base = to_derived_pointer(base);
     *derived_loc = derived_base + offset;

@@ -49,5 +49,28 @@ HeapWord* ObjectStartArray::object_start(HeapWord* addr) const {
   return scroll_forward;
 }
 
+#ifdef TERA_CARDS
+  // Optimized for finding the first object that crosses into
+  // a given block in TeraCache. The blocks contain the offset of the last
+  // object in that block. Scroll backwards by one, and the first
+  // object hit should be at the beginning of the block
+HeapWord* ObjectStartArray::th_object_start(HeapWord* addr) const {
+  assert(_covered_region.contains(addr), "Must be in covered region");
+  int* block = th_block_for_addr(addr);
+  HeapWord* scroll_forward = th_offset_addr_for_block(block--);
+  while (scroll_forward > addr) {
+    scroll_forward = th_offset_addr_for_block(block--);
+  }
+
+  HeapWord* next = scroll_forward;
+  while (next <= addr) {
+    scroll_forward = next;
+    next += cast_to_oop(next)->size();
+  }
+  assert(scroll_forward <= addr, "wrong order for current and arg");
+  assert(addr <= next, "wrong order for arg and next");
+  return scroll_forward;
+}
+#endif // TERA_CARDS
 
 #endif // SHARE_GC_PARALLEL_OBJECTSTARTARRAY_INLINE_HPP

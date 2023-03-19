@@ -28,6 +28,7 @@
 #include "oops/instanceMirrorKlass.hpp"
 
 #include "classfile/javaClasses.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "oops/klass.hpp"
 #include "oops/oop.inline.hpp"
@@ -47,6 +48,10 @@ void InstanceMirrorKlass::oop_oop_iterate_statics(oop obj, OopClosureType* closu
 
 template <typename T, class OopClosureType>
 void InstanceMirrorKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
+#ifdef TERA_MAJOR_GC
+  DEBUG_ONLY(if (EnableTeraHeap) { assert(!Universe::teraHeap()->is_obj_in_h2(obj), "Object is in TeraCache"); })
+#endif
+
   InstanceKlass::oop_oop_iterate<T>(obj, closure);
 
   if (Devirtualizer::do_metadata(closure)) {

@@ -28,6 +28,7 @@
 #include "oops/oop.hpp"
 
 #include "memory/universe.hpp"
+#include "memory/sharedDefines.h"
 #include "oops/access.inline.hpp"
 #include "oops/arrayKlass.hpp"
 #include "oops/arrayOop.hpp"
@@ -52,6 +53,89 @@ markWord oopDesc::mark() const {
 markWord* oopDesc::mark_addr() const {
   return (markWord*) &_mark;
 }
+
+#ifdef TERA_FLAG
+  // Mark an object with 'id' to be moved in H2. H2 allocator uses the
+  // 'id' to locate objects with the same 'id' by to the same region.
+  // 'id' is defined by the application.
+void oopDesc::mark_move_h2(uint64_t rdd_id, uint64_t part_id) { 
+  _tera_flag = (part_id << 48);
+  _tera_flag |= (rdd_id << 32);
+  _tera_flag |= MOVE_TO_TERA;
+}
+
+// Check if an object is marked to be moved in H2
+bool oopDesc::is_marked_move_h2() { 
+  return (_tera_flag & 0xffffffff) == MOVE_TO_TERA ;
+}
+
+// Mark this object that is located in TeraCache
+void oopDesc::set_in_h2() { 
+  uint64_t part_id = (_tera_flag >> 48);
+  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
+  uint64_t state   = _tera_flag & 0xffffffff;
+
+  _tera_flag = (part_id << 48);
+  _tera_flag |= (rdd_id << 32);
+  _tera_flag |= IN_TERA_CACHE;
+}
+
+// Get the state of the object
+uint64_t oopDesc::get_obj_state() { 
+  // Get the object state. The state is saved in the lowes 32bit 
+  return (_tera_flag & 0xffffffff);
+}
+
+// Init the object state 
+void oopDesc::init_obj_state() { 
+  _tera_flag = INIT_TF;
+}
+
+// Get the object group id
+int oopDesc::get_obj_group_id() {
+  return ((_tera_flag >> 32) & 0xffff) ;
+}
+
+// Get object partition Id
+uint64_t oopDesc::get_obj_part_id() {
+  return _tera_flag >> 48;
+}
+
+bool oopDesc::is_live() {
+  return (get_obj_state() == LIVE_TERA_OBJ || 
+  get_obj_state() == VISITED_TERA_OBJ || 
+  get_obj_state() == MOVE_TO_TERA);
+}
+
+void oopDesc::reset_live() {
+  set_in_h2();
+}
+
+void oopDesc::set_live() {
+  uint64_t part_id = (_tera_flag >> 48);
+  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
+  uint64_t state   = _tera_flag & 0xffffffff;
+
+  _tera_flag = (part_id << 48);
+  _tera_flag |= (rdd_id << 32);
+  _tera_flag |= LIVE_TERA_OBJ;
+}
+
+void oopDesc::set_visited() {
+  uint64_t part_id = (_tera_flag >> 48);
+  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
+  uint64_t state   = _tera_flag & 0xffffffff;
+
+  _tera_flag = (part_id << 48);
+  _tera_flag |= (rdd_id << 32);
+  _tera_flag |= VISITED_TERA_OBJ;
+}
+
+bool oopDesc::is_visited() {
+  return (get_obj_state() == VISITED_TERA_OBJ);
+}
+
+#endif // TERA_FLAG
 
 void oopDesc::set_mark(markWord m) {
   HeapAccess<MO_RELAXED>::store_at(as_oop(), mark_offset_in_bytes(), m.value());

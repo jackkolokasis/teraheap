@@ -32,6 +32,7 @@
 #include "gc/shared/referencePolicy.hpp"
 #include "gc/shared/referenceProcessor.inline.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "logging/log.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/resourceArea.hpp"
@@ -252,8 +253,20 @@ void DiscoveredListIterator::load_ptrs(DEBUG_ONLY(bool allow_null_referent)) {
          "Expected an oop or NULL for discovered field at " PTR_FORMAT, p2i(discovered));
   _next_discovered = discovered;
   _referent = java_lang_ref_Reference::unknown_referent_no_keepalive(_current_discovered);
+#ifdef TERA_ASSERT
+  debug_only(if (EnableTeraHeap) {
+               assert(Universe::heap()->is_in_or_null(_referent)
+                      || Universe::teraHeap()->is_obj_in_h2(_referent),
+                      "Wrong oop found in java.lang.Reference object");
+             }
+             else {
+               assert(Universe::heap()->is_in_or_null(_referent),
+                      "Wrong oop found in java.lang.Reference object");
+             });
+#else
   assert(Universe::heap()->is_in_or_null(_referent),
          "Wrong oop found in java.lang.Reference object");
+#endif
   assert(allow_null_referent ?
              oopDesc::is_oop_or_null(_referent)
            : oopDesc::is_oop(_referent),

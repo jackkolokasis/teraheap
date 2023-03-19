@@ -1259,4 +1259,39 @@ public final class Unsafe {
 
         theInternalUnsafe.invokeCleaner(directBuffer);
     }
+  
+    /**
+     * Mark object and move it in the next full GC in H2 - TeraHeap
+     *
+     * @param o object/array to update tera mark word
+     * @param label of the marking object
+     * @param partId partition id of the marking object
+     */
+    public void h2TagAndMoveRoot(Object o, long label, long partId) {
+        theInternalUnsafe.h2TagAndMoveRoot(o, label, partId);
+    }
+    
+    /**
+     * Mark root object to be moved in H2 - TeraHeap. Object will be
+     * moved only after calling h2Move().
+     *
+     * @param o object/array to update tera mark word
+     * @param label of the marking object
+     * @param partId partition id of the marking object
+     */
+    public void h2TagRoot(Object o, long label, long partId) {
+        theInternalUnsafe.h2TagRoot(o, label, partId);
+    }
+    
+    /**
+     * Move all objects with the specific label in H2 - TeraHeap. Object
+     * will be moved in H2 in the next full GC.
+     *
+     * @param label of the marking object
+     */
+    public void h2Move(long label) {
+        theInternalUnsafe.h2Move(label);
+    }
+
+
 }

@@ -27,6 +27,7 @@
 
 #include "gc/shared/cardTable.hpp"
 #include "oops/oop.hpp"
+#include "gc/shared/gc_globals.hpp"
 
 class MutableSpace;
 class ObjectStartArray;
@@ -47,11 +48,18 @@ class PSCardTable: public CardTable {
 
   enum ExtendedCardValue {
     youngergen_card   = CT_MR_BS_last_reserved + 1,
+#ifdef TERA_CARDS
+    oldergen_card     = CT_MR_BS_last_reserved + 2,
+#endif
     verify_card       = CT_MR_BS_last_reserved + 5
   };
 
  public:
   PSCardTable(MemRegion whole_heap) : CardTable(whole_heap) {}
+
+#ifdef TERA_CARDS
+  PSCardTable(MemRegion whole_heap, MemRegion th_whole_heap) : CardTable(whole_heap, th_whole_heap) {}
+#endif
 
   static CardValue youngergen_card_val() { return youngergen_card; }
   static CardValue verify_card_val()     { return verify_card; }
@@ -64,6 +72,18 @@ class PSCardTable: public CardTable {
                                   uint stripe_number,
                                   uint stripe_total);
 
+#ifdef TERA_CARDS
+  // Scavenge support for TeraCache
+  // 'is_scavenge_done' field shows if we use this function during minor gc or
+  // we use this function only to trace dirty objects of TeraCache
+  void h2_scavenge_contents_parallel(ObjectStartArray* start_array,
+                                  HeapWord* space_top,
+                                  PSPromotionManager* pm,
+                                  uint stripe_number,
+                                  uint stripe_total, 
+                                  bool is_scavenge_done);
+#endif //TERA_CARDS
+
   bool addr_is_marked_imprecise(void *addr);
   bool addr_is_marked_precise(void *addr);
 
@@ -75,10 +95,36 @@ class PSCardTable: public CardTable {
   static bool card_is_clean(int value)      { return value == clean_card; }
   static bool card_is_verify(int value)     { return value == verify_card; }
 
+#ifdef TERA_CARDS
+  static bool card_is_oldgen(int value)     {return value == oldergen_card; }
+
+  static bool th_card_is_clean(int value, bool is_scavenge_done) {
+#ifdef DISABLE_TRAVERSE_OLD_GEN
+	  if (!is_scavenge_done)
+		  return card_is_clean(value); 
+
+	  return (card_is_clean(value) || card_is_oldgen(value));
+#else
+	  return card_is_clean(value);
+#endif
+  }
+#endif
+
   // Card marking
-  void inline_write_ref_field_gc(void* field, oop new_val) {
+  void inline_write_ref_field_gc(void* field, oop new_val, bool promote_to_oldgen=false) {
     CardValue* byte = byte_for(field);
+#ifdef TERA_CARDS
+    if (EnableTeraHeap && is_field_in_tera_heap(field)) {
+      if (promote_to_oldgen) {
+        Atomic::cmpxchg(byte, (CardValue)clean_card, (CardValue)oldergen_card);
+        Atomic::cmpxchg(byte, (CardValue)dirty_card, (CardValue)oldergen_card);
+        return;
+      }
+    }
     *byte = youngergen_card;
+#else
+    *byte = youngergen_card;
+#endif
   }
 
   // ReduceInitialCardMarks support
@@ -98,10 +144,23 @@ class PSCardTable: public CardTable {
   HeapWord* lowest_prev_committed_start(int ind) const;
 
 #ifdef ASSERT
+
   bool is_valid_card_address(CardValue* addr) {
+#ifdef TERA_CARDS
+    if (EnableTeraHeap) {
+      // Check if the address belongs to the address range of the Old Generation
+      // or in the TeraCache
+      return ((addr >= _byte_map) && (addr < _byte_map + _byte_map_size)
+      ||
+      ((addr >= _th_byte_map) && (addr < _th_byte_map + _th_byte_map_size)));
+    } 
     return (addr >= _byte_map) && (addr < _byte_map + _byte_map_size);
+#else
+    return (addr >= _byte_map) && (addr < _byte_map + _byte_map_size);
+#endif
   }
-#endif // ASSERT
+
+  #endif // ASSERT
 
   // Verification
   void verify_all_young_refs_imprecise();

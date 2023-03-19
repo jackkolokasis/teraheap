@@ -244,9 +244,16 @@ void ConstantOopWriteValue::write_on(DebugInfoWriteStream* stream) {
     // cannot use ThreadInVMfromNative here since in case of JVMCI compiler,
     // thread is already in VM state.
     ThreadInVMfromUnknown tiv;
-    assert(JNIHandles::resolve(value()) == NULL ||
-           Universe::heap()->is_in(JNIHandles::resolve(value())),
-           "Should be in heap");
+#ifdef TERA_ASSERT
+    DEBUG_ONLY(
+        if (EnableTeraHeap) {
+          assert(JNIHandles::resolve(value()) == NULL || Universe::heap()->is_in(JNIHandles::resolve(value())) || Universe::is_in_h2(JNIHandles::resolve(value())), "Should be in heap");
+        } else {
+          assert(JNIHandles::resolve(value()) == NULL || Universe::heap()->is_in(JNIHandles::resolve(value())), "Should be in heap");
+        });
+#else
+    assert(JNIHandles::resolve(value()) == NULL || Universe::heap()->is_in(JNIHandles::resolve(value())), "Should be in heap");
+#endif
  }
 #endif
   stream->write_int(CONSTANT_OOP_CODE);
@@ -265,8 +272,17 @@ void ConstantOopWriteValue::print_on(outputStream* st) const {
 
 ConstantOopReadValue::ConstantOopReadValue(DebugInfoReadStream* stream) {
   _value = Handle(Thread::current(), stream->read_oop());
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(_value() == NULL || Universe::heap()->is_in(_value()) || Universe::is_in_h2_or_null(_value()), "Should be in heap");
+      } else {
+        assert(_value() == NULL || Universe::heap()->is_in(_value()), "Should be in heap");
+      });
+#else
   assert(_value() == NULL ||
          Universe::heap()->is_in(_value()), "Should be in heap");
+#endif
 }
 
 void ConstantOopReadValue::write_on(DebugInfoWriteStream* stream) {

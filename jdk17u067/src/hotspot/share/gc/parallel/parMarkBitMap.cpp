@@ -39,7 +39,15 @@ ParMarkBitMap::initialize(MemRegion covered_region)
   const idx_t bits = bits_required(covered_region);
   // The bits will be divided evenly between two bitmaps; each of them should be
   // an integral number of words.
+#ifdef TERA_MAJOR_GC
+  DEBUG_ONLY(if (EnableTeraHeap) {
+               assert(is_aligned(bits, (BitsPerWord * 2)), "region size unaligned");
+             } else {
+               assert(is_aligned(bits, (BitsPerWord * 2)), "region size unaligned");
+             })
+#else
   assert(is_aligned(bits, (BitsPerWord * 2)), "region size unaligned");
+#endif
 
   const size_t words = bits / BitsPerWord;
   const size_t raw_bytes = words * sizeof(idx_t);
@@ -61,8 +69,19 @@ ParMarkBitMap::initialize(MemRegion covered_region)
     _region_start = covered_region.start();
     _region_size = covered_region.word_size();
     BitMap::bm_word_t* map = (BitMap::bm_word_t*)_virtual_space->reserved_low_addr();
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+      _beg_bits = BitMapView(map,               bits / 3);
+      _end_bits = BitMapView(map + (words / 3), bits / 3);
+      _h2_candidate_bits = BitMapView(map + ((words / 3) * 2), bits / 3);
+    } else {
+      _beg_bits = BitMapView(map,             bits / 2);
+      _end_bits = BitMapView(map + words / 2, bits / 2);
+    }
+#else
     _beg_bits = BitMapView(map,             bits / 2);
     _end_bits = BitMapView(map + words / 2, bits / 2);
+#endif
     return true;
   }
 
@@ -89,6 +108,28 @@ ParMarkBitMap::mark_obj(HeapWord* addr, size_t size)
   }
   return false;
 }
+
+#ifdef TERA_MAJOR_GC
+void
+ParMarkBitMap::unmark_obj(HeapWord* addr, size_t size)
+{
+  const idx_t beg_bit = addr_to_bit(addr);
+  const idx_t end_bit = addr_to_bit(addr + size - 1);
+  assert(_beg_bits.at(beg_bit) && _end_bits.at(end_bit), "Bits should be enabled");
+  _beg_bits.clear_bit(beg_bit);
+  _end_bits.clear_bit(end_bit);
+}
+
+bool
+ParMarkBitMap::mark_h2_candidate_obj(HeapWord* addr)
+{
+  const idx_t candidate_obj_bit = addr_to_bit(addr);
+  if (_h2_candidate_bits.par_set_bit(candidate_obj_bit))
+    return true;
+
+  return false;
+}
+#endif //TERA_MAJOR_GC
 
 inline bool
 ParMarkBitMap::is_live_words_in_range_in_cache(ParCompactionManager* cm, HeapWord* beg_addr) const {

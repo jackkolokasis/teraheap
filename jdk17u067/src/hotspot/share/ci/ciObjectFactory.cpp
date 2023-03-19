@@ -232,7 +232,16 @@ void ciObjectFactory::remove_symbols() {
 ciObject* ciObjectFactory::get(oop key) {
   ASSERT_IN_VM;
 
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::heap()->is_in(key) || Universe::is_obj_in_h2(key), "must be");
+      } else {
+        assert(Universe::heap()->is_in(key), "must be");
+      });
+#else
   assert(Universe::heap()->is_in(key), "must be");
+#endif
 
   NonPermObject* &bucket = find_non_perm(key);
   if (bucket != NULL) {
@@ -245,7 +254,17 @@ ciObject* ciObjectFactory::get(oop key) {
   ciObject* new_object = create_new_object(keyHandle());
   assert(keyHandle() == new_object->get_oop(), "must be properly recorded");
   init_ident_of(new_object);
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::heap()->is_in(new_object->get_oop()) ||
+               Universe::is_obj_in_h2(new_object->get_oop()), "must be");
+      } else {
+        assert(Universe::heap()->is_in(new_object->get_oop()), "must be");
+      });
+#else
   assert(Universe::heap()->is_in(new_object->get_oop()), "must be");
+#endif
 
   // Not a perm-space object.
   insert_non_perm(bucket, keyHandle(), new_object);
@@ -634,7 +653,16 @@ static ciObjectFactory::NonPermObject* emptyBucket = NULL;
 // If there is no entry in the cache corresponding to this oop, return
 // the null tail of the bucket into which the oop should be inserted.
 ciObjectFactory::NonPermObject* &ciObjectFactory::find_non_perm(oop key) {
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::heap()->is_in(key) || Universe::is_obj_in_h2(key), "must be");
+      } else {
+        assert(Universe::heap()->is_in(key), "must be");
+      });
+#else
   assert(Universe::heap()->is_in(key), "must be");
+#endif
   ciMetadata* klass = get_metadata(key->klass());
   NonPermObject* *bp = &_non_perm_bucket[(unsigned) klass->hash() % NON_PERM_BUCKETS];
   for (NonPermObject* p; (p = (*bp)) != NULL; bp = &p->next()) {
@@ -662,8 +690,17 @@ inline ciObjectFactory::NonPermObject::NonPermObject(ciObjectFactory::NonPermObj
 //
 // Insert a ciObject into the non-perm table.
 void ciObjectFactory::insert_non_perm(ciObjectFactory::NonPermObject* &where, oop key, ciObject* obj) {
-  assert(Universe::heap()->is_in_or_null(key), "must be");
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::heap()->is_in_or_null(key) ||
+               Universe::is_in_h2_or_null(key), "must be");
+      } else {
+        assert(Universe::heap()->is_in_or_null(key), "must be");
+      });
+#else
   assert(&where != &emptyBucket, "must not try to fill empty bucket");
+#endif
   NonPermObject* p = new (arena()) NonPermObject(where, key, obj);
   assert(where == p && is_equal(p, key) && p->object() == obj, "entry must match");
   assert(find_non_perm(key) == p, "must find the same spot");

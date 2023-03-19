@@ -93,6 +93,10 @@ class CollectedHeap : public CHeapObj<mtGC> {
  protected:
   // Not used by all GCs
   MemRegion _reserved;
+  
+#ifdef TERA_CARDS
+  MemRegion _tera_heap_reserved;
+#endif // TERA_CARDS
 
   bool _is_gc_active;
 

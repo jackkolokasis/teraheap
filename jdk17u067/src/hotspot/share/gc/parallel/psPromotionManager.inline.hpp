@@ -36,6 +36,7 @@
 #include "gc/shared/tlab_globals.hpp"
 #include "logging/log.hpp"
 #include "memory/iterator.inline.hpp"
+#include "memory/sharedDefines.h"
 #include "oops/access.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/orderAccess.hpp"
@@ -54,8 +55,16 @@ inline void PSPromotionManager::push_depth(ScannerTask task) {
 template <class T>
 inline void PSPromotionManager::claim_or_forward_depth(T* p) {
   assert(should_scavenge(p, true), "revisiting object?");
-  assert(ParallelScavengeHeap::heap()->is_in(p), "pointer outside heap");
+  #ifdef TERA_MINOR_GC
+  DEBUG_ONLY(if (EnableTeraHeap) {
+             assert(ParallelScavengeHeap::heap()->is_in(p) ||
+                    Universe::teraHeap()->is_field_in_h2(p), "pointer outside heap");
+             } else {
+             assert(ParallelScavengeHeap::heap()->is_in(p), "pointer outside heap");
+             });
+#endif
   oop obj = RawAccess<IS_NOT_NULL>::oop_load(p);
+
   Prefetch::write(obj->mark_addr(), 0);
   push_depth(ScannerTask(p));
 }
@@ -102,6 +111,41 @@ class PSPushContentsClosure: public BasicOopIterateClosure {
   virtual void do_oop(narrowOop* p) { do_oop_nv(p); }
 };
 
+#ifdef TERA_MINOR_GC
+class H2ToYoungPSPushContentsClosure: public BasicOopIterateClosure {
+  PSPromotionManager* _pm;
+ public:
+  H2ToYoungPSPushContentsClosure(PSPromotionManager* pm) : 
+    BasicOopIterateClosure(PSScavenge::reference_processor()), _pm(pm) {}
+
+  template <typename T> void do_oop_nv(T* p) {
+    if (PSScavenge::h2_should_scavenge(p)) {
+      _pm->claim_or_forward_depth(p);
+    }
+  }
+
+  virtual void do_oop(oop* p)       { do_oop_nv(p); }
+  virtual void do_oop(narrowOop* p) { do_oop_nv(p); }
+};
+
+class H2ToH1PSPushContentsClosure: public BasicOopIterateClosure {
+  PSPromotionManager* _pm;
+ public:
+  H2ToH1PSPushContentsClosure(PSPromotionManager* pm) : 
+    BasicOopIterateClosure(PSScavenge::reference_processor()), _pm(pm) {}
+
+  template <typename T> void do_oop_nv(T* p) {
+    if (PSScavenge::h2_should_trace(p)) {
+      _pm->claim_or_forward_depth(p);
+    }
+  }
+
+  virtual void do_oop(oop* p)       { do_oop_nv(p); }
+  virtual void do_oop(narrowOop* p) { do_oop_nv(p); }
+};
+
+#endif // TERA_MINOR_GC
+
 //
 // This closure specialization will override the one that is defined in
 // instanceRefKlass.inline.cpp. It swaps the order of oop_oop_iterate and
@@ -127,6 +171,22 @@ inline void PSPromotionManager::push_contents(oop obj) {
     obj->oop_iterate_backwards(&pcc);
   }
 }
+
+#ifdef TERA_CARDS
+inline void PSPromotionManager::h2_push_contents(oop obj) {
+  if (!obj->klass()->is_typeArray_klass()) {
+    H2ToYoungPSPushContentsClosure pcc(this);
+    obj->oop_iterate_backwards(&pcc);
+  }
+}
+
+inline void PSPromotionManager::h2_trace_contents(oop obj) {
+  if (!obj->klass()->is_typeArray_klass()) {
+    H2ToH1PSPushContentsClosure pcc(this);
+    obj->oop_iterate_backwards(&pcc);
+  }
+}
+#endif
 
 template<bool promote_immediately>
 inline oop PSPromotionManager::copy_to_survivor_space(oop o) {
@@ -157,6 +217,9 @@ template<bool promote_immediately>
 inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
                                                                markWord test_mark) {
   assert(should_scavenge(&o), "Sanity");
+#ifdef TERA_MINOR_GC
+  DEBUG_ONLY(if (EnableTeraHeap) assert(!Universe::teraHeap()->is_obj_in_h2(o), "Object should not be belonged to teracache space"););
+#endif
 
   oop new_obj = NULL;
   bool new_obj_is_tenured = false;
@@ -317,6 +380,12 @@ inline void PSPromotionManager::copy_and_push_safe_barrier(T* p) {
   assert(should_scavenge(p, true), "revisiting object?");
 
   oop o = RawAccess<IS_NOT_NULL>::oop_load(p);
+
+#ifdef TERA_MINOR_GC
+  if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(o))
+    return;
+#endif // TERA_MINOR_GC
+
   oop new_obj = copy_to_survivor_space<promote_immediately>(o);
   RawAccess<IS_NOT_NULL>::oop_store(p, new_obj);
 
@@ -325,10 +394,21 @@ inline void PSPromotionManager::copy_and_push_safe_barrier(T* p) {
   // or from metadata.
   if ((!PSScavenge::is_obj_in_young((HeapWord*)p)) &&
       ParallelScavengeHeap::heap()->is_in_reserved(p)) {
+#ifdef TERA_MINOR_GC
+    DEBUG_ONLY(if (EnableTeraHeap) {assert(!Universe::teraHeap()->is_obj_in_h2(new_obj), "Sanity");});
+    DEBUG_ONLY(if (EnableTeraHeap) {assert(!Universe::teraHeap()->is_field_in_h2((void*) p), "Sanity");});
+#endif // TERA_MINOR_GC
     if (PSScavenge::is_obj_in_young(new_obj)) {
       PSScavenge::card_table()->inline_write_ref_field_gc(p, new_obj);
     }
   }
+
+#ifdef TERA_MINOR_GC
+	if (EnableTeraHeap && Universe::teraHeap()->is_field_in_h2((void *)p)) {
+		assert(!Universe::teraHeap()->is_obj_in_h2(new_obj), "Sanity");
+    PSScavenge::card_table()->inline_write_ref_field_gc(p, new_obj, !PSScavenge::is_obj_in_young(new_obj));
+	}
+#endif //TERA_MINOR_GC
 }
 
 inline void PSPromotionManager::process_popped_location_depth(ScannerTask task) {

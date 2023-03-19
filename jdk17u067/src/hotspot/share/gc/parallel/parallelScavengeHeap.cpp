@@ -41,6 +41,7 @@
 #include "gc/shared/gcInitLogger.hpp"
 #include "gc/shared/locationPrinter.inline.hpp"
 #include "gc/shared/scavengableNMethods.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "logging/log.hpp"
 #include "memory/iterator.hpp"
 #include "memory/metaspaceCounters.hpp"
@@ -69,8 +70,32 @@ jint ParallelScavengeHeap::initialize() {
 
   initialize_reserved_region(heap_rs);
 
+#ifdef TERA_CARDS
+  PSCardTable* card_table;
+  if (EnableTeraHeap) {
+    _tera_heap_reserved = MemRegion((HeapWord*)Universe::teraHeap()->h2_start_addr(),
+                                    (HeapWord*)Universe::teraHeap()->h2_end_addr());
+
+    if (!(_tera_heap_reserved.start() >= _reserved.end()))
+      vm_shutdown_during_initialization(
+          "H2 should be in greater addresses than H1");
+
+    card_table = new PSCardTable(heap_rs.region(), _tera_heap_reserved);
+    card_table->initialize();
+    card_table->th_card_table_initialize();
+    
+    Universe::teraHeap()->h2_start_array()->th_initialize(_tera_heap_reserved);
+	  Universe::teraHeap()->h2_start_array()->th_set_covered_region(_tera_heap_reserved);
+
+  } else {
+    card_table = new PSCardTable(heap_rs.region());
+    card_table->initialize();
+  }
+#else
   PSCardTable* card_table = new PSCardTable(heap_rs.region());
   card_table->initialize();
+#endif // TERA_CARDS
+
   CardTableBarrierSet* const barrier_set = new CardTableBarrierSet(card_table);
   barrier_set->initialize();
   BarrierSet::set_barrier_set(barrier_set);

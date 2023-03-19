@@ -52,6 +52,7 @@ class ParCompactionManager;
 class PSPromotionManager {
   friend class PSScavenge;
   friend class ScavengeRootsTask;
+  friend class H2ScavengeRootsTask;
 
  private:
   typedef OverflowTaskQueue<ScannerTask, mtGC>           PSScannerTasksQueue;
@@ -174,6 +175,15 @@ class PSPromotionManager {
   TASKQUEUE_STATS_ONLY(inline void record_steal(ScannerTask task);)
 
   void push_contents(oop obj);
+
+#ifdef TERA_MINOR_GC
+  // Parallel Scavenge TeraCache
+  void h2_push_contents(oop obj);
+  
+  // Parallel Trace TeraCache contents
+  void h2_trace_contents(oop obj);
+#endif //TERA_MINOR_GC
+
 };
 
 #endif // SHARE_GC_PARALLEL_PSPROMOTIONMANAGER_HPP

@@ -27,6 +27,7 @@
 
 #include "oops/compressedOops.hpp"
 
+#include "gc/shared/gc_globals.hpp"
 #include "memory/universe.hpp"
 #include "oops/oop.hpp"
 #include "utilities/align.hpp"
@@ -55,7 +56,18 @@ inline oop CompressedOops::decode_not_null(narrowOop v) {
   assert(!is_null(v), "narrow oop value can never be zero");
   oop result = decode_raw(v);
   assert(is_object_aligned(result), "address not aligned: " INTPTR_FORMAT, p2i((void*) result));
-  assert(Universe::is_in_heap(result), "object not in heap " PTR_FORMAT, p2i((void*) result));
+#ifdef TERA_MAJOR_GC
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::is_in_heap(result) || Universe::is_obj_in_h2(result), "object not in H1 and not in H2 " PTR_FORMAT, p2i((void*) result));
+      }
+      else {
+        assert(Universe::is_in_heap(result), "object not in heap " PTR_FORMAT, p2i((void*) result));
+      }
+    );
+#else
+        assert(Universe::is_in_heap(result), "object not in heap " PTR_FORMAT, p2i((void*) result));
+#endif
   return result;
 }
 
@@ -79,7 +91,18 @@ inline narrowOop CompressedOops::encode(oop v) {
 }
 
 inline oop CompressedOops::decode_not_null(oop v) {
+#ifdef TERA_MAJOR_GC
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::is_in_heap(v) || Universe::is_obj_in_h2(v), "object not in heap " PTR_FORMAT, p2i((void*) v));
+      }
+      else {
+        assert(Universe::is_in_heap(v), "object not in heap " PTR_FORMAT, p2i((void*) v));
+      }
+    );
+#else
   assert(Universe::is_in_heap(v), "object not in heap " PTR_FORMAT, p2i((void*) v));
+#endif
   return v;
 }
 

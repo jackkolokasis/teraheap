@@ -144,6 +144,10 @@ static void steal_work(TaskTerminator& terminator, uint worker_id) {
 class PSIsAliveClosure: public BoolObjectClosure {
 public:
   bool do_object_b(oop p) {
+#ifdef TERA_MINOR_GC
+    if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(p))
+      return true;
+#endif //TERA_MINOR_GC
     return (!PSScavenge::is_obj_in_young(p)) || p->is_forwarded();
   }
 };
@@ -256,8 +260,14 @@ bool PSScavenge::invoke() {
     full_gc_done = PSParallelCompact::invoke_no_policy(clear_all_softrefs);
   }
 
+#ifdef TERA_MINOR_GC
+  if (EnableTeraHeap)
+	  Universe::teraHeap()->h2_clear_back_ref_stacks();
+#endif //TERA_MINOR_GC
+
   return full_gc_done;
 }
+
 
 class PSThreadRootsTaskClosure : public ThreadClosure {
   uint _worker_id;
@@ -315,6 +325,39 @@ public:
       assert(_old_gen->object_space()->contains(_gen_top) || _gen_top == _old_gen->object_space()->top(), "Sanity");
       assert(worker_id < ParallelGCThreads, "Sanity");
 
+#ifdef TERA_MINOR_GC
+      {
+        if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty()) {
+          struct timeval start_time;
+          struct timeval end_time;
+          uint64_t ellapsed_time;
+
+          if (TeraHeapStatistics)
+            gettimeofday(&start_time, NULL);
+
+          PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(worker_id);
+          PSCardTable* card_table = ParallelScavengeHeap::heap()->card_table();
+
+          card_table->h2_scavenge_contents_parallel(Universe::teraHeap()->h2_start_array(),
+                                                    (HeapWord *)Universe::teraHeap()->h2_top_addr(),
+                                                    pm,
+                                                    worker_id,
+                                                    _active_workers,
+                                                    true);
+          if (TeraHeapStatistics) {
+            gettimeofday(&end_time, NULL);
+
+            ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
+              ((end_time.tv_usec - start_time.tv_usec) / 1000);
+
+            Universe::teraHeap()->h2_back_ref_traversal_time(worker_id, ellapsed_time);
+          }
+
+          // Do the real work
+          pm->drain_stacks(false);
+        }
+      }
+#endif //TERA_MINOR_GC
       {
         PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(worker_id);
         PSCardTable* card_table = ParallelScavengeHeap::heap()->card_table();
@@ -358,6 +401,62 @@ public:
   }
 };
 
+class H2ScavengeRootsTask : public AbstractGangTask {
+  uint _active_workers;
+  TaskTerminator _terminator;
+
+public:
+  H2ScavengeRootsTask(uint active_workers) :
+      AbstractGangTask("ScavengeRootsTask"),
+      _active_workers(active_workers),
+      _terminator(active_workers, PSPromotionManager::vm_thread_promotion_manager()->stack_array_depth()) {
+  }
+
+  virtual void work(uint worker_id) {
+    ResourceMark rm;
+
+    assert(worker_id < ParallelGCThreads, "Sanity");
+
+    {
+      struct timeval start_time;
+      struct timeval end_time;
+      uint64_t ellapsed_time;
+          
+      if (TeraHeapStatistics)
+        gettimeofday(&start_time, NULL);
+
+      PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(worker_id);
+      PSCardTable* card_table = ParallelScavengeHeap::heap()->card_table();
+
+      card_table->h2_scavenge_contents_parallel(Universe::teraHeap()->h2_start_array(),
+                                                (HeapWord *)Universe::teraHeap()->h2_top_addr(),
+                                                pm,
+                                                worker_id,
+                                                _active_workers,
+                                                false);
+      if (TeraHeapStatistics) {
+        gettimeofday(&end_time, NULL);
+
+        ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
+          ((end_time.tv_usec - start_time.tv_usec) / 1000);
+
+        Universe::teraHeap()->h2_back_ref_traversal_time(worker_id, ellapsed_time);
+      }
+
+      // Do the real work
+      pm->drain_stacks(false);
+    }
+    
+    // If active_workers can exceed 1, add a steal_work().
+    // PSPromotionManager::drain_stacks_depth() does not fully drain its
+    // stacks and expects a steal_work() to complete the draining if
+    // ParallelGCThreads is > 1.
+    if (_active_workers > 1) {
+      steal_work(_terminator, worker_id);
+    }
+  }
+};
+
 // This method contains no policy. You should probably
 // be calling invoke() instead.
 bool PSScavenge::invoke_no_policy() {
@@ -392,6 +491,30 @@ bool PSScavenge::invoke_no_policy() {
   PSYoungGen* young_gen = heap->young_gen();
   PSOldGen* old_gen = heap->old_gen();
   PSAdaptiveSizePolicy* size_policy = heap->size_policy();
+
+#ifdef TERA_MINOR_GC
+  PSCardTable *ct = ParallelScavengeHeap::heap()->card_table();
+  static bool first_minor_gc = true;
+
+  if (EnableTeraHeap) {
+	  // In the first minor collection make all the cells in the teracache card
+	  // table to be clean. We note that the default value of the card
+	  // table during initialization is dirty. Thus increase the overhead of
+	  // traversing the card tables in teraCache.
+	  if (first_minor_gc) {
+		  ct->th_clean_cards(
+				  (HeapWord *) Universe::teraHeap()->h2_start_addr(), 
+				  (HeapWord *) Universe::teraHeap()->h2_end_addr() - 1);
+		  first_minor_gc = false;
+	  }
+
+    if (TeraHeapCardStatistics) {
+      ct->th_num_dirty_cards(
+          (HeapWord*)Universe::teraHeap()->h2_start_addr(),
+          (HeapWord *) Universe::teraHeap()->h2_top_addr(), true);
+    }
+  }
+#endif //TERA_MINOR_GC
 
   heap->increment_total_collections();
 
@@ -701,8 +824,66 @@ bool PSScavenge::invoke_no_policy() {
 
   _gc_tracer.report_gc_end(_gc_timer.gc_end(), _gc_timer.time_partitions());
 
+#ifdef TERA_MINOR_GC
+  if (EnableTeraHeap) {
+    // Give advise to kernel to prefetch pages for TeraCache sequentially
+    Universe::teraHeap()->h2_enable_seq_faults();
+
+    // Print statistics for TeraCache
+    if (TeraHeapStatistics)
+      Universe::teraHeap()->print_minor_gc_statistics();
+
+    if (TeraHeapCardStatistics) {
+      ct->th_num_dirty_cards(
+          (HeapWord*)Universe::teraHeap()->h2_start_addr(),
+          (HeapWord *) Universe::teraHeap()->h2_top_addr(), false);
+    }
+  }
+#endif
+
   return !promotion_failure_occurred;
 }
+
+#ifdef TERA_MINOR_GC
+// Scavenge only the dirty objects in H2 TeraHeap. We use this
+// function in case where we perform directly major gc without
+// performing minor gc. So using this function we identify backward
+// references (from H2 to H1) to use them during major gc.
+void PSScavenge::h2_scavenge_back_references() {
+  struct timeval start_time;
+  struct timeval end_time;
+
+  assert(Universe::teraHeap()->h2_is_empty_back_ref_stacks(), "Backward stack should be empty");
+
+  if (Universe::teraHeap()->h2_is_empty())
+    return;
+
+  if (TeraHeapStatistics) 
+    gettimeofday(&start_time, NULL);
+    
+  const uint active_workers =
+    WorkerPolicy::calc_active_workers(ParallelScavengeHeap::heap()->workers().total_workers(),
+                                      ParallelScavengeHeap::heap()->workers().active_workers(),
+                                      Threads::number_of_non_daemon_threads());
+  ParallelScavengeHeap::heap()->workers().update_active_workers(active_workers);
+    
+  PSPromotionManager* promotion_manager = PSPromotionManager::vm_thread_promotion_manager();
+  {
+    H2ScavengeRootsTask task(active_workers);
+    ParallelScavengeHeap::heap()->workers().run_task(&task);
+  }
+    
+  //PSPromotionManager::post_scavenge(_gc_tracer);
+
+  if (TeraHeapStatistics) {
+    gettimeofday(&end_time, NULL);
+
+    thlog_or_tty->print_cr("[STATISTICS] | PHASE0 = %llu\n",
+                           (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                           (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+  }
+}
+#endif //TERA_MINOR_GC
 
 // This method iterates over all objects in the young generation,
 // removing all forwarding references. It then restores any preserved marks.

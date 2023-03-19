@@ -33,6 +33,8 @@
 #include "gc/shared/oopStorageSet.hpp"
 #include "gc/shared/weakProcessorTimes.hpp"
 #include "gc/shared/workgroup.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
+#include "memory/universe.hpp"
 #include "prims/resolvedMethodTable.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/enumIterator.hpp"
@@ -59,6 +61,11 @@ public:
 
   void do_oop(oop* p) {
     oop obj = *p;
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap && obj != NULL && Universe::teraHeap()->is_obj_in_h2(obj)) {
+      Universe::teraHeap()->mark_used_region(cast_from_oop<HeapWord *>(obj));
+    }
+#endif
     if (obj == NULL) {
       ++_old_dead;
     } else if (_is_alive->do_object_b(obj)) {

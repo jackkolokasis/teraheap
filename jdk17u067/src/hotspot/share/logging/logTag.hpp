@@ -72,6 +72,7 @@
   LOG_TAG(event) \
   LOG_TAG(exceptions) \
   LOG_TAG(exit) \
+  LOG_TAG(fdtable) \
   LOG_TAG(fingerprint) \
   DEBUG_ONLY(LOG_TAG(foreign)) \
   LOG_TAG(free) \
@@ -180,6 +181,7 @@
   LOG_TAG(system) \
   LOG_TAG(table) \
   LOG_TAG(task) \
+  LOG_TAG(teraheap) \
   DEBUG_ONLY(LOG_TAG(test)) \
   LOG_TAG(thread) \
   LOG_TAG(throttle) \

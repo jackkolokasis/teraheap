@@ -26,6 +26,7 @@
 #include "cds/heapShared.inline.hpp"
 #include "classfile/altHashing.hpp"
 #include "classfile/javaClasses.inline.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/access.inline.hpp"
@@ -100,9 +101,22 @@ intptr_t oopDesc::slow_identity_hash() {
 
 // used only for asserts and guarantees
 bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap) {
+    if (!Universe::heap()->is_oop(obj) && !Universe::teraHeap()->is_obj_in_h2(obj)) {
+      return false;
+    }
+  }
+  else {
+    if (!Universe::heap()->is_oop(obj)) {
+      return false;
+    }
+  }
+#else
   if (!Universe::heap()->is_oop(obj)) {
     return false;
   }
+#endif
 
   // Header verification: the mark is typically non-zero. If we're
   // at a safepoint, it must not be zero.

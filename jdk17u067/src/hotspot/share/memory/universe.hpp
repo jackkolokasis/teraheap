@@ -39,6 +39,7 @@
 // support is provided. Allocation by the interpreter and compiled code is done inline
 // and bails out to Scavenge::invoke_and_allocate.
 
+class TeraHeap;
 class CollectedHeap;
 class DeferredObjAllocEvent;
 class OopStorage;
@@ -141,6 +142,9 @@ class Universe: AllStatic {
 
   // The particular choice of collected heap.
   static CollectedHeap* _collectedHeap;
+  
+  // The instance for H2 - TeraHeap
+  static TeraHeap *_teraHeap;
 
   static intptr_t _non_oop_bits;
 
@@ -299,7 +303,14 @@ class Universe: AllStatic {
 
   // The particular choice of collected heap.
   static CollectedHeap* heap() { return _collectedHeap; }
+  
+  // Accessor of teraHeap
+  static TeraHeap *teraHeap() { return _teraHeap; }
 
+  DEBUG_ONLY(static bool is_in_h2_or_null(const void* p));
+  DEBUG_ONLY(static bool is_in_h2(const void* p));
+  DEBUG_ONLY(static bool is_obj_in_h2(const oop obj);)
+  DEBUG_ONLY(static bool is_in_h2_or_null(const oop obj) { return obj == NULL || is_obj_in_h2(obj); })
   DEBUG_ONLY(static bool is_gc_active();)
   DEBUG_ONLY(static bool is_in_heap(const void* p);)
   DEBUG_ONLY(static bool is_in_heap_or_null(const void* p) { return p == NULL || is_in_heap(p); })

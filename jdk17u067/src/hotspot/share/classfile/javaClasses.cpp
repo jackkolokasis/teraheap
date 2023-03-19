@@ -277,6 +277,9 @@ Handle java_lang_String::basic_create(int length, bool is_latin1, TRAPS) {
   // and the char array it points to end up in the same cache line.
   oop obj;
   obj = vmClasses::String_klass()->allocate_instance(CHECK_NH);
+#ifdef TERA_FLAG
+  DEBUG_ONLY(if (EnableTeraHeap) {assert(obj->get_obj_state() == INIT_TF, "Sanity Check");});
+#endif // TERA_FLAG
 
   // Create the char array.  The String object must be handlized here
   // because GC can happen as a result of the allocation attempt.

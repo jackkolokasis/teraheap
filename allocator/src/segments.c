@@ -542,7 +542,7 @@ bool is_region_start(char *obj){
  */
 void enable_region_groups(char *obj){
   region_enabled = ((uint64_t)(obj - region_array[0].start_address)) / ((uint64_t) REGION_SIZE);
-  assertf(region_enabled > 0 && region_enabled < INT32_MAX, "Sanity check for overflow");
+  assertf(region_enabled >= 0 && region_enabled < INT32_MAX, "Sanity check for overflow");
 }
 
 /*
@@ -550,7 +550,7 @@ void enable_region_groups(char *obj){
  */
 void disable_region_groups(void){
   region_enabled = REGION_ARRAY_SIZE;
-  assertf(region_enabled > 0 && region_enabled < INT32_MAX, "Sanity check for overflow");
+  assertf(region_enabled >= 0 && region_enabled < INT32_MAX, "Sanity check for overflow");
 }
 
 
@@ -597,6 +597,10 @@ char *get_first_object(char *addr) {
 
 int get_num_of_continuous_regions(char *addr){
   uint64_t seg = (addr - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
+
+  if (region_array[seg].last_allocated_end == region_array[seg].start_address)
+    return 0;
+
   return ((region_array[seg].last_allocated_end - region_array[seg].first_allocated_start) % (uint64_t)REGION_SIZE != 0) ? 
   (region_array[seg].last_allocated_end - region_array[seg].first_allocated_start) / (uint64_t)REGION_SIZE + 1 :
   (region_array[seg].last_allocated_end - region_array[seg].first_allocated_start) / (uint64_t)REGION_SIZE ; 

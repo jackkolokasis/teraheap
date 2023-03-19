@@ -469,7 +469,16 @@ void JNIHandleBlock::oops_do(OopClosure* f) {
 
 
 jobject JNIHandleBlock::allocate_handle(oop obj, AllocFailType alloc_failmode) {
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::heap()->is_in(obj) || Universe::is_obj_in_h2(obj), "sanity check");
+      } else {
+        assert(Universe::heap()->is_in(obj), "sanity check");
+      });
+#else
   assert(Universe::heap()->is_in(obj), "sanity check");
+#endif
   if (_top == 0) {
     // This is the first allocation or the initial block got zapped when
     // entering a native function. If we have any following blocks they are

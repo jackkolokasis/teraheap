@@ -3419,6 +3419,33 @@ public final class Unsafe {
     @IntrinsicCandidate
     public native void fullFence();
 
+  /**
+   * Mark object and move it in the next full GC in H2 - TeraHeap
+   *
+   * @param o object/array to update tera mark word
+   * @param label of the marking object
+   * @param partId partition id of the marking object
+   */
+  public native void h2TagAndMoveRoot(Object o, long label, long partId);
+  
+  /**
+   * Mark root object to be moved in H2 - TeraHeap. Object will be
+   * moved only after calling h2Move().
+   *
+   * @param o object/array to update tera mark word
+   * @param label of the marking object
+   * @param partId partition id of the marking object
+   */
+  public native void h2TagRoot(Object o, long label, long partId);
+  
+  /**
+   * Move all objects with the specific label in H2 - TeraHeap. Object
+   * will be moved in H2 in the next full GC.
+   *
+   * @param label of the marking object
+   */
+  public native void h2Move(long label);
+
     /**
      * Ensures that loads before the fence will not be reordered with
      * loads after the fence.

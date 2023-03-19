@@ -28,7 +28,9 @@
 #include "gc/shared/cardTableBarrierSet.hpp"
 #include "gc/shared/c2/cardTableBarrierSetC2.hpp"
 #include "gc/shared/gc_globals.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "opto/arraycopynode.hpp"
+#include "opto/runtime.hpp"
 #include "opto/graphKit.hpp"
 #include "opto/idealKit.hpp"
 #include "opto/macro.hpp"
@@ -86,21 +88,110 @@ void CardTableBarrierSetC2::post_barrier(GraphKit* kit,
   assert(adr != NULL, "");
 
   IdealKit ideal(kit, true);
+  Node* no_base =  __ top();
 
   // Convert the pointer to an int prior to doing math on it
   Node* cast = __ CastPX(__ ctrl(), adr);
+  Node* card_adr = NULL;
+  Node* card_offset = NULL;
 
+#ifdef TERA_C2
   // Divide by card size
-  Node* card_offset = __ URShiftX(cast, __ ConI(CardTable::card_shift));
+  card_offset = __ URShiftX(cast, __ ConI(CardTable::card_shift));
+  
+  // Get the alias_index for raw card-mark memory
+  int adr_type = Compile::AliasIdxRaw;
+  // Dirty card value to store
+  Node* dirty = __ ConI(CardTable::dirty_card_val());
 
-  // Combine card table base and card offset
-  Node* card_adr = __ AddP(__ top(), byte_map_base_node(kit), card_offset);
+  if (EnableTeraHeap) {
+#ifdef C2_ONLY_LEAF_CALL
 
+    const TypeFunc *tf = OptoRuntime::h2_wb_post_Type();
+    __ make_leaf_call(tf,  CAST_FROM_FN_PTR(address, SharedRuntime::h2_wb_post), "h2_wb_post", adr);
+
+#else
+    Node* tc_adr = __ makecon(
+        TypeRawPtr::make((address)Universe::teraHeap()->h2_start_addr()));
+    Node* tc_cast = __ CastPX(__ ctrl(), tc_adr);
+    
+    assert(adr->bottom_type()->isa_ptr() != NULL, "Error");
+    assert(tc_adr->bottom_type()->isa_ptr() != NULL, "Error");
+    
+    Node* t = kit->gvn().transform(new SubXNode(cast, tc_cast));
+    
+   __ if_then(t, BoolTest::lt, __ ConX(0)); {
+
+      // Combine Heap card table base and card offset and mark card as dirty
+      card_adr =  __ AddP(no_base, byte_map_base_node(kit), card_offset);
+  
+      if (UseCondCardMark) {
+        // The classic GC reference write barrier is typically implemented
+        // as a store into the global card mark table.  Unfortunately
+        // unconditional stores can result in false sharing and excessive
+        // coherence traffic as well as false transactional aborts.
+        // UseCondCardMark enables MP "polite" conditional card mark
+        // stores.  In theory we could relax the load from ctrl() to
+        // no_ctrl, but that doesn't buy much latitude.
+        Node* card_val = __ load( __ ctrl(), card_adr, TypeInt::BYTE, T_BYTE, adr_type);
+        __ if_then(card_val, BoolTest::ne, dirty);
+      }
+
+      // Smash dirty value into card
+      __ store(__ ctrl(), card_adr, dirty, T_BYTE, adr_type, MemNode::unordered);
+
+      if (UseCondCardMark) {
+        __ end_if();
+      }
+    } __ else_(); {
+
+      // Mark tera card as dirty
+      const TypeFunc *tf = OptoRuntime::h2_wb_post_Type();
+      __ make_leaf_call(tf,  CAST_FROM_FN_PTR(address, SharedRuntime::h2_wb_post), "h2_wb_post", adr);
+
+    } __ end_if();
+
+#endif // C2_ONLY_LEAF_CALL
+    // Final sync IdealKit and GraphKit.
+    kit->final_sync(ideal);
+  } else {
+    // Combine card table base and card offset
+    card_adr = __ AddP(__ top(), byte_map_base_node(kit), card_offset);
+  
+    if (UseCondCardMark) {
+      // The classic GC reference write barrier is typically implemented
+      // as a store into the global card mark table.  Unfortunately
+      // unconditional stores can result in false sharing and excessive
+      // coherence traffic as well as false transactional aborts.
+      // UseCondCardMark enables MP "polite" conditional card mark
+      // stores.  In theory we could relax the load from ctrl() to
+      // no_ctrl, but that doesn't buy much latitude.
+      Node* card_val = __ load( __ ctrl(), card_adr, TypeInt::BYTE, T_BYTE, adr_type);
+      __ if_then(card_val, BoolTest::ne, dirty);
+    }
+
+    // Smash dirty value into card
+    __ store(__ ctrl(), card_adr, dirty, T_BYTE, adr_type, MemNode::unordered);
+
+    if (UseCondCardMark) {
+      __ end_if();
+    }
+
+    // Final sync IdealKit and GraphKit.
+    kit->final_sync(ideal);
+  }
+#else
+  // Divide by card size
+  card_offset = __ URShiftX(cast, __ ConI(CardTable::card_shift));
+  
   // Get the alias_index for raw card-mark memory
   int adr_type = Compile::AliasIdxRaw;
 
   // Dirty card value to store
   Node* dirty = __ ConI(CardTable::dirty_card_val());
+
+  // Combine card table base and card offset
+  card_adr = __ AddP(__ top(), byte_map_base_node(kit), card_offset);
 
   if (UseCondCardMark) {
     // The classic GC reference write barrier is typically implemented
@@ -123,6 +214,8 @@ void CardTableBarrierSetC2::post_barrier(GraphKit* kit,
 
   // Final sync IdealKit and GraphKit.
   kit->final_sync(ideal);
+
+#endif // TERA_C2
 }
 
 void CardTableBarrierSetC2::clone(GraphKit* kit, Node* src, Node* dst, Node* size, bool is_array) const {

@@ -162,6 +162,10 @@ Mutex*   Bootclasspath_lock           = NULL;
 Monitor* JVMCI_lock                   = NULL;
 #endif
 
+#ifdef TERA_MINOR_GC
+Mutex*   tera_heap_lock              = NULL;
+Mutex*   tera_heap_group_lock        = NULL;
+#endif // TERA_MINOR_GC
 
 #define MAX_NUM_MUTEX 128
 static Mutex* _mutex_array[MAX_NUM_MUTEX];
@@ -229,6 +233,14 @@ void mutex_init() {
 
     def(MonitoringSupport_lock     , PaddedMutex  , native   ,   true,  _safepoint_check_never);      // used for serviceability monitoring support
   }
+
+#ifdef TERA_MINOR_GC
+  if (EnableTeraHeap) {
+    def(tera_heap_lock              , Mutex  , leaf    ,    true, _safepoint_check_always); // Used for Teraheap backward reference stacks
+    def(tera_heap_group_lock        , Mutex  , leaf    ,    true, _safepoint_check_always); // Used for TeraHeap region groupping
+  }
+#endif // TERA_MINOR_GC
+
   def(StringDedup_lock             , PaddedMonitor, leaf,        true,  _safepoint_check_never);
   def(StringDedupIntern_lock       , PaddedMutex  , leaf,        true,  _safepoint_check_never);
   def(ParGCRareEvent_lock          , PaddedMutex  , leaf,        true,  _safepoint_check_always);

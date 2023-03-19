@@ -27,6 +27,7 @@
 
 #include "memory/iterator.hpp"
 #include "memory/memRegion.hpp"
+#include "memory/sharedDefines.h"
 #include "oops/accessDecorators.hpp"
 #include "oops/markWord.hpp"
 #include "oops/metadata.hpp"
@@ -57,9 +58,61 @@ class oopDesc {
     narrowKlass _compressed_klass;
   } _metadata;
 
+#ifdef TERA_FLAG
+  // TeraFlag word is used by the TeraCache. TeraFlag is a 64-bit word and is
+  // divided in three parts:
+  //
+  //+-------+----------------------------------------------------------------+
+  //| Bits  | Description                                                    |
+  //+-------+----------------------------------------------------------------+
+  //| 63-48 | Represent the RDD partition Id                                 |
+  //+-------+----------------------------------------------------------------+
+  //| 32-47 | Represent the RDD Id											 |
+  //+-------+----------------------------------------------------------------+
+  //| 31-0  | Represent the state of the object                              |
+  //+-------+----------------------------------------------------------------+
+
+  volatile int64_t _tera_flag;      //< MarkTeracache objects
+#endif // TERA_FLAG
+
  public:
   inline markWord  mark()          const;
   inline markWord* mark_addr() const;
+
+#ifdef TERA_FLAG
+  // Mark an object with 'id' to be moved in H2. H2 allocator uses the
+  // 'id' to locate objects with the same 'id' by to the same region.
+  // 'id' is defined by the application.
+  inline void mark_move_h2(uint64_t rdd_id, uint64_t part_id);
+
+  // Check if an object is marked to be moved in H2
+  inline bool is_marked_move_h2();
+
+  // Mark this object that is located in TeraCache
+  inline void set_in_h2();
+
+  // Get the state of the object
+  inline uint64_t get_obj_state();
+  
+  // Init the object state 
+  inline void init_obj_state();
+
+  // Get the object group id
+  inline int get_obj_group_id();
+
+  // Get object partition Id
+  inline uint64_t get_obj_part_id();
+
+  inline bool is_live();
+
+  inline void reset_live();
+
+  inline void set_live();
+
+  inline void set_visited();
+
+  inline bool is_visited();
+#endif // TERA_FLAG
 
   inline void set_mark(markWord m);
   static inline void set_mark(HeapWord* mem, markWord m);
@@ -305,8 +358,23 @@ class oopDesc {
   static int klass_offset_in_bytes()     { return offset_of(oopDesc, _metadata._klass); }
   static int klass_gap_offset_in_bytes() {
     assert(has_klass_gap(), "only applicable to compressed klass pointers");
+#ifdef TERA_FLAG
+    return klass_offset_in_bytes() + sizeof(narrowKlass) + sizeof(int64_t);
+#else
     return klass_offset_in_bytes() + sizeof(narrowKlass);
+#endif
   }
+
+#ifdef TERA_FLAG
+  // 0 +-----------+
+  //   | _mark     |
+  // 8 +-----------+
+  //   | _klass    |
+  // 16+-----------+
+  //   | _tera_flag|
+  //   +-----------+
+  static int teraflag_offset_in_bytes() { return offset_of(oopDesc, _tera_flag); }
+#endif
 
   // for error reporting
   static void* load_klass_raw(oop obj);

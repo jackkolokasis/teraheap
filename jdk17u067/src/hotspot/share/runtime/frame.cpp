@@ -1001,7 +1001,16 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
     return NULL;
   }
   oop r = *oop_adr;
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(
+      if (EnableTeraHeap) {
+        assert(Universe::heap()->is_in_or_null(r) || Universe::is_in_h2_or_null(r), "bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", p2i(r), p2i(r));
+      } else {
+        assert(Universe::heap()->is_in_or_null(r), "bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", p2i(r), p2i(r));
+      });
+#else
   assert(Universe::heap()->is_in_or_null(r), "bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", p2i(r), p2i(r));
+#endif
   return r;
 }
 

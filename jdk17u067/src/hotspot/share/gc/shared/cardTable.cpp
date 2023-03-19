@@ -41,6 +41,52 @@ size_t CardTable::compute_byte_map_size() {
   return align_up(_guard_index + 1, MAX2(_page_size, granularity));
 }
 
+#ifdef TERA_CARDS
+size_t CardTable::th_compute_byte_map_size() {
+  assert(_th_guard_index == th_cards_required(_th_whole_heap.word_size()) - 1,
+         "unitialized, check declaration order");
+  assert(_th_page_size != 0, "unitialized, check declaration order");
+  const size_t granularity = os::vm_allocation_granularity();
+  return align_up(_th_guard_index + 1, MAX2(_th_page_size, granularity));
+}
+
+CardTable::CardTable(MemRegion whole_heap, MemRegion th_whole_heap) :
+  _whole_heap(whole_heap),
+  _guard_index(0),
+  _last_valid_index(0),
+  _page_size(os::vm_page_size()),
+  _byte_map_size(0),
+  _byte_map(NULL),
+  _byte_map_base(NULL),
+
+  // TeraHeap
+  _th_whole_heap(th_whole_heap),
+  _th_guard_index(0),
+  _th_last_valid_index(0),
+  _th_page_size(os::vm_page_size()),
+  _th_byte_map_size(0),
+  _th_byte_map(NULL),
+  _th_byte_map_base(NULL),
+  
+  _cur_covered_regions(0),
+  _covered(MemRegion::create_array(_max_covered_regions, mtGC)),
+  _committed(MemRegion::create_array(_max_covered_regions, mtGC)),
+
+  _guard_region(),
+  _th_guard_region()
+{
+  assert((uintptr_t(_whole_heap.start())  & (card_size - 1))  == 0, "heap must start at card boundary");
+  assert((uintptr_t(_whole_heap.end()) & (card_size - 1))  == 0, "heap must end at card boundary");
+  
+  assert((uintptr_t(_th_whole_heap.start()) & (th_card_size - 1)) == 0,
+         "heap must start at card boundary");
+
+  assert(card_size <= 512, "card_size must be less than 512"); // why?
+  assert(th_card_size <= (1 << TERA_CARD_SIZE),
+         "TeraCache card_size  must be less equall %d", (1 << TERA_CARD_SIZE));
+}
+#endif // TERA_CARDS
+
 CardTable::CardTable(MemRegion whole_heap) :
   _whole_heap(whole_heap),
   _guard_index(0),
@@ -49,6 +95,9 @@ CardTable::CardTable(MemRegion whole_heap) :
   _byte_map_size(0),
   _byte_map(NULL),
   _byte_map_base(NULL),
+#ifdef TERA_CARDS
+  _th_page_size(os::vm_page_size()),
+#endif
   _cur_covered_regions(0),
   _covered(MemRegion::create_array(_max_covered_regions, mtGC)),
   _committed(MemRegion::create_array(_max_covered_regions, mtGC)),
@@ -64,6 +113,54 @@ CardTable::~CardTable() {
   MemRegion::destroy_array(_covered, _max_covered_regions);
   MemRegion::destroy_array(_committed, _max_covered_regions);
 }
+
+#ifdef TERA_CARDS
+void CardTable::th_card_table_initialize() {
+  _th_guard_index = th_cards_required(_th_whole_heap.word_size()) - 1;
+  _th_last_valid_index = _th_guard_index - 1;
+  
+  _th_byte_map_size = th_compute_byte_map_size();
+  
+  HeapWord *th_low_bound = _th_whole_heap.start();
+  HeapWord *th_high_bound = _th_whole_heap.end();
+  
+  const size_t th_rs_align =
+    _th_page_size == (size_t)os::vm_page_size() ? 0 :
+    MAX2(_th_page_size, (size_t)os::vm_allocation_granularity());
+  
+  assert(_th_byte_map_size > 0, "_th_byte_map_size should not be zero");
+  ReservedSpace th_heap_rs(_th_byte_map_size, th_rs_align, _th_page_size);
+  MemTracker::record_virtual_memory_type((address)th_heap_rs.base(), mtGC);
+  os::trace_page_sizes("teraheap card table", _th_guard_index + 1,
+                       _th_guard_index + 1, _th_page_size, th_heap_rs.base(),
+                       th_heap_rs.size());
+  
+  if (!th_heap_rs.is_reserved()) {
+    vm_exit_during_initialization("Could not reserve enough space for the "
+                                  "card marking array");
+  }
+  
+  _th_byte_map = (CardValue *)th_heap_rs.base();
+  _th_byte_map_base = _th_byte_map - (uintptr_t(th_low_bound) >> th_card_shift);
+  
+  assert(byte_for(th_low_bound) == &_th_byte_map[0], "Checking start of map");
+  assert(byte_for(th_high_bound - 1) <= &_th_byte_map[_th_last_valid_index],
+         "Checking end of map");
+  
+  CardValue *th_guard_card = &_th_byte_map[_th_guard_index];
+  HeapWord* th_guard_page =
+      align_down((HeapWord*)th_guard_card, _th_page_size);
+  _th_guard_region = MemRegion(th_guard_page, _th_page_size);
+  os::commit_memory_or_exit((char *)th_guard_page, _th_page_size, _th_page_size,
+                            !ExecMem, "Teraheap card table last card");
+  *th_guard_card = last_card;
+  
+  log_trace(gc, barrier)("TeraCardTable::TeraCardTable: ");
+  log_trace(gc, barrier)("    &_th_byte_map[0]: " INTPTR_FORMAT "  &_th_byte_map[_th_last_valid_index]: " INTPTR_FORMAT,
+                  p2i(&_th_byte_map[0]), p2i(&_th_byte_map[_th_last_valid_index]));
+  log_trace(gc, barrier)("    _th_byte_map_base: " INTPTR_FORMAT, p2i(_th_byte_map_base));
+}
+#endif //TERA_CARDS
 
 void CardTable::initialize() {
   _guard_index = cards_required(_whole_heap.word_size()) - 1;
@@ -431,6 +528,12 @@ uintx CardTable::ct_max_alignment_constraint() {
   return card_size * os::vm_page_size();
 }
 
+#ifdef TERA_CARDS
+uint64_t CardTable::th_ct_max_alignment_constraint() {
+  return (uint64_t) th_card_size * (uint64_t) os::vm_page_size();
+}
+#endif //TERA_CARDS
+
 void CardTable::verify_guard() {
   // For product build verification
   guarantee(_byte_map[_guard_index] == last_card,
@@ -445,6 +548,69 @@ void CardTable::invalidate(MemRegion mr) {
     if (!mri.is_empty()) dirty_MemRegion(mri);
   }
 }
+
+#ifdef TERA_CARDS
+void CardTable::th_write_ref_field(void *obj) {
+  CardValue* card  = byte_for(obj);
+  *card = dirty_card;
+}
+
+void CardTable::th_clean_cards(HeapWord *start, HeapWord* end) {
+  assert((HeapWord*)align_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
+  assert((HeapWord*)align_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
+  CardValue* cur  = byte_for(start);
+  CardValue* last = byte_for(end);
+      
+  // H2 card table is reserved but memory is protected for reads and
+  // writes. We need to remove protection for the specific address
+  // range
+  os::protect_memory((char *) cur, (last-cur)-1, os::MEM_PROT_RW);
+
+  memset(cur, clean_card, (last-cur)-1);
+}
+
+void CardTable::th_num_dirty_cards(HeapWord *start, HeapWord* end, bool before) {
+	assert((HeapWord*)align_down((uintptr_t)start, HeapWordSize) == start, "Unaligned start");
+	assert((HeapWord*)align_up  ((uintptr_t)end,   HeapWordSize) == end,   "Unaligned end"  );
+	CardValue* cur  = byte_for(start);
+	CardValue* last = byte_after(end);
+
+	int num_dirty_card = 0;
+	int num_clean_card = 0;
+  int num_youngen_card = 0;
+  int num_oldgen_card = 0;
+
+  while (cur < last) { 
+    switch (*cur) {
+      case dirty_card:
+        num_dirty_card++;
+        break;
+      case (CardTable::CT_MR_BS_last_reserved + 1):
+        num_youngen_card++;
+        break;
+      case (CardTable::CT_MR_BS_last_reserved + 2):
+        num_oldgen_card++;
+        break;
+      default:
+        num_clean_card++;
+    }
+    cur++;
+  }
+
+	if (before)
+		thlog_or_tty->print_cr("BEFORE\n");
+	else 
+		thlog_or_tty->print_cr("AFTER\n");
+
+	thlog_or_tty->print_cr("\t\t DIRTY_CARDS  = %d\n", num_dirty_card);
+	thlog_or_tty->print_cr("\t\t YOUNGEN_CARD = %d\n", num_youngen_card);
+	thlog_or_tty->print_cr("\t\t OLDGEN_CARD  = %d\n", num_oldgen_card);
+	thlog_or_tty->print_cr("\t\t CLEAN_CARD   = %d\n", num_clean_card);
+	
+  // After minor gc the number of dirty cards should be zero
+  DEBUG_ONLY(if (!before) { assert(num_dirty_card == 0, "Dirty cards exists after minor gc");});
+}
+#endif // TERA_CARDS
 
 void CardTable::verify() {
   verify_guard();

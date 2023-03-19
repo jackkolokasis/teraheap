@@ -29,6 +29,7 @@
 #include "gc/parallel/psVirtualspace.hpp"
 #include "gc/shared/collectorCounters.hpp"
 #include "gc/shared/gcTrace.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "utilities/stack.hpp"
@@ -126,6 +127,18 @@ class PSScavenge: AllStatic {
 
   template <class T> static inline bool should_scavenge(T* p);
 
+#ifdef TERA_MINOR_GC
+  // Scavenge only the dirty objects in H2 TeraHeap. We use this
+  // function in case where we perform directly major gc without
+  // performing minor gc. So using this function we identify backward
+  // references (from H2 to H1) to use them during major gc.
+  static void h2_scavenge_back_references();
+  
+  template <class T> static inline bool h2_should_scavenge(T* p);
+
+  template <class T> static inline bool h2_should_trace(T* p);
+#endif //TERA_MINOR_GC
+
   // These call should_scavenge() above and, if it returns true, also check that
   // the object was not newly copied into to_space.  The version with the bool
   // argument is a convenience wrapper that fetches the to_space pointer from
@@ -137,17 +150,29 @@ class PSScavenge: AllStatic {
   // This assumes that the 'o' is in the heap,
   // so it only checks one side of the complete predicate.
 
+#ifdef TERA_MAJOR_GC
+  inline static bool is_obj_in_young(oop o) {
+    return EnableTeraHeap ? (cast_from_oop<HeapWord*>(o) >= _young_generation_boundary && !Universe::teraHeap()->is_obj_in_h2(o)) : cast_from_oop<HeapWord*>(o) >= _young_generation_boundary;
+  }
+#else
   inline static bool is_obj_in_young(oop o) {
     return cast_from_oop<HeapWord*>(o) >= _young_generation_boundary;
   }
+#endif // TERA_MAJOR_GC
 
   inline static bool is_obj_in_young(narrowOop o) {
     return (uintptr_t)o >= _young_generation_boundary_compressed;
   }
 
+#ifdef TERA_MAJOR_GC
+  inline static bool is_obj_in_young(HeapWord* o) {
+    return EnableTeraHeap ? (o >= _young_generation_boundary && !Universe::teraHeap()->is_in_h2(o)) : o >= _young_generation_boundary;
+  }
+#else
   inline static bool is_obj_in_young(HeapWord* o) {
     return o >= _young_generation_boundary;
   }
+#endif
 };
 
 #endif // SHARE_GC_PARALLEL_PSSCAVENGE_HPP

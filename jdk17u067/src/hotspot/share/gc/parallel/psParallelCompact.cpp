@@ -94,18 +94,25 @@
 // All sizes are in HeapWords.
 const size_t ParallelCompactData::Log2RegionSize  = 16; // 64K words
 const size_t ParallelCompactData::RegionSize      = (size_t)1 << Log2RegionSize;
-const size_t ParallelCompactData::RegionSizeBytes =
-  RegionSize << LogHeapWordSize;
+// 524288
+const size_t ParallelCompactData::RegionSizeBytes = RegionSize << LogHeapWordSize;
+//63
 const size_t ParallelCompactData::RegionSizeOffsetMask = RegionSize - 1;
+// 524287 or 0x7ffff
 const size_t ParallelCompactData::RegionAddrOffsetMask = RegionSizeBytes - 1;
+// 524288
 const size_t ParallelCompactData::RegionAddrMask       = ~RegionAddrOffsetMask;
 
 const size_t ParallelCompactData::Log2BlockSize   = 7; // 128 words
+// 128
 const size_t ParallelCompactData::BlockSize       = (size_t)1 << Log2BlockSize;
-const size_t ParallelCompactData::BlockSizeBytes  =
-  BlockSize << LogHeapWordSize;
+// 128*8 = 1024
+const size_t ParallelCompactData::BlockSizeBytes  = BlockSize << LogHeapWordSize;
+// 0x7F
 const size_t ParallelCompactData::BlockSizeOffsetMask = BlockSize - 1;
+// 0x3FF
 const size_t ParallelCompactData::BlockAddrOffsetMask = BlockSizeBytes - 1;
+// 1024
 const size_t ParallelCompactData::BlockAddrMask       = ~BlockAddrOffsetMask;
 
 const size_t ParallelCompactData::BlocksPerRegion = RegionSize / BlockSize;
@@ -552,6 +559,36 @@ void ParallelCompactData::add_obj(HeapWord* addr, size_t len)
   _region_data[end_region].set_partial_obj_addr(addr);
 }
 
+#ifdef TERA_MAJOR_GC
+void ParallelCompactData::remove_obj(HeapWord* addr, size_t len) {
+  const size_t obj_ofs = pointer_delta(addr, _region_start);
+  const size_t beg_region = obj_ofs >> Log2RegionSize;
+  // end_region is inclusive
+  const size_t end_region = (obj_ofs + len - 1) >> Log2RegionSize;
+
+  if (beg_region == end_region) {
+    // All in one region.
+    _region_data[beg_region].remove_live_obj(len);
+    return;
+  }
+  
+  // First region.
+  const size_t beg_ofs = region_offset(addr);
+  _region_data[beg_region].remove_live_obj(RegionSize - beg_ofs);
+
+  // Middle regions--completely spanned by this object.
+  for (size_t region = beg_region + 1; region < end_region; ++region) {
+    _region_data[region].unset_partial_obj_size(RegionSize);
+    _region_data[region].unset_partial_obj_addr(addr);
+  }
+
+  // Last region.
+  const size_t end_ofs = region_offset(addr + len - 1);
+  _region_data[end_region].unset_partial_obj_size(end_ofs + 1);
+  _region_data[end_region].unset_partial_obj_addr(addr);
+}
+#endif
+
 void
 ParallelCompactData::summarize_dense_prefix(HeapWord* beg, HeapWord* end)
 {
@@ -682,28 +719,161 @@ ParallelCompactData::summarize_split_space(size_t src_region,
   return source_next;
 }
 
+#ifdef TERA_MAJOR_GC
+
+void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
+                                                          HeapWord* source_end,
+                                                          ParMarkBitMap mark_bitmap,
+                                                          ParallelCompactData summary_data) {
+  // Get the start region the space
+  size_t cur_region = addr_to_region_idx(source_beg);
+  // Get the last region of the top pointer of the region
+  const size_t end_region = addr_to_region_idx(region_align_up(source_end));
+
+  while (cur_region < end_region) {
+    HeapWord *beg_addr = region_to_addr(cur_region);
+    size_t end_bit = mark_bitmap.addr_to_bit(beg_addr + ParallelCompactData::RegionSize);
+    // The bitmap routines require the right boundary to be word-aligned.
+    size_t range_end = mark_bitmap.align_range_end(end_bit);
+    size_t beg_bit = mark_bitmap.find_h2_candidate(mark_bitmap.addr_to_bit(beg_addr), range_end);
+    size_t region_size = _region_data[cur_region].data_size();
+
+    // Get the forwarding table of the region
+    TeraForwardingTable *fd_table = _region_data[cur_region].get_forwarding_table();
+
+    // Create a forwarding table only for the regions that have H2
+    // candidate objects. Reduce the number of metadata.
+    if (beg_bit < range_end) {
+      assert(fd_table == NULL, "Sanity check");
+      fd_table = new TeraForwardingTable();
+    }
+
+    while (beg_bit < range_end) {
+      HeapWord *h1_addr = mark_bitmap.bit_to_addr(beg_bit);
+      oop obj = cast_to_oop(h1_addr);
+      assert(obj->is_marked_move_h2(), "H1: %p | TF = %lu\n", h1_addr, obj->get_obj_state());
+      size_t size = obj->size();
+      // Get the last bit where the object ends
+      size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
+
+      // Get the new object location in H2 and create an entry in the forwarding table
+      HeapWord* h2_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(obj, size);
+      fd_table->add(h1_addr, h2_addr);
+      assert(h2_addr == fd_table->find(h1_addr)->literal(), "Sanity check");
+
+      // Clear the bits from obj_beg and obj_end bitmaps. We mark the
+      // H2 candidate objects as dead to exclude them from the summary
+      // phase calculations of H1.
+      mark_bitmap.unmark_obj(obj, size);
+      summary_data.remove_obj(obj, size);
+
+      if (tmp_end >= range_end)
+        break;
+
+      beg_bit = mark_bitmap.find_h2_candidate(tmp_end + 1, range_end);
+    }
+    _region_data[cur_region].set_forwarding_table(fd_table);
+    assert(_region_data[cur_region].data_size() <= region_size,
+           "Region size differ, size before = %lu and size after = %lu", region_size, _region_data[cur_region].data_size());
+    ++cur_region;
+  }
+}
+
+void ParallelCompactData::compact_h2_candidate_objects(HeapWord* source_beg,
+                                                       HeapWord* source_end,
+                                                       ParMarkBitMap mark_bitmap,
+                                                       ParCompactionManager *cm) {
+  // Get the start region the space
+  size_t cur_region = addr_to_region_idx(source_beg);
+  // Get the last region of the top pointer of the region
+  const size_t end_region = addr_to_region_idx(region_align_up(source_end));
+
+  while (cur_region < end_region) {
+    HeapWord *beg_addr = region_to_addr(cur_region);
+    size_t end_bit = mark_bitmap.addr_to_bit(beg_addr + ParallelCompactData::RegionSize);
+    // The bitmap routines require the right boundary to be word-aligned.
+    size_t range_end = mark_bitmap.align_range_end(end_bit);
+    size_t beg_bit = mark_bitmap.find_h2_candidate(mark_bitmap.addr_to_bit(beg_addr), range_end);
+
+    // Get the forwarding table of the region
+    TeraForwardingTable *fd_table = _region_data[cur_region].get_forwarding_table();
+
+    while (beg_bit < range_end) {
+      assert(fd_table != NULL, "Should be not null");
+      HeapWord *h1_addr = mark_bitmap.bit_to_addr(beg_bit);
+      HeapWord *h2_addr = fd_table->find(h1_addr)->literal();
+      oop obj = cast_to_oop(h1_addr);
+      assert(h2_addr != NULL, "fd_table->find(h1_addr)->literal()");
+      assert(obj->is_marked_move_h2(), "H1: %p | TF = %lu\n", h1_addr, obj->get_obj_state());
+      size_t size = obj->size();
+      size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
+
+      // Enable grouping of objects
+      Universe::teraHeap()->enable_groups(h1_addr, h2_addr);
+      cm->update_contents(obj);
+      Universe::teraHeap()->disable_groups();
+
+      // Move objects to H2
+      Universe::teraHeap()->h2_move_obj(h1_addr, h2_addr, size);
+
+      if (tmp_end >= range_end)
+        break;
+
+      // Find the next H2 candidate
+      beg_bit = mark_bitmap.find_h2_candidate(tmp_end + 1, range_end);
+    }
+    ++cur_region;
+  }
+}
+
+void ParallelCompactData::clear_fwd_table(HeapWord* source_beg, HeapWord* source_end, ParMarkBitMap mark_bitmap) {
+  // Get the start region the space
+  size_t cur_region = addr_to_region_idx(source_beg);
+  // Get the last region of the top pointer of the region
+  const size_t end_region = addr_to_region_idx(region_align_up(source_end));
+
+  while (cur_region < end_region) {
+    TeraForwardingTable *fd_table = _region_data[cur_region].get_forwarding_table();
+
+    if (fd_table != NULL) {
+      delete fd_table;
+      fd_table = NULL;
+    }
+
+    ++cur_region;
+  }
+}
+
+#endif //TERA_MAJOR_GC
+
 bool ParallelCompactData::summarize(SplitInfo& split_info,
                                     HeapWord* source_beg, HeapWord* source_end,
                                     HeapWord** source_next,
                                     HeapWord* target_beg, HeapWord* target_end,
                                     HeapWord** target_next)
 {
-  HeapWord* const source_next_val = source_next == NULL ? NULL : *source_next;
+  HeapWord* const source_next_val = (source_next == NULL) ? NULL : *source_next;
   log_develop_trace(gc, compaction)(
       "sb=" PTR_FORMAT " se=" PTR_FORMAT " sn=" PTR_FORMAT
       "tb=" PTR_FORMAT " te=" PTR_FORMAT " tn=" PTR_FORMAT,
       p2i(source_beg), p2i(source_end), p2i(source_next_val),
       p2i(target_beg), p2i(target_end), p2i(*target_next));
 
+  // Get the start region that address belongs to
   size_t cur_region = addr_to_region_idx(source_beg);
+  // Get the last region
   const size_t end_region = addr_to_region_idx(region_align_up(source_end));
 
+  // If target_beg == space->bottom_addr then the destination address
+  // is the start of the heap
   HeapWord *dest_addr = target_beg;
   while (cur_region < end_region) {
     // The destination must be set even if the region has no data.
     _region_data[cur_region].set_destination(dest_addr);
 
+    // Calculate the number of live bytes
     size_t words = _region_data[cur_region].data_size();
+
     if (words > 0) {
       // If cur_region does not fit entirely into the target space, find a point
       // at which the source space can be 'split' so that part is copied to the
@@ -773,10 +943,19 @@ bool ParallelCompactData::summarize(SplitInfo& split_info,
 HeapWord* ParallelCompactData::calc_new_pointer(HeapWord* addr, ParCompactionManager* cm) const {
   assert(addr != NULL, "Should detect NULL oop earlier");
   assert(ParallelScavengeHeap::heap()->is_in(addr), "not in heap");
-  assert(PSParallelCompact::mark_bitmap()->is_marked(addr), "not marked");
+  assert(PSParallelCompact::mark_bitmap()->is_marked(addr)
+         || PSParallelCompact::mark_bitmap()->is_h2_marked(addr), "not marked");
 
   // Region covering the object.
   RegionData* const region_ptr = addr_to_region_ptr(addr);
+
+  if (PSParallelCompact::mark_bitmap()->is_h2_marked(addr)) {
+    assert(region_ptr->get_forwarding_table() != NULL, "Error forwarding table is empty");
+    assert(region_ptr->get_forwarding_table()->find(addr)->literal() != NULL, "Error");
+
+    return region_ptr->get_forwarding_table()->find(addr)->literal();
+  }
+
   HeapWord* result = region_ptr->destination();
 
   // If the entire Region is live, the new location is region->destination + the
@@ -841,7 +1020,19 @@ ParallelCompactData PSParallelCompact::_summary_data;
 
 PSParallelCompact::IsAliveClosure PSParallelCompact::_is_alive_closure;
 
+#ifdef TERA_MAJOR_GC
+bool PSParallelCompact::IsAliveClosure::do_object_b(oop p) { 
+  //return (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(p)) ? true : mark_bitmap()->is_marked(p); 
+if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(p)) {
+    Universe::teraHeap()->mark_used_region(cast_from_oop<HeapWord *>(p));
+    return true;
+  } else {
+  return mark_bitmap()->is_marked(p); 
+  }
+}
+#else
 bool PSParallelCompact::IsAliveClosure::do_object_b(oop p) { return mark_bitmap()->is_marked(p); }
+#endif //TERA_MAJOR_GC
 
 class PCReferenceProcessor: public ReferenceProcessor {
 public:
@@ -860,6 +1051,13 @@ public:
     T* referent_addr = (T*) java_lang_ref_Reference::referent_addr_raw(obj);
     T heap_oop = RawAccess<>::oop_load(referent_addr);
     oop referent = CompressedOops::decode_not_null(heap_oop);
+
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(referent)) {
+      Universe::teraHeap()->mark_used_region(cast_from_oop<HeapWord *>(referent));
+      return true;
+    }
+#endif
     return PSParallelCompact::mark_bitmap()->is_unmarked(referent)
         && ReferenceProcessor::discover_reference(obj, type);
   }
@@ -1430,6 +1628,26 @@ PSParallelCompact::compute_dense_prefix(const SpaceId id,
   return sd.region_to_addr(best_cp);
 }
 
+#ifdef TERA_MAJOR_GC
+
+void PSParallelCompact::precompact_h2_candidate_objects() {
+  for (unsigned int i = 0; i < last_space_id; ++i) {
+    const MutableSpace* space = _space_info[i].space();
+    _summary_data.precompact_h2_candidate_objects(space->bottom(),
+                                                  space->top(),
+                                                  _mark_bitmap,
+                                                  _summary_data);
+  }
+}
+
+void PSParallelCompact::clear_fwd_table() {
+  for (unsigned int i = 0; i < last_space_id; ++i) {
+    const MutableSpace* space = _space_info[i].space();
+    _summary_data.clear_fwd_table(space->bottom(), space->top(), _mark_bitmap);
+  }
+}
+#endif
+
 void PSParallelCompact::summarize_spaces_quick()
 {
   for (unsigned int i = 0; i < last_space_id; ++i) {
@@ -1597,14 +1815,23 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
 {
   GCTraceTime(Info, gc, phases) tm("Summary Phase", &_gc_timer);
 
-  // Quick summarization of each space into itself, to see how much is live.
+  if (EnableTeraHeap) {
+    // Assign to H2 candidate objects a new address from H2
+    precompact_h2_candidate_objects();
+  }
+
+  // Quick summarization of each space into itself, to see how much is
+  // live.
+  // Calculate the new top() pointer for each space
+  // The dense prefix for each space is set to bottom.
   summarize_spaces_quick();
 
   log_develop_trace(gc, compaction)("summary phase:  after summarizing each space to self");
   NOT_PRODUCT(print_region_ranges());
   NOT_PRODUCT(print_initial_summary_data(_summary_data, _space_info));
 
-  // The amount of live data that will end up in old space (assuming it fits).
+  // The amount of live data that will end up in old space (assuming
+  // it fits).
   size_t old_space_total_live = 0;
   for (unsigned int id = old_space_id; id < last_space_id; ++id) {
     old_space_total_live += pointer_delta(_space_info[id].new_top(),
@@ -1613,11 +1840,10 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
 
   MutableSpace* const old_space = _space_info[old_space_id].space();
   const size_t old_capacity = old_space->capacity_in_words();
-  if (old_space_total_live > old_capacity) {
+  if (EnableTeraHeap || old_space_total_live > old_capacity) {
     // XXX - should also try to expand
     maximum_compaction = true;
   }
-
   // Old generations.
   summarize_space(old_space_id, maximum_compaction);
 
@@ -1789,9 +2015,29 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
     ref_processor()->enable_discovery();
     ref_processor()->setup_policy(maximum_heap_compaction);
 
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+      // We scavenge only the dirty objects in TeraCache and prepare
+      // the backward stacks.
+                
+      if (!Universe::teraHeap()->h2_is_empty())
+        PSScavenge::h2_scavenge_back_references();
+
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->h2_init_stats_counters();
+		
+      // Give advise to kernel to prefetch pages for TeraCache random
+      Universe::teraHeap()->h2_enable_rand_faults();
+
+      // Reset the used field of all regions
+      Universe::teraHeap()->h2_reset_used_field();
+    }
+#endif // TERA_MAJOR_GC
+
     bool marked_for_unloading = false;
 
     marking_start.update();
+
     marking_phase(vmthread_cm, maximum_heap_compaction, &_gc_tracer);
 
     bool max_on_system_gc = UseMaximumCompactionOnSystemGC
@@ -1801,6 +2047,15 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 #if COMPILER2_OR_JVMCI
     assert(DerivedPointerTable::is_active(), "Sanity");
     DerivedPointerTable::set_active(false);
+#endif
+
+#ifdef TERA_MAJOR_GC
+    // Adjust the references of H2 candidate objects and 
+    if (EnableTeraHeap) {
+      compact_h2_candidate_objects();
+      Universe::teraHeap()->h2_complete_transfers();
+      adjust_backward_references();
+    }
 #endif
 
     // adjust_roots() updates Universe::_intArrayKlassObj which is
@@ -1815,6 +2070,31 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
     // Reset the mark bitmap, summary data, and do other bookkeeping.  Must be
     // done before resizing.
     post_compact();
+
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+      if (TeraHeapAllocatorStatistics)
+        Universe::teraHeap()->print_region_groups();
+
+      if (H2ObjectPlacement)
+        Universe::teraHeap()->h2_print_objects_per_region();
+
+      if (H2LivenessAnalysis)
+        Universe::teraHeap()->h2_mark_live_objects_per_region();
+      
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->h2_print_stats();
+
+      // Free all the regions that are unused after marking
+      Universe::teraHeap()->free_unused_regions();
+
+      // Deallocate stacks for TeraCache
+      Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+      // Clear the forwarding tables in each region
+      clear_fwd_table();
+    }
+#endif
 
     // Let the size policy know we're done
     size_policy->major_collection_end(old_gen->used_in_bytes(), gc_cause);
@@ -2033,6 +2313,33 @@ public:
   }
 
   virtual void work(uint worker_id) {
+
+#ifdef TERA_MAJOR_GC
+    // Mark TeraHeap backward references as live
+    if (EnableTeraHeap && worker_id == 0 && !Universe::teraHeap()->h2_is_empty()) {
+      struct timeval start_time;
+      struct timeval end_time;
+
+      if (TeraHeapStatistics)
+        gettimeofday(&start_time, NULL);
+
+      ParCompactionManager* cm = ParCompactionManager::gc_thread_compaction_manager(worker_id);
+      oop *obj = Universe::teraHeap()->h2_get_next_back_reference();
+
+      while(obj != NULL) {
+        cm->tera_mark_and_push(obj);
+        obj = Universe::teraHeap()->h2_get_next_back_reference();
+      }
+
+      if (TeraHeapStatistics) {
+        gettimeofday(&end_time, NULL);
+        thlog_or_tty->print_cr("[STATISTICS] | H2_MARK = %llu\n", 
+                               (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                               (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+      }
+    }
+#endif //TERA_MAJOR_GC
+
     for (uint task = 0; _subtasks.try_claim_task(task); /*empty*/ ) {
       mark_from_roots_work(static_cast<ParallelRootType::Value>(task), worker_id);
     }
@@ -2079,6 +2386,15 @@ public:
 void PSParallelCompact::marking_phase(ParCompactionManager* cm,
                                       bool maximum_heap_compaction,
                                       ParallelOldTracer *gc_tracer) {
+
+#ifdef TERA_MAJOR_GC
+  struct timeval start_time;
+  struct timeval end_time;
+
+  if (EnableTeraHeap && TeraHeapStatistics)
+    gettimeofday(&start_time, NULL);
+#endif
+
   // Recursively traverse all live objects and mark them
   GCTraceTime(Info, gc, phases) tm("Marking Phase", &_gc_timer);
 
@@ -2123,17 +2439,39 @@ void PSParallelCompact::marking_phase(ParCompactionManager* cm,
   {
     GCTraceTime(Debug, gc, phases) tm_m("Class Unloading", &_gc_timer);
 
-    // Follow system dictionary roots and unload classes.
-    bool purged_class = SystemDictionary::do_unloading(&_gc_timer);
+    if (EnableTeraHeap) {
+#ifndef DO_NOT_UNLOAD_CLASSES 
+      // Follow system dictionary roots and unload classes.
+      bool purged_class = SystemDictionary::do_unloading(&_gc_timer);
 
-    // Unload nmethods.
-    CodeCache::do_unloading(is_alive_closure(), purged_class);
+      // Unload nmethods.
+      CodeCache::do_unloading(is_alive_closure(), purged_class);
+#endif
+    
+      if (TeraHeapStatistics) {
+        gettimeofday(&end_time, NULL);
 
-    // Prune dead klasses from subklass/sibling/implementor lists.
-    Klass::clean_weak_klass_links(purged_class);
+        thlog_or_tty->print_cr("[STATISTICS] | PHASE1 = %llu\n",
+                               (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                               (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
 
-    // Clean JVMCI metadata handles.
-    JVMCI_ONLY(JVMCI::do_unloading(purged_class));
+        if (TeraHeapAllocatorStatistics)
+          Universe::teraHeap()->print_h2_active_regions();
+      }
+    } else {
+
+      // Follow system dictionary roots and unload classes.
+      bool purged_class = SystemDictionary::do_unloading(&_gc_timer);
+
+      // Unload nmethods.
+      CodeCache::do_unloading(is_alive_closure(), purged_class);
+
+      // Prune dead klasses from subklass/sibling/implementor lists.
+      Klass::clean_weak_klass_links(purged_class);
+
+      // Clean JVMCI metadata handles.
+      JVMCI_ONLY(JVMCI::do_unloading(purged_class));
+    }
   }
 
   _gc_tracer.report_object_count_after_gc(is_alive_closure());
@@ -2216,6 +2554,42 @@ public:
     _sub_tasks.all_tasks_claimed();
   }
 };
+
+#ifdef TERA_MAJOR_GC
+void PSParallelCompact::compact_h2_candidate_objects() {
+  for (unsigned int i = 0; i < last_space_id; ++i) {
+    const MutableSpace* space = _space_info[i].space();
+    ParCompactionManager* cm = ParCompactionManager::get_vmthread_cm();
+    _summary_data.compact_h2_candidate_objects(space->bottom(), space->top(),
+                                               _mark_bitmap, cm);
+  }
+}
+
+void PSParallelCompact::adjust_backward_references() {
+  struct timeval start_time;
+  struct timeval end_time;
+
+  if (TeraHeapStatistics)
+    gettimeofday(&start_time, NULL);
+
+  ParCompactionManager* cm = ParCompactionManager::get_vmthread_cm();
+  oop *obj = Universe::teraHeap()->h2_adjust_next_back_reference();
+
+  while (obj != NULL) {
+    Universe::teraHeap()->enable_groups(NULL, (HeapWord*) obj);
+    adjust_pointer(obj, cm);
+    Universe::teraHeap()->disable_groups();
+    obj = Universe::teraHeap()->h2_adjust_next_back_reference();
+  }
+
+  if (TeraHeapStatistics) {
+    gettimeofday(&end_time, NULL);
+    thlog_or_tty->print_cr("[STATISTICS] | TC_ADJUST %llu\n",
+                           (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
+                           (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+  }
+}
+#endif //TERA_MAJOR_GC
 
 void PSParallelCompact::adjust_roots() {
   // Adjust the pointers to reflect the new locations
@@ -2984,7 +3358,6 @@ void PSParallelCompact::fill_region(ParCompactionManager* cm, MoveAndUpdateClosu
     HeapWord* const end_addr = MIN2(sd.region_align_up(cur_addr + 1),
                                     src_space_top);
     IterationStatus status = bitmap->iterate(&closure, cur_addr, end_addr);
-
     if (status == ParMarkBitMap::incomplete) {
       // The last obj that starts in the source region does not end in the
       // region.
@@ -3023,6 +3396,7 @@ void PSParallelCompact::fill_region(ParCompactionManager* cm, MoveAndUpdateClosu
       closure.complete_region(cm, dest_addr, region_ptr);
       return;
     }
+
 
     decrement_destination_counts(cm, src_space_id, src_region_idx, end_addr);
 
@@ -3216,6 +3590,7 @@ MoveAndUpdateClosure::do_addr(HeapWord* addr, size_t words) {
   assert(bitmap()->obj_size(addr) == words, "bad size");
 
   _source = addr;
+  assert(!Universe::teraHeap()->is_obj_in_h2(cast_to_oop(_source)), "Error");
   assert(PSParallelCompact::summary_data().calc_new_pointer(source(), compaction_manager()) ==
          destination(), "wrong destination");
 

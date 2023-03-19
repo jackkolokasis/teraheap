@@ -1674,6 +1674,14 @@ PhaseMacroExpand::initialize_object(AllocateNode* alloc,
   rawmem = make_store(control, rawmem, object, oopDesc::mark_offset_in_bytes(), mark_node, TypeX_X->basic_type());
 
   rawmem = make_store(control, rawmem, object, oopDesc::klass_offset_in_bytes(), klass_node, T_METADATA);
+
+#ifdef TERA_FLAG 
+  if (EnableTeraHeap) {
+    Node* tf_node = makecon(TypeLong::make((intptr_t) INIT_TF_HEX));
+    rawmem = make_store(control, rawmem, object, oopDesc::teraflag_offset_in_bytes(), tf_node, T_LONG);
+  }
+#endif
+
   int header_size = alloc->minimum_header_size();  // conservatively small
 
   // Array length

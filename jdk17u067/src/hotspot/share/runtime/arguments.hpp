@@ -319,6 +319,11 @@ class Arguments : AllStatic {
 
   // Option flags
   static const char*  _gc_log_filename;
+
+#ifdef TERA_LOG
+  static const char*  _th_log_filename;
+#endif // TERA_LOG
+
   // Value of the conservative maximum heap alignment needed
   static size_t  _conservative_max_heap_alignment;
 
@@ -526,6 +531,12 @@ class Arguments : AllStatic {
 
   // -Dsun.java.launcher
   static const char* sun_java_launcher()    { return _sun_java_launcher; }
+
+#ifdef TERA_LOG
+  // -Xlogth:<file>, if not specified will be NULL
+  static const char* th_log_filename()      { return _th_log_filename; }
+#endif //TERA_LOG
+
   // Was VM created by a Java launcher?
   static bool created_by_java_launcher();
   // -Dsun.java.launcher.is_altjvm

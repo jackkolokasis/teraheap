@@ -32,6 +32,7 @@
 #include "gc/shared/collectedHeap.hpp"
 #include "gc/shared/collectorCounters.hpp"
 #include "gc/shared/taskTerminator.hpp"
+#include "gc/teraHeap/teraForwardingTable.hpp"
 #include "oops/oop.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/orderAccess.hpp"
@@ -317,6 +318,15 @@ public:
     void set_partial_obj_size(size_t words)    {
       _partial_obj_size = (region_sz_t) words;
     }
+#ifdef TERA_MAJOR_GC
+    void unset_partial_obj_addr(HeapWord* addr) { _partial_obj_addr = NULL; }
+    void unset_partial_obj_size(size_t words) {
+      _partial_obj_size = 0;
+    }
+    TeraForwardingTable* get_forwarding_table() { return h2_forwarding_table;}
+    void set_forwarding_table(TeraForwardingTable *fd_table) {h2_forwarding_table = fd_table;}
+    inline void remove_live_obj(size_t words);
+#endif
     inline void set_blocks_filled();
 
     inline void set_destination_count(uint count);
@@ -378,6 +388,9 @@ public:
     region_sz_t volatile _dc_and_los;
     bool        volatile _blocks_filled;
     int         volatile _shadow_state;
+#ifdef TERA_MAJOR_GC
+    TeraForwardingTable *h2_forwarding_table;
+#endif
 
 #ifdef ASSERT
     size_t               _blocks_filled_count;   // Number of block table fills.
@@ -428,6 +441,11 @@ public:
   void add_obj(HeapWord* addr, size_t len);
   void add_obj(oop p, size_t len) { add_obj(cast_from_oop<HeapWord*>(p), len); }
 
+#ifdef TERA_MAJOR_GC
+  void remove_obj(HeapWord* addr, size_t len);
+  void remove_obj(oop p, size_t len) {remove_obj(cast_from_oop<HeapWord*>(p), len); }
+#endif
+
   // Fill in the regions covering [beg, end) so that no data moves; i.e., the
   // destination of region n is simply the start of region n.  Both arguments
   // beg and end must be region-aligned.
@@ -441,6 +459,22 @@ public:
                  HeapWord** source_next,
                  HeapWord* target_beg, HeapWord* target_end,
                  HeapWord** target_next);
+
+#ifdef TERA_MAJOR_GC
+  void precompact_h2_candidate_objects(HeapWord* source_beg,
+                                       HeapWord* source_end,
+                                       ParMarkBitMap mark_bitmap,
+                                       ParallelCompactData _summary_data);
+
+  void compact_h2_candidate_objects(HeapWord* source_beg,
+                                    HeapWord* source_end,
+                                    ParMarkBitMap mark_bitmap,
+                                    ParCompactionManager *cm);
+
+  void clear_fwd_table(HeapWord* source_beg,
+                       HeapWord* source_end,
+                       ParMarkBitMap mark_bitmap);
+#endif
 
   void clear();
   void clear_range(size_t beg_region, size_t end_region);
@@ -610,6 +644,14 @@ inline void ParallelCompactData::RegionData::add_live_obj(size_t words)
   assert(words <= (size_t)los_mask - live_obj_size(), "overflow");
   Atomic::add(&_dc_and_los, static_cast<region_sz_t>(words));
 }
+
+#ifdef TERA_MAJOR_GC
+inline void ParallelCompactData::RegionData::remove_live_obj(size_t words)
+{
+  assert(words <= (size_t)los_mask - live_obj_size(), "overflow");
+  _dc_and_los -= words;
+}
+#endif
 
 inline void ParallelCompactData::RegionData::set_highest_ref(HeapWord* addr)
 {
@@ -1104,9 +1146,24 @@ class PSParallelCompact : AllStatic {
   // non-empty.
   static void fill_dense_prefix_end(SpaceId id);
 
+#ifdef TERA_MAJOR_GC
+  // Assign to H2 candidate objects a new address from H2
+  static void precompact_h2_candidate_objects();
+  static void clear_fwd_table();
+#endif
+
   static void summarize_spaces_quick();
   static void summarize_space(SpaceId id, bool maximum_compaction);
   static void summary_phase(ParCompactionManager* cm, bool maximum_compaction);
+
+#ifdef TERA_MAJOR_GC
+  // Adjust the references of H2 candidate objects and then move them
+  // to H2 
+  static void compact_h2_candidate_objects();
+
+  // Adjust the backward references from H2 to H1
+  static void adjust_backward_references();
+#endif
 
   // Adjust addresses in roots.  Does not adjust addresses in heap.
   static void adjust_roots();
@@ -1155,6 +1212,9 @@ class PSParallelCompact : AllStatic {
 
   // Marking support
   static inline bool mark_obj(oop obj);
+#ifdef TERA_MAJOR_GC
+  static inline bool mark_h2_candidate_obj(oop obj);
+#endif // TERA_MAJOR_GC
   static inline bool is_marked(oop obj);
 
   template <class T> static inline void adjust_pointer(T* p, ParCompactionManager* cm);

@@ -4038,6 +4038,10 @@ void TemplateTable::_new() {
 #endif
     Register tmp_store_klass = LP64_ONLY(rscratch1) NOT_LP64(noreg);
     __ store_klass(rax, rcx, tmp_store_klass);  // klass
+#ifdef TERA_FLAG
+    if (EnableTeraHeap)
+      __ movptr(Address(rax, oopDesc::teraflag_offset_in_bytes()), (intptr_t) INIT_TF_HEX);
+#endif //TERA_FLAG
 
     {
       SkipIfEqual skip_if(_masm, &DTraceAllocProbes, 0);

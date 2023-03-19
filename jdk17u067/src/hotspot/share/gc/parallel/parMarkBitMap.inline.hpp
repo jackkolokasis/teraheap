@@ -29,6 +29,7 @@
 
 #include "utilities/align.hpp"
 #include "utilities/bitMap.inline.hpp"
+#include "gc/shared/gc_globals.hpp"
 
 inline ParMarkBitMap::ParMarkBitMap():
   _region_start(NULL), _region_size(0), _beg_bits(), _end_bits(), _virtual_space(NULL), _reserved_byte_size(0)
@@ -37,12 +38,22 @@ inline ParMarkBitMap::ParMarkBitMap():
 inline void ParMarkBitMap::clear_range(idx_t beg, idx_t end) {
   _beg_bits.clear_range(beg, end);
   _end_bits.clear_range(beg, end);
+  _h2_candidate_bits.clear_range(beg, end);
 }
 
 inline ParMarkBitMap::idx_t ParMarkBitMap::bits_required(size_t words) {
   // Need two bits (one begin bit, one end bit) for each unit of 'object
   // granularity' in the heap.
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap)
+    // Here we need space for the extra bitmap that we use to track
+    // which objects we move to h2
+    return words_to_bits(words * 3);
+  else
+    return words_to_bits(words * 2);
+#else
   return words_to_bits(words * 2);
+#endif
 }
 
 inline ParMarkBitMap::idx_t ParMarkBitMap::bits_required(MemRegion covered_region) {
@@ -84,6 +95,32 @@ inline bool ParMarkBitMap::is_marked(HeapWord* addr) const {
 inline bool ParMarkBitMap::is_marked(oop obj) const {
   return is_marked(cast_from_oop<HeapWord*>(obj));
 }
+
+#ifdef TERA_MAJOR_GC
+inline bool ParMarkBitMap::is_h2_marked(idx_t bit) const {
+  return _h2_candidate_bits.at(bit);
+}
+
+inline bool ParMarkBitMap::is_h2_marked(HeapWord* addr) const {
+  return is_h2_marked(addr_to_bit(addr));
+}
+
+inline bool ParMarkBitMap::is_h2_marked(oop obj) const {
+  return is_h2_marked(cast_from_oop<HeapWord*>(obj));
+}
+
+inline bool ParMarkBitMap::is_h2_unmarked(idx_t bit) const {
+  return !is_marked(bit);
+}
+
+inline bool ParMarkBitMap::is_h2_unmarked(HeapWord* addr) const {
+  return !is_marked(addr);
+}
+
+inline bool ParMarkBitMap::is_h2_unmarked(oop obj) const {
+  return !is_marked(obj);
+}
+#endif
 
 inline bool ParMarkBitMap::is_unmarked(idx_t bit) const {
   return !is_marked(bit);
@@ -148,6 +185,16 @@ inline bool ParMarkBitMap::mark_obj(oop obj, int size) {
   return mark_obj(cast_from_oop<HeapWord*>(obj), (size_t)size);
 }
 
+#ifdef TERA_MAJOR_GC
+inline void ParMarkBitMap::unmark_obj(oop obj, int size) {
+  unmark_obj(cast_from_oop<HeapWord*>(obj), (size_t)size);
+}
+
+inline bool ParMarkBitMap::mark_h2_candidate_obj(oop obj) {
+  return mark_h2_candidate_obj(cast_from_oop<HeapWord*>(obj));
+}
+#endif //TERA_MAJOR_GC
+
 inline ParMarkBitMap::idx_t ParMarkBitMap::addr_to_bit(HeapWord* addr) const {
   DEBUG_ONLY(verify_addr(addr);)
   return words_to_bits(pointer_delta(addr, region_start()));
@@ -172,6 +219,12 @@ inline ParMarkBitMap::idx_t ParMarkBitMap::find_obj_end(idx_t beg, idx_t end) co
   return _end_bits.get_next_one_offset_aligned_right(beg, end);
 }
 
+#ifdef TERA_MAJOR_GC
+inline ParMarkBitMap::idx_t ParMarkBitMap::find_h2_candidate(idx_t beg, idx_t end) const {
+  return _h2_candidate_bits.get_next_one_offset_aligned_right(beg, end);
+}
+#endif
+
 inline HeapWord* ParMarkBitMap::find_obj_beg(HeapWord* beg, HeapWord* end) const {
   const idx_t beg_bit = addr_to_bit(beg);
   const idx_t end_bit = addr_to_bit(end);
@@ -187,6 +240,16 @@ inline HeapWord* ParMarkBitMap::find_obj_end(HeapWord* beg, HeapWord* end) const
   const idx_t res_bit = MIN2(find_obj_end(beg_bit, search_end), end_bit);
   return bit_to_addr(res_bit);
 }
+
+#ifdef TERA_MAJOR_GC
+inline HeapWord* ParMarkBitMap::find_h2_candidate(HeapWord* beg, HeapWord* end) const {
+  const idx_t beg_bit = addr_to_bit(beg);
+  const idx_t end_bit = addr_to_bit(end);
+  const idx_t search_end = align_range_end(end_bit);
+  const idx_t res_bit = MIN2(find_h2_candidate(beg_bit, search_end), end_bit);
+  return bit_to_addr(res_bit);
+}
+#endif
 
 #ifdef  ASSERT
 inline void ParMarkBitMap::verify_bit(idx_t bit) const {

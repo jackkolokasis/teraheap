@@ -93,7 +93,7 @@ export_env_vars()
 {
 	local PROJECT_DIR="$(pwd)/../"
 
-	export JAVA_HOME="/usr/java/jdk-17.0.4.1"
+	export JAVA_HOME="/opt/jdk-17"
 
 	### TeraHeap Allocator
 	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LIBRARY_PATH

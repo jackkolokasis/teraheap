@@ -34,6 +34,7 @@
 #include "compiler/disassembler.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "interpreter/interpreter.hpp"
 #include "interpreter/interpreterRuntime.hpp"
 #include "interpreter/linkResolver.hpp"
@@ -731,11 +732,30 @@ JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter(JavaThread* current, B
     Atomic::inc(BiasedLocking::slow_path_entry_count_addr());
   }
   Handle h_obj(current, elem->obj());
-  assert(Universe::heap()->is_in_or_null(h_obj()),
-         "must be NULL or an object");
+#ifdef TERA_ASSERT
+DEBUG_ONLY(
+    if (EnableTeraHeap) {
+      assert(Universe::heap()->is_in_or_null(h_obj()) || Universe::is_in_h2_or_null(h_obj()),
+             "must be NULL or an object");
+    } else {
+      assert(Universe::heap()->is_in_or_null(h_obj()), "must be NULL or an object");
+    });
+#else
+      assert(Universe::heap()->is_in_or_null(h_obj()), "must be NULL or an object");
+#endif
   ObjectSynchronizer::enter(h_obj, elem->lock(), current);
-  assert(Universe::heap()->is_in_or_null(elem->obj()),
-         "must be NULL or an object");
+#ifdef TERA_ASSERT
+DEBUG_ONLY(
+    if (EnableTeraHeap) {
+      assert(Universe::heap()->is_in_or_null(elem->obj()) || Universe::is_in_h2_or_null(elem->obj()),
+             "must be NULL or an object");
+    } else {
+      assert(Universe::heap()->is_in_or_null(elem->obj()), "must be NULL or an object");
+    });
+#else
+      assert(Universe::heap()->is_in_or_null(elem->obj()), "must be NULL or an object");
+#endif
+
 #ifdef ASSERT
   current->last_frame().interpreter_frame_verify_monitor(elem);
 #endif
@@ -744,7 +764,18 @@ JRT_END
 
 JRT_LEAF(void, InterpreterRuntime::monitorexit(BasicObjectLock* elem))
   oop obj = elem->obj();
+
+#ifdef  TERA_ASSERT
+DEBUG_ONLY(if (EnableTeraHeap) { 
+             assert(Universe::heap()->is_in(obj) ||
+                    Universe::teraHeap()->is_obj_in_h2(obj),
+                    "must be NULL or an object");
+           } else {
+             assert(Universe::heap()->is_in(obj), "must be an object");
+           });
+#else
   assert(Universe::heap()->is_in(obj), "must be an object");
+#endif // TERA_ASSERT
   // The object could become unlocked through a JNI call, which we have no other checks for.
   // Give a fatal message if CheckJNICalls. Otherwise we ignore it.
   if (obj->is_unlocked()) {
@@ -810,9 +841,17 @@ void InterpreterRuntime::resolve_invoke(JavaThread* current, Bytecodes::Code byt
     Bytecode_invoke call(m, last_frame.bci());
     Symbol* signature = call.signature();
     receiver = Handle(current, last_frame.callee_receiver(signature));
-
-    assert(Universe::heap()->is_in_or_null(receiver()),
-           "sanity check");
+#ifdef TERA_ASSERT
+    DEBUG_ONLY(
+        if (EnableTeraHeap) {
+          assert(Universe::heap()->is_in_or_null(receiver()) ||
+                 Universe::is_in_h2_or_null(receiver()), "sanity check");
+        } else {
+          assert(Universe::heap()->is_in_or_null(receiver()), "sanity check");
+        });
+#else
+    assert(Universe::heap()->is_in_or_null(receiver()), "sanity check");
+#endif
     assert(receiver.is_null() ||
            !Universe::heap()->is_in(receiver->klass()),
            "sanity check");

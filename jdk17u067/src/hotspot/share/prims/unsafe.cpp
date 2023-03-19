@@ -31,6 +31,7 @@
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmSymbols.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/resourceArea.hpp"
@@ -352,6 +353,49 @@ UNSAFE_LEAF(void, Unsafe_StoreFence(JNIEnv *env, jobject unsafe)) {
 UNSAFE_LEAF(void, Unsafe_FullFence(JNIEnv *env, jobject unsafe)) {
   OrderAccess::fence();
 } UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_h2TagAndMoveRoot(JNIEnv *env, jobject unsafe,
+                                           jobject obj, jlong label, jlong partId))
+  
+  if (!EnableTeraHeap)
+    return;
+
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  // If the object is already in TeraCache then do not mark its teraflag
+  if (Universe::teraHeap()->is_obj_in_h2(o))
+  	return;
+
+  // Initialize object's teraflag
+  o->mark_move_h2(label, 0);
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_h2TagRoot(JNIEnv *env, jobject unsafe,
+			jobject obj, jlong label, jlong partId))
+  
+  if (!EnableTeraHeap)
+    return;
+
+  oop o = JNIHandles::resolve_non_null(obj);
+
+  // If the object is already in TeraCache then do not mark its teraflag
+  if (Universe::teraHeap()->is_obj_in_h2(o))
+  	return;
+
+  // Initialize object's teraflag
+  o->mark_move_h2(Universe::teraHeap()->get_non_promote_tag(), 0);
+UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_h2Move(JNIEnv *env, jobject unsafe,
+			jlong label))
+  
+  if (!EnableTeraHeap)
+      return;
+
+  Universe::teraHeap()->set_promote_tag(label);
+  Universe::teraHeap()->set_non_promote_tag(label+1);
+
+UNSAFE_END
 
 ////// Allocation requests
 
@@ -951,6 +995,15 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "loadFence",          CC "()V",                  FN_PTR(Unsafe_LoadFence)},
     {CC "storeFence",         CC "()V",                  FN_PTR(Unsafe_StoreFence)},
     {CC "fullFence",          CC "()V",                  FN_PTR(Unsafe_FullFence)},
+
+  // Mark object and move it in the next full GC in H2 - TeraHeap
+    {CC"h2TagAndMoveRoot",    CC "(" OBJ "JJ)V",         FN_PTR(Unsafe_h2TagAndMoveRoot)},
+    // Mark root object to be moved in H2 - TeraHeap. Object will be
+    // moved only after calling h2Move().
+    {CC"h2TagRoot",           CC "(" OBJ "JJ)V",         FN_PTR(Unsafe_h2TagRoot)},
+    // Move all objects with the specific label in H2 - TeraHeap. Object
+    // will be moved in H2 in the next full GC.
+    {CC"h2Move",              CC"(J)V",                  FN_PTR(Unsafe_h2Move)},
 };
 
 #undef CC

@@ -44,6 +44,7 @@
 #include "gc/shared/oopStorageSet.hpp"
 #include "gc/shared/stringdedup/stringDedup.hpp"
 #include "gc/shared/tlab_globals.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "memory/metadataFactory.hpp"
@@ -151,6 +152,7 @@ OopStorage*     Universe::_vm_weak = NULL;
 OopStorage*     Universe::_vm_global = NULL;
 
 CollectedHeap*  Universe::_collectedHeap = NULL;
+TeraHeap *Universe::_teraHeap = NULL;
 
 objArrayOop Universe::the_empty_class_array ()  {
   return (objArrayOop)_the_empty_class_array.resolve();
@@ -796,6 +798,12 @@ jint Universe::initialize_heap() {
   _collectedHeap = GCConfig::arguments()->create_heap();
 
   log_info(gc)("Using %s", _collectedHeap->name());
+  
+  if (EnableTeraHeap) {
+    _teraHeap = new TeraHeap();
+    log_info(gc)("Initialize Teraheap");
+  }
+
   return _collectedHeap->initialize();
 }
 
@@ -1244,6 +1252,18 @@ bool Universe::release_fullgc_alot_dummy() {
     fullgc_alot_dummy_array->obj_at_put(_fullgc_alot_dummy_next++, NULL);
   }
   return true;
+}
+
+bool Universe::is_in_h2_or_null(const void* p) {
+  return (p == NULL || is_in_h2(p));
+}
+
+bool Universe::is_in_h2(const void* p) {
+  return teraHeap()->is_in_h2(p);
+}
+
+bool Universe::is_obj_in_h2(const oop obj) {
+  return teraHeap()->is_obj_in_h2(obj);
 }
 
 bool Universe::is_gc_active() {

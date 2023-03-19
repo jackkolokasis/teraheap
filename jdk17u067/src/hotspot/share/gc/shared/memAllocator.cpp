@@ -388,6 +388,14 @@ oop MemAllocator::finish(HeapWord* mem) const {
     // May be bootstrapping
     oopDesc::set_mark(mem, markWord::prototype());
   }
+
+#ifdef TERA_FLAG
+  if (EnableTeraHeap) {
+    oop obj = cast_to_oop(mem);
+    obj->init_obj_state();
+  }
+#endif // TERA_FLAG
+
   // Need a release store to ensure array/class length, mark word, and
   // object zeroing are visible before setting the klass non-NULL, for
   // concurrent collectors.

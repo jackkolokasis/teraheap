@@ -65,8 +65,15 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   static RegionTaskQueueSet*    _region_task_queues;
   static PSOldGen*              _old_gen;
 
-  OverflowTaskQueue<oop, mtGC>        _marking_stack;
+  OverflowTaskQueue<oop, mtGC>  _marking_stack;
   ObjArrayTaskQueue             _objarray_stack;
+#ifdef TERA_MAJOR_GC
+  // Total number of forward ptrs from H1 to H2
+  unsigned int                  _fwd_ptrs_h1_h2;
+  bool                          _is_h2_candidate = false;
+  uint64_t                      _h2_group_id = 0;
+  uint64_t                      _h2_part_id = 0;
+#endif // TERA_MAJOR_GC
   size_t                        _next_shadow_region;
 
   // Is there a way to reuse the _marking_stack for the
@@ -104,6 +111,11 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   void stack_push(oop obj);
   // Do not implement an equivalent stack_pop.  Deal with the
   // marking stack and overflow stack directly.
+
+#ifdef TERA_MAJOR_GC
+  void increase_fwd_ptrs() { _fwd_ptrs_h1_h2++; };
+  void set_h2_candidate_flags(oop obj);
+#endif // TERA_MAJOR_GC
 
  public:
   static const size_t InvalidShadow = ~0;
@@ -160,7 +172,9 @@ class ParCompactionManager : public CHeapObj<mtGC> {
 
   // Check mark and maybe push on marking stack.
   template <typename T> inline void mark_and_push(T* p);
-
+#ifdef TERA_MAJOR_GC
+  template <typename T> inline void tera_mark_and_push(T* p);
+#endif // TERA_MAJOR_GC
   inline void follow_klass(Klass* klass);
 
   void follow_class_loader(ClassLoaderData* klass);
