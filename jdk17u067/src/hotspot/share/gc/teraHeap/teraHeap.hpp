@@ -3,6 +3,7 @@
 
 #include "gc/parallel/objectStartArray.hpp"
 #include "gc/shared/collectedHeap.inline.hpp"
+#include "gc/teraHeap//teraTimers.hpp"
 #include "utilities/stack.inline.hpp"
 //#include "gc/parallel/psCompactionManager.hpp"
 #include "memory/sharedDefines.h"
@@ -37,6 +38,10 @@ private:
   // TeraHeap and point to objects in the heap. We adjust these pointers
   // during adjust phase of the Full GC.
   static Stack<oop *, mtGC> _tc_adjust_stack;
+
+#ifdef TERA_TIMERS
+  TeraTimers *teraTimer;
+#endif
 
   /*-----------------------------------------------
    * Statistics of TeraHeap
@@ -390,6 +395,10 @@ public:
 
   // Check if the group of regions in H2 is enabled
   bool is_h2_group_enabled();
+
+#ifdef TERA_TIMERS
+  TeraTimers* getTeraTimer();
+#endif
 };
 
 #endif

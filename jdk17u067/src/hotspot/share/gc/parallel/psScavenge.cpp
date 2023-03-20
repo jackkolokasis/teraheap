@@ -829,7 +829,7 @@ bool PSScavenge::invoke_no_policy() {
     // Give advise to kernel to prefetch pages for TeraCache sequentially
     Universe::teraHeap()->h2_enable_seq_faults();
 
-    // Print statistics for TeraCache
+    // Print statistics for TeraHeap
     if (TeraHeapStatistics)
       Universe::teraHeap()->print_minor_gc_statistics();
 
@@ -858,9 +858,10 @@ void PSScavenge::h2_scavenge_back_references() {
   if (Universe::teraHeap()->h2_is_empty())
     return;
 
-  if (TeraHeapStatistics) 
-    gettimeofday(&start_time, NULL);
-    
+#ifdef TERA_TIMERS
+  Universe::teraHeap()->getTeraTimer()->h2_scavenge_start();
+#endif //TERA_TIMERS
+
   const uint active_workers =
     WorkerPolicy::calc_active_workers(ParallelScavengeHeap::heap()->workers().total_workers(),
                                       ParallelScavengeHeap::heap()->workers().active_workers(),
@@ -875,13 +876,10 @@ void PSScavenge::h2_scavenge_back_references() {
     
   //PSPromotionManager::post_scavenge(_gc_tracer);
 
-  if (TeraHeapStatistics) {
-    gettimeofday(&end_time, NULL);
+#ifdef TERA_TIMERS
+  Universe::teraHeap()->getTeraTimer()->h2_scavenge_end();
+#endif //TERA_TIMERS
 
-    thlog_or_tty->print_cr("[STATISTICS] | PHASE0 = %llu\n",
-                           (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
-                           (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
-  }
 }
 #endif //TERA_MINOR_GC
 

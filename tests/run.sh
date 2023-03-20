@@ -4,16 +4,13 @@ MODE=""
 PARALLEL_GC_THREADS=()
 STRIPE_SIZE=2048
 
-#JAVA="$(pwd)/../jdk8u345/build/linux-x86_64-normal-server-release/jdk/bin/java"
-#JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-fastdebug/jdk/bin/java"
-JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-release/jdk/bin/java"
+JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-fastdebug/jdk/bin/java"
+#JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-release/jdk/bin/java"
 
 EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
 	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
 	"HashMap" "Rehashing" "Clone" "Groupping" "MultiHashMap" \
 	"Test_WeakHashMap" "ClassInstance")
-
-EXEC=("MultiHashMap")
 
 # Export Enviroment Variables
 export_env_vars() {

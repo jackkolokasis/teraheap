@@ -55,7 +55,7 @@
 
 //#define TEST_CLONE                // Clone objects
 
-//#define DISABLE_TRAVERSE_OLD_GEN  //< Disable backward reference traversal
+#define DISABLE_TRAVERSE_OLD_GEN  //< Disable backward reference traversal
 									                // from H2 to old generation (H1) during
 									                // minor GC
 

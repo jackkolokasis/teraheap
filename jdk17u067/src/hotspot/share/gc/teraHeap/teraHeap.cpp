@@ -68,6 +68,10 @@ TeraHeap::TeraHeap() {
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
 	total_marked_obj_for_h2 = 0;
 #endif
+
+#ifdef TERA_TIMERS
+  teraTimer = new TeraTimers();
+#endif
 }
 
 // Return H2 start address
@@ -863,3 +867,9 @@ void TeraHeap::h2_complete_transfers() {
 bool TeraHeap::is_h2_group_enabled() {
   return (obj_h1_addr != NULL  || obj_h2_addr != NULL);
 }
+
+#ifdef TERA_TIMERS
+TeraTimers* TeraHeap::getTeraTimer() {
+  return teraTimer;
+}
+#endif

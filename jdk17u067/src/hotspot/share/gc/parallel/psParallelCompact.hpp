@@ -1149,7 +1149,6 @@ class PSParallelCompact : AllStatic {
 #ifdef TERA_MAJOR_GC
   // Assign to H2 candidate objects a new address from H2
   static void precompact_h2_candidate_objects();
-  static void clear_fwd_table();
 #endif
 
   static void summarize_spaces_quick();
