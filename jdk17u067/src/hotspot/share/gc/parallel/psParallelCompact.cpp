@@ -1833,7 +1833,8 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
                                       bool maximum_compaction)
 {
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_summary_phase_start();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_summary_phase_start();
 #endif //TERA_TIMERS
   GCTraceTime(Info, gc, phases) tm("Summary Phase", &_gc_timer);
 
@@ -1928,7 +1929,8 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
   NOT_PRODUCT(print_region_ranges());
   NOT_PRODUCT(print_initial_summary_data(_summary_data, _space_info));
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_summary_phase_end();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_summary_phase_end();
 #endif //TERA_TIMERS
 }
 
@@ -2402,7 +2404,8 @@ void PSParallelCompact::marking_phase(ParCompactionManager* cm,
                                       ParallelOldTracer *gc_tracer) {
 
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_marking_phase_start();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_marking_phase_start();
 #endif //TERA_TIMERS
   // Recursively traverse all live objects and mark them
   GCTraceTime(Info, gc, phases) tm("Marking Phase", &_gc_timer);
@@ -2476,7 +2479,8 @@ void PSParallelCompact::marking_phase(ParCompactionManager* cm,
 
   _gc_tracer.report_object_count_after_gc(is_alive_closure());
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_marking_phase_end();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_marking_phase_end();
 #endif //TERA_TIMERS
 }
 
@@ -2601,7 +2605,8 @@ void PSParallelCompact::adjust_backward_references() {
 
 void PSParallelCompact::adjust_roots() {
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_adjust_roots_start();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_adjust_roots_start();
 #endif
   // Adjust the pointers to reflect the new locations
   GCTraceTime(Info, gc, phases) tm("Adjust Roots", &_gc_timer);
@@ -2610,7 +2615,8 @@ void PSParallelCompact::adjust_roots() {
   ParallelScavengeHeap::heap()->workers().run_task(&task);
 
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_adjust_roots_end();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_adjust_roots_end();
 #endif
 }
 
@@ -2911,7 +2917,8 @@ public:
 
 void PSParallelCompact::compact() {
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_compact_start();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_compact_start();
 #endif
   GCTraceTime(Info, gc, phases) tm("Compaction Phase", &_gc_timer);
 
@@ -2958,7 +2965,8 @@ void PSParallelCompact::compact() {
 
   DEBUG_ONLY(write_block_fill_histogram());
 #ifdef TERA_TIMERS
-  Universe::teraHeap()->getTeraTimer()->h1_compact_end();
+  if (EnableTeraHeap)
+    Universe::teraHeap()->getTeraTimer()->h1_compact_end();
 #endif
 }
 
