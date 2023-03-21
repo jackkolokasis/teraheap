@@ -38,7 +38,8 @@ inline ParMarkBitMap::ParMarkBitMap():
 inline void ParMarkBitMap::clear_range(idx_t beg, idx_t end) {
   _beg_bits.clear_range(beg, end);
   _end_bits.clear_range(beg, end);
-  _h2_candidate_bits.clear_range(beg, end);
+  if (EnableTeraHeap)
+    _h2_candidate_bits.clear_range(beg, end);
 }
 
 inline ParMarkBitMap::idx_t ParMarkBitMap::bits_required(size_t words) {
