@@ -955,7 +955,7 @@ HeapWord* ParallelCompactData::calc_new_pointer(HeapWord* addr, ParCompactionMan
   // Region covering the object.
   RegionData* const region_ptr = addr_to_region_ptr(addr);
 
-  if (PSParallelCompact::mark_bitmap()->is_h2_marked(addr)) {
+  if (EnableTeraHeap && PSParallelCompact::mark_bitmap()->is_h2_marked(addr)) {
     assert(region_ptr->get_forwarding_table() != NULL, "Error forwarding table is empty");
     assert(region_ptr->get_forwarding_table()->find(addr)->literal() != NULL, "Error");
 
