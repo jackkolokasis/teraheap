@@ -48,6 +48,7 @@ JVM_ASFLAGS += $(EXTRA_ASFLAGS)
 
 JVM_LIBS += \
     $(JVM_LIBS_FEATURES) \
+    -lregions \
     #
 
 # These files and directories are always excluded
