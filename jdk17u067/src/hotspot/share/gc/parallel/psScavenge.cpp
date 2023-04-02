@@ -328,13 +328,10 @@ public:
 #ifdef TERA_MINOR_GC
       {
         if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty()) {
-          struct timeval start_time;
-          struct timeval end_time;
-          uint64_t ellapsed_time;
-
+#ifdef TERA_TIMERS 
           if (TeraHeapStatistics)
-            gettimeofday(&start_time, NULL);
-
+            Universe::teraHeap()->getTeraTimer()->h2_card_table_start(worker_id);
+#endif
           PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(worker_id);
           PSCardTable* card_table = ParallelScavengeHeap::heap()->card_table();
 
@@ -344,15 +341,10 @@ public:
                                                     worker_id,
                                                     _active_workers,
                                                     true);
-          if (TeraHeapStatistics) {
-            gettimeofday(&end_time, NULL);
-
-            ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
-              ((end_time.tv_usec - start_time.tv_usec) / 1000);
-
-            Universe::teraHeap()->h2_back_ref_traversal_time(worker_id, ellapsed_time);
-          }
-
+#ifdef TERA_TIMERS 
+          if (TeraHeapStatistics)
+            Universe::teraHeap()->getTeraTimer()->h2_card_table_end(worker_id);
+#endif
           // Do the real work
           pm->drain_stacks(false);
         }
@@ -362,12 +354,22 @@ public:
         PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(worker_id);
         PSCardTable* card_table = ParallelScavengeHeap::heap()->card_table();
 
+#ifdef TERA_TIMERS 
+          if (TeraHeapStatistics)
+            Universe::teraHeap()->getTeraTimer()->h1_card_table_start(worker_id);
+#endif
+
         card_table->scavenge_contents_parallel(_old_gen->start_array(),
                                                _old_gen->object_space(),
                                                _gen_top,
                                                pm,
                                                worker_id,
                                                _active_workers);
+
+#ifdef TERA_TIMERS 
+        if (TeraHeapStatistics)
+          Universe::teraHeap()->getTeraTimer()->h1_card_table_end(worker_id);
+#endif
 
         // Do the real work
         pm->drain_stacks(false);
@@ -418,13 +420,6 @@ public:
     assert(worker_id < ParallelGCThreads, "Sanity");
 
     {
-      struct timeval start_time;
-      struct timeval end_time;
-      uint64_t ellapsed_time;
-          
-      if (TeraHeapStatistics)
-        gettimeofday(&start_time, NULL);
-
       PSPromotionManager* pm = PSPromotionManager::gc_thread_promotion_manager(worker_id);
       PSCardTable* card_table = ParallelScavengeHeap::heap()->card_table();
 
@@ -434,15 +429,6 @@ public:
                                                 worker_id,
                                                 _active_workers,
                                                 false);
-      if (TeraHeapStatistics) {
-        gettimeofday(&end_time, NULL);
-
-        ellapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000) +
-          ((end_time.tv_usec - start_time.tv_usec) / 1000);
-
-        Universe::teraHeap()->h2_back_ref_traversal_time(worker_id, ellapsed_time);
-      }
-
       // Do the real work
       pm->drain_stacks(false);
     }
@@ -829,9 +815,11 @@ bool PSScavenge::invoke_no_policy() {
     // Give advise to kernel to prefetch pages for TeraCache sequentially
     Universe::teraHeap()->h2_enable_seq_faults();
 
+#ifdef TERA_TIMERS
     // Print statistics for TeraHeap
     if (TeraHeapStatistics)
-      Universe::teraHeap()->print_minor_gc_statistics();
+      Universe::teraHeap()->getTeraTimer()->print_card_table_scanning_time();
+#endif
 
     if (TeraHeapCardStatistics) {
       ct->th_num_dirty_cards(
@@ -850,9 +838,6 @@ bool PSScavenge::invoke_no_policy() {
 // performing minor gc. So using this function we identify backward
 // references (from H2 to H1) to use them during major gc.
 void PSScavenge::h2_scavenge_back_references() {
-  struct timeval start_time;
-  struct timeval end_time;
-
   assert(Universe::teraHeap()->h2_is_empty_back_ref_stacks(), "Backward stack should be empty");
 
   if (Universe::teraHeap()->h2_is_empty())

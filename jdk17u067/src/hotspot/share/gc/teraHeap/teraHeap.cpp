@@ -1,8 +1,6 @@
 #include "gc/teraHeap/teraHeap.hpp"
 #include "gc/parallel/psVirtualspace.hpp"
 #include "gc/parallel/psVirtualspace.hpp"
-//#include "gc/parallel/psCompactionManager.hpp"
-//#include "memory/card.hpp"
 #include "memory/memRegion.hpp"
 #include "memory/sharedDefines.h"
 #include "oops/oop.inline.hpp"
@@ -15,18 +13,6 @@ char *TeraHeap::_stop_addr = NULL;
 Stack<oop *, mtGC> TeraHeap::_tc_stack;
 Stack<oop *, mtGC> TeraHeap::_tc_adjust_stack;
 
-uint64_t TeraHeap::total_objects;
-uint64_t TeraHeap::total_objects_size;
-uint64_t TeraHeap::fwd_ptrs_per_fgc;
-uint64_t TeraHeap::back_ptrs_per_fgc;
-uint64_t TeraHeap::trans_per_fgc;
-
-uint64_t TeraHeap::tc_ct_trav_time[16];
-uint64_t TeraHeap::heap_ct_trav_time[16];
-
-uint64_t TeraHeap::back_ptrs_per_mgc;
-
-uint64_t TeraHeap::obj_distr_size[3];
 long int TeraHeap::cur_obj_group_id;
 long int TeraHeap::cur_obj_part_id;
 
@@ -38,23 +24,6 @@ TeraHeap::TeraHeap() {
 
   _start_addr = start_addr_mem_pool();
   _stop_addr = stop_addr_mem_pool();
-
-  // Initilize counters for TeraHeap
-  // These counters are used for experiments
-  total_objects = 0;
-  total_objects_size = 0;
-
-  // Initialize arrays for the next minor collection
-  for (unsigned int i = 0; i < ParallelGCThreads; i++) {
-    tc_ct_trav_time[i] = 0;
-    heap_ct_trav_time[i] = 0;
-  }
-
-  back_ptrs_per_mgc = 0;
-
-  for (unsigned int i = 0; i < 3; i++) {
-    obj_distr_size[i] = 0;
-  }
 
   cur_obj_group_id = 0;
 
@@ -71,6 +40,20 @@ TeraHeap::TeraHeap() {
 
 #ifdef TERA_TIMERS
   teraTimer = new TeraTimers();
+#endif
+
+#ifdef TERA_STATS
+  tera_stats = new TeraStatistics();
+#endif
+}
+
+TeraHeap::~TeraHeap() {
+#ifdef TERA_TIMERS
+  delete teraTimer;
+#endif
+
+#ifdef TERA_STATS
+  delete tera_stats;
 #endif
 }
 
@@ -125,70 +108,11 @@ bool TeraHeap::is_field_in_h2(void *p) {
 	char* const cp = (char *)p;
 	return cp >= _start_addr && cp < _stop_addr;
 }
-
+  
+// Deallocate the backward references stacks
 void TeraHeap::h2_clear_back_ref_stacks() {
-	if (TeraHeapStatistics)
-		back_ptrs_per_mgc = 0;
-		
 	_tc_adjust_stack.clear(true);
 	_tc_stack.clear(true);
-}
-
-// Keep for each thread the time that need to traverse the TeraHeap
-// card table.
-// Each thread writes the time in a table based on each ID and then we
-// take the maximum time from all the threads as the total time.
-void TeraHeap::h2_back_ref_traversal_time(unsigned int tid, uint64_t total_time) {
-	if (tc_ct_trav_time[tid]  < total_time)
-		tc_ct_trav_time[tid] = total_time;
-}
-
-// Keep for each thread the time that need to traverse the Heap
-// card table
-// Each thread writes the time in a table based on each ID and then we
-// take the maximum time from all the threads as the total time.
-void TeraHeap::h1_old_to_young_traversal_time(unsigned int tid, uint64_t total_time) {
-	if (heap_ct_trav_time[tid]  < total_time)
-		heap_ct_trav_time[tid] = total_time;
-}
-
-// Print the statistics of TeraHeap at the end of each minorGC
-// Will print:
-//	- the time to traverse the TeraHeap dirty card tables
-//	- the time to traverse the Heap dirty card tables
-//	- TODO number of dirty cards in TeraHeap
-//	- TODO number of dirty cards in Heap
-void TeraHeap::print_minor_gc_statistics() {
-	uint64_t max_tc_ct_trav_time = 0;		//< Maximum traversal time of
-											// TeraHeap card tables from all
-											// threads
-	uint64_t max_heap_ct_trav_time = 0;     //< Maximum traversal time of Heap
-											// card tables from all the threads
-
-	for (unsigned int i = 0; i < ParallelGCThreads; i++) {
-		if (max_tc_ct_trav_time < tc_ct_trav_time[i])
-			max_tc_ct_trav_time = tc_ct_trav_time[i];
-		
-		if (max_heap_ct_trav_time < heap_ct_trav_time[i])
-			max_heap_ct_trav_time = heap_ct_trav_time[i];
-	}
-
-	thlog_or_tty->print_cr("[STATISTICS] | TC_CT_TIME = %lu\n", max_tc_ct_trav_time);
-	thlog_or_tty->print_cr("[STATISTICS] | HEAP_CT_TIME = %lu\n", max_heap_ct_trav_time);
-	thlog_or_tty->print_cr("[STATISTICS] | BACK_PTRS_PER_MGC = %lu\n", back_ptrs_per_mgc);
-
-#ifdef BACK_REF_STAT
-	h2_print_back_ref_stats();
-#endif
-	
-	// Initialize arrays for the next minor collection
-	for (unsigned int i = 0; i < ParallelGCThreads; i++) {
-		tc_ct_trav_time[i] = 0;
-		heap_ct_trav_time[i] = 0;
-	}
-
-	// Initialize counters
-	back_ptrs_per_mgc = 0;
 }
 
 // Give advise to kernel to expect page references in sequential order
@@ -308,18 +232,8 @@ void TeraHeap::h2_push_backward_reference(void *p, oop o) {
 	_tc_stack.push((oop *)p);
 	_tc_adjust_stack.push((oop *)p);
 	
-	back_ptrs_per_mgc++;
-
 	assert(!_tc_stack.is_empty(), "Sanity Check");
 	assert(!_tc_adjust_stack.is_empty(), "Sanity Check");
-}
-
-// Init the statistics counters of TeraHeap to zero when a Full GC
-// starts
-void TeraHeap::h2_init_stats_counters() {
-	fwd_ptrs_per_fgc  = 0;	
-	back_ptrs_per_fgc = 0;
-	trans_per_fgc     = 0;
 }
 
 // Resets the used field of all regions in H2
@@ -464,28 +378,6 @@ void TeraHeap::free_unused_regions(void){
     }
 }
 
-// Print the statistics of TeraHeap at the end of each FGC
-// Will print:
-//	- the total forward pointers from the JVM heap to the TeraHeap
-//	- the total back pointers from TeraHeap to the JVM heap
-//	- the total objects that has been transfered to the TeraHeap
-//	- the current total size of objects in TeraHeap until
-//	- the current total objects that are located in TeraHeap
-void TeraHeap::h2_print_stats() {
-	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %lu\n", fwd_ptrs_per_fgc);
-	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_BACK_PTRS = %lu\n", back_ptrs_per_fgc);
-	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_TRANS_OBJ = %lu\n", trans_per_fgc);
-
-	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
-	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
-	thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
-			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
-
-#ifdef FWD_REF_STAT
-	h2_print_fwd_ref_stat();
-#endif
-}
-
 #ifdef FWD_REF_STAT
 // Add a new entry to the histogram for forward reference that start from
 // H1 and results in 'obj' in H2 
@@ -588,11 +480,6 @@ bool TeraHeap::h2_is_empty_back_ref_stacks() {
 	return _tc_adjust_stack.is_empty();
 }
 
-// Increase the number of forward references from H1 to H2
-void TeraHeap::h2_increase_fwd_ref() {
-	fwd_ptrs_per_fgc++;
-}
-
 // Get the group Id of the objects that belongs to this region. We
 // locate the objects of the same group to the same region. We use the
 // field 'p' of the object to identify in which region the object
@@ -624,24 +511,10 @@ void TeraHeap::mark_used_region(HeapWord *obj) {
 char* TeraHeap::h2_add_object(oop obj, size_t size) {
 	char *pos;			// Allocation position
 
-	// Update Statistics
-	total_objects_size += size;
-	++total_objects;
-	++trans_per_fgc;
-
-	if (TeraHeapStatistics) {
-		size_t obj_size = (size * HeapWordSize) / 1024UL;
-		int count = 0;
-
-		while (obj_size > 0) {
-			count++;
-			obj_size/=1024UL;
-		}
-
-		assert(count <=2, "Array out of range");
-
-		++obj_distr_size[count];
-	}
+#ifdef TERA_STATS
+  tera_stats->add_object(size);
+  tera_stats->update_object_distribution(size);
+#endif
 
   pos = allocate(size, (uint64_t)obj->get_obj_group_id(), (uint64_t)obj->get_obj_part_id());
 
@@ -869,7 +742,17 @@ bool TeraHeap::is_h2_group_enabled() {
 }
 
 #ifdef TERA_TIMERS
+// Tera timers maintains timers for the different phases of the
+// major GC
 TeraTimers* TeraHeap::getTeraTimer() {
   return teraTimer;
+}
+#endif
+
+#ifdef TERA_STATS
+// Tera statistics for objects that we move to H2, forward references,
+// and backward references.
+TeraStatistics* TeraHeap::get_tera_stats() {
+  return tera_stats;
 }
 #endif

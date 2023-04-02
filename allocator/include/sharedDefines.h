@@ -52,7 +52,7 @@
 
 #define MMAP_SIZE (4*1024*1024)       //< Size of small mmaps in Anonymous mode
 
-#define STATISTICS 1				  //< Enable allocator to print statistics
+#define STATISTICS 0				  //< Enable allocator to print statistics
 
 #define DEBUG_PRINT 0			      //< Enable debug prints
 

@@ -3,9 +3,9 @@
 
 #include "gc/parallel/objectStartArray.hpp"
 #include "gc/shared/collectedHeap.inline.hpp"
-#include "gc/teraHeap//teraTimers.hpp"
+#include "gc/teraHeap/teraTimers.hpp"
+#include "gc/teraHeap/teraStatistics.hpp"
 #include "utilities/stack.inline.hpp"
-//#include "gc/parallel/psCompactionManager.hpp"
 #include "memory/sharedDefines.h"
 #include "oops/oop.hpp"
 
@@ -15,8 +15,6 @@
 #include <map>
 #include <tr1/tuple>
 #endif
-
-//class ParCompactionManager;
 
 class TeraHeap: public CHeapObj<mtInternal> {
 private:
@@ -43,23 +41,9 @@ private:
   TeraTimers *teraTimer;
 #endif
 
-  /*-----------------------------------------------
-   * Statistics of TeraHeap
-   *---------------------------------------------*/
-  static uint64_t total_objects; //< Total number of objects located in TeraHeap
-  static uint64_t total_objects_size; //< Total number of objects size
-
-  static uint64_t fwd_ptrs_per_fgc;    //< Total number of forward ptrs per FGC
-  static uint64_t back_ptrs_per_fgc;   //< Total number of back ptrs per FGC
-  static uint64_t trans_per_fgc;       //< Total number of objects transfered to
-                                       //< TeraHeap per FGC
-  static uint64_t tc_ct_trav_time[16]; //< Time to traverse TeraCards card table
-  static uint64_t heap_ct_trav_time[16]; //< Time to traverse heap card tables
-
-  static uint64_t back_ptrs_per_mgc; //< Total number of back ptrs per MGC
-
-  static uint64_t
-      obj_distr_size[3]; //< Object size distribution between B, KB, MB
+#ifdef TERA_STATS
+  TeraStatistics *tera_stats;
+#endif
 
   static long int cur_obj_group_id; //<We save the current object
                                     // group id for tera-marked
@@ -120,6 +104,9 @@ public:
   // Constructor
   TeraHeap();
   
+  // Destructor
+  ~TeraHeap();
+  
   // Get object start array for h2
   ObjectStartArray *h2_start_array() { return &_start_array; }
   
@@ -159,26 +146,6 @@ public:
   // Deallocate the backward references stacks
   void h2_clear_back_ref_stacks();
   
-  // Keep for each thread with 'tid' the 'total time' that needed to
-  // traverse the TeraHeap card table.
-  // Each thread writes the time in a table based on each ID and then we
-  // take the maximum time from all the threads as the total time.
-  void h2_back_ref_traversal_time(unsigned int tid, uint64_t total_time);
-
-  // Keep for each thread with 'tid' the 'total time' that needed to
-  // traverse the Heap card table.
-  // Each thread writes the time in a table based on each ID and then we
-  // take the maximum time from all the threads as the total time.
-  void h1_old_to_young_traversal_time(unsigned int tid, uint64_t total_time);
-  
-  // Print the statistics of TeraHeap at the end of each minorGC
-  // Will print:
-  //	- the time to traverse the TeraHeap dirty card tables
-  //	- the time to traverse the Heap dirty card tables
-  //	- TODO number of dirty cards in TeraHeap
-  //	- TODO number of dirty cards in Heap
-  void print_minor_gc_statistics();
-
   // Give advise to kernel to expect page references in sequential order
   void h2_enable_seq_faults();
 
@@ -207,29 +174,12 @@ public:
   // kept alive.
   oop* h2_get_next_back_reference();
 
-  // Increase forward ptrs from JVM heap to TeraHeap
-  void h2_increase_fwd_ref();
-
   // Update backward reference stacks that we use in marking and
   // pointer adjustment phases of major GC.
   void h2_push_backward_reference(void *p, oop o);
 
   // Get the next backward reference from the stack to adjust
   oop* h2_adjust_next_back_reference();
-
-  // Init the statistics counters of TeraHeap to zero when a Full GC
-  // starts
-  void h2_init_stats_counters();
-
-  // Print the statistics of TeraHeap at the end of each FGC
-  // Will print:
-  //	- the total forward pointers from the JVM heap to the
-  // TeraHeap
-  //	- the total back pointers from TeraHeap to the JVM heap
-  //	- the total objects that has been transfered to the TeraHeap
-  //	- the current total size of objects in TeraHeap
-  //	- the current total objects that are located in TeraHeap
-  void h2_print_stats();
 
   // Explicit (using systemcall) write 'data' with 'size' to the specific
   // 'offset' in the file.
@@ -397,7 +347,15 @@ public:
   bool is_h2_group_enabled();
 
 #ifdef TERA_TIMERS
+  // Tera timers maintains timers for the different phases of the
+  // major GC
   TeraTimers* getTeraTimer();
+#endif
+
+#ifdef TERA_STATS
+  // Tera statistics for objects that we move to H2, forward references,
+  // and backward references.
+  TeraStatistics* get_tera_stats();
 #endif
 };
 

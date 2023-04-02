@@ -2049,9 +2049,6 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
       if (!Universe::teraHeap()->h2_is_empty())
         PSScavenge::h2_scavenge_back_references();
       
-      if (TeraHeapStatistics)
-        Universe::teraHeap()->h2_init_stats_counters();
-		
       // Give advise to kernel to prefetch pages for TeraCache random
       Universe::teraHeap()->h2_enable_rand_faults();
 
@@ -2107,8 +2104,10 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
       if (H2LivenessAnalysis)
         Universe::teraHeap()->h2_mark_live_objects_per_region();
       
+#ifdef TERA_STATS
       if (TeraHeapStatistics)
-        Universe::teraHeap()->h2_print_stats();
+        Universe::teraHeap()->get_tera_stats()->print_major_gc_stats();
+#endif
 
       // Free all the regions that are unused after marking
       Universe::teraHeap()->free_unused_regions();
@@ -2347,6 +2346,9 @@ public:
       oop *obj = Universe::teraHeap()->h2_get_next_back_reference();
 
       while(obj != NULL) {
+#ifdef TERA_STATS
+        Universe::teraHeap()->get_tera_stats()->add_back_ref();
+#endif
         cm->tera_mark_and_push(obj);
         obj = Universe::teraHeap()->h2_get_next_back_reference();
       }
@@ -2375,6 +2377,14 @@ public:
     if (_active_workers > 1) {
       steal_marking_work(_terminator, worker_id);
     }
+    
+#ifdef TERA_STATS
+    if (EnableTeraHeap && TeraHeapStatistics) {
+      ParCompactionManager* cm = ParCompactionManager::gc_thread_compaction_manager(worker_id);
+      Universe::teraHeap()->get_tera_stats()->add_forward_ref(cm->get_fwd_ptrs(), worker_id);
+      cm->reset_fwd_ptrs();
+    }
+#endif
   }
 };
 

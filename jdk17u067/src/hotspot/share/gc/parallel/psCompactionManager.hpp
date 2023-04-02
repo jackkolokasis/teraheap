@@ -114,6 +114,8 @@ class ParCompactionManager : public CHeapObj<mtGC> {
 
 #ifdef TERA_MAJOR_GC
   void increase_fwd_ptrs() { _fwd_ptrs_h1_h2++; };
+  unsigned int get_fwd_ptrs() { return _fwd_ptrs_h1_h2++; };
+  void reset_fwd_ptrs() { _fwd_ptrs_h1_h2 = 0; };
   void set_h2_candidate_flags(oop obj);
 #endif // TERA_MAJOR_GC
 

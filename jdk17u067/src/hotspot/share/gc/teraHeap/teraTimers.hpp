@@ -36,6 +36,10 @@ private:
   struct timeval h2_clear_fwd_table_start_time;
   struct timeval h2_clear_fwd_table_end_time;
 
+  timeval *h1_card_table_start_time;
+
+  timeval *h2_card_table_start_time;
+
   void print_ellapsed_time(struct timeval start_time,
                            struct timeval end_time, char* msg);
 
@@ -72,5 +76,21 @@ public:
   
   void h2_clear_fwd_table_start();
   void h2_clear_fwd_table_end();
+  
+  // Keep for each GC thread the time that need to traverse the H1
+  // card table.
+  // Each thread writes the time in a table based on each ID and then we
+  // take the maximum time from all the threads as the total time.
+  void h1_card_table_start(unsigned int worker_id);
+  void h1_card_table_end(unsigned int worker_id);
+
+  // Keep for each GC thread the time that need to traverse the H2
+  // card table.
+  // Each thread writes the time in a table based on each ID and then we
+  // take the maximum time from all the threads as the total time.
+  void h2_card_table_start(unsigned int worker_id);
+  void h2_card_table_end(unsigned int worker_id);
+
+  void print_card_table_scanning_time();
 };
 #endif

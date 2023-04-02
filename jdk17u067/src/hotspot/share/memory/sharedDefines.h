@@ -67,6 +67,8 @@
                                   // or -XX:AllocateOldGenAt="/mnt/dir"
 #define TERA_TIMERS
 
+#define TERA_STATS
+
 /**********************************
  * Write Mode to H2
  **********************************/
