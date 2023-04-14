@@ -108,6 +108,10 @@ void ParCompactionManager::reset_all_bitmap_query_caches() {
   uint parallel_gc_threads = ParallelScavengeHeap::heap()->workers().total_workers();
   for (uint i=0; i<=parallel_gc_threads; i++) {
     _manager_array[i]->reset_bitmap_query_cache();
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap)
+      _manager_array[i]->_is_h2_candidate = false;
+#endif
   }
 }
 
