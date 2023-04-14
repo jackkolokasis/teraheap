@@ -226,6 +226,9 @@ public:
   // Prints all the region groups
   void print_region_groups(void);
 
+  // Check if the collector transfers and adjust H2 candidate objects.
+  bool compact_h2_candidate_obj_enabled();
+
   // Enables groupping with region of obj
   void enable_groups(HeapWord *old_addr, HeapWord *new_addr);
 
@@ -357,6 +360,17 @@ public:
   // and backward references.
   TeraStatistics* get_tera_stats();
 #endif
+
+  // Init the allocator to reserve dram space for the allocation of
+  // forwarding tables 
+  void init_tera_dram_allocator(uint64_t entries);
+  
+  // Request an address from the allocator. Sizes should be up to 24bytes.
+  // Eeach entry in the forwarding table is 24bytes
+  inline char* tera_dram_malloc(size_t size);
+
+  // Destroy the reserved dram space
+  void destroy_tera_dram_allocator();
 };
 
 #endif

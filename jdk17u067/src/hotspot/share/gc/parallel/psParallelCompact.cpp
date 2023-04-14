@@ -736,7 +736,7 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
     // The bitmap routines require the right boundary to be word-aligned.
     size_t range_end = mark_bitmap.align_range_end(end_bit);
     size_t beg_bit = mark_bitmap.find_h2_candidate(mark_bitmap.addr_to_bit(beg_addr), range_end);
-    size_t region_size = _region_data[cur_region].data_size();
+    DEBUG_ONLY(size_t region_size = _region_data[cur_region].data_size();)
 
     // Get the forwarding table of the region
     TeraForwardingTable *fd_table = _region_data[cur_region].get_forwarding_table();
@@ -746,6 +746,9 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
     if (beg_bit < range_end) {
       assert(fd_table == NULL, "Sanity check");
       fd_table = new TeraForwardingTable();
+#ifdef TERA_STATS
+      Universe::teraHeap()->get_tera_stats()->add_fwd_tables();
+#endif
     }
 
     while (beg_bit < range_end) {
@@ -759,6 +762,7 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
       // Get the new object location in H2 and create an entry in the forwarding table
       HeapWord* h2_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(obj, size);
       fd_table->add(h1_addr, h2_addr);
+      obj->set_h2_dst_addr((uint64_t) h2_addr);
       assert(h2_addr == fd_table->find(h1_addr)->literal(), "Sanity check");
 
       // Clear the bits from obj_beg and obj_end bitmaps. We mark the
@@ -772,6 +776,7 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
 
       beg_bit = mark_bitmap.find_h2_candidate(tmp_end + 1, range_end);
     }
+
     _region_data[cur_region].set_forwarding_table(fd_table);
     assert(_region_data[cur_region].data_size() <= region_size,
            "Region size differ, size before = %lu and size after = %lu", region_size, _region_data[cur_region].data_size());
@@ -801,10 +806,9 @@ void ParallelCompactData::compact_h2_candidate_objects(HeapWord* source_beg,
     while (beg_bit < range_end) {
       assert(fd_table != NULL, "Should be not null");
       HeapWord *h1_addr = mark_bitmap.bit_to_addr(beg_bit);
-      HeapWord *h2_addr = fd_table->find(h1_addr)->literal();
       oop obj = cast_to_oop(h1_addr);
+      HeapWord *h2_addr = (HeapWord *) obj->get_h2_dst_addr();
       assert(h2_addr != NULL, "fd_table->find(h1_addr)->literal()");
-      assert(obj->is_marked_move_h2(), "H1: %p | TF = %lu\n", h1_addr, obj->get_obj_state());
       size_t size = obj->size();
       size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
 
@@ -959,7 +963,9 @@ HeapWord* ParallelCompactData::calc_new_pointer(HeapWord* addr, ParCompactionMan
     assert(region_ptr->get_forwarding_table() != NULL, "Error forwarding table is empty");
     assert(region_ptr->get_forwarding_table()->find(addr)->literal() != NULL, "Error");
 
-    return region_ptr->get_forwarding_table()->find(addr)->literal();
+    return Universe::teraHeap()->compact_h2_candidate_obj_enabled() ? 
+      (HeapWord*) cast_to_oop(addr)->get_h2_dst_addr() : 
+      region_ptr->get_forwarding_table()->find(addr)->literal();
   }
 
   HeapWord* result = region_ptr->destination();
@@ -1840,6 +1846,7 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
 
   if (EnableTeraHeap) {
     // Assign to H2 candidate objects a new address from H2
+    Universe::teraHeap()->init_tera_dram_allocator(500000000);
     precompact_h2_candidate_objects();
   }
 
@@ -2095,6 +2102,11 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
 #ifdef TERA_MAJOR_GC
     if (EnableTeraHeap) {
+      // Wait to complete all the transfers to H2 and then continue
+      Universe::teraHeap()->h2_complete_transfers();
+
+      Universe::teraHeap()->destroy_tera_dram_allocator();
+
       if (TeraHeapAllocatorStatistics)
         Universe::teraHeap()->print_region_groups();
 
@@ -2103,6 +2115,11 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
       if (H2LivenessAnalysis)
         Universe::teraHeap()->h2_mark_live_objects_per_region();
+
+#ifdef TERA_TIMERS
+      if (TeraHeapStatistics)
+        Universe::teraHeap()->getTeraTimer()->print_malloc_time();
+#endif
       
 #ifdef TERA_STATS
       if (TeraHeapStatistics)
@@ -2350,6 +2367,7 @@ public:
         Universe::teraHeap()->get_tera_stats()->add_back_ref();
 #endif
         cm->tera_mark_and_push(obj);
+        //cm->mark_and_push(obj);
         obj = Universe::teraHeap()->h2_get_next_back_reference();
       }
 #ifdef TERA_TIMERS
@@ -2584,8 +2602,6 @@ void PSParallelCompact::compact_h2_candidate_objects() {
     _summary_data.compact_h2_candidate_objects(space->bottom(), space->top(),
                                                _mark_bitmap, cm);
   }
-  // Wait to complete all the transfers to H2 and then continue
-  Universe::teraHeap()->h2_complete_transfers();
 
 #ifdef TERA_TIMERS
   Universe::teraHeap()->getTeraTimer()->h2_compact_end();

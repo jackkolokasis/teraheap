@@ -35,8 +35,8 @@ function release()
   make dist-clean
   bash ./configure \
     --with-jobs="$(nproc)" \
-    --with-extra-cflags="-O3 -I/home/kolokasis/github/teraheap/allocator/include" \
-    --with-extra-cxxflags="-O3 -I/home/kolokasis/github/teraheap/allocator/include" \
+    --with-extra-cflags="-O3 -I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include" \
+    --with-extra-cxxflags="-O3 -I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include" \
     --with-target-bits=64
   
   intercept-build make
@@ -57,8 +57,8 @@ function debug_symbols_on()
     --with-native-debug-symbols=internal \
     --with-target-bits=64 \
     --with-jobs="$(nproc)" \
-    --with-extra-cflags="-I/home/kolokasis/github/teraheap/allocator/include" \
-    --with-extra-cxxflags="-I/home/kolokasis/github/teraheap/allocator/include"
+    --with-extra-cflags="-I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include" \
+    --with-extra-cxxflags="-I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include"
 
   intercept-build make
   cd ../ 

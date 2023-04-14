@@ -72,7 +72,7 @@ class oopDesc {
   //| 31-0  | Represent the state of the object                              |
   //+-------+----------------------------------------------------------------+
 
-  volatile int64_t _tera_flag;      //< MarkTeracache objects
+  volatile uint64_t _tera_flag;      //< MarkTeracache objects
 #endif // TERA_FLAG
 
  public:
@@ -80,6 +80,14 @@ class oopDesc {
   inline markWord* mark_addr() const;
 
 #ifdef TERA_FLAG
+  // Save the H2 destination address of the object. By saving the
+  // destination address to the teraflag we avoid to overwrite the
+  // mark word of the object
+  inline void set_h2_dst_addr(uint64_t addr);
+  
+  // Get the H2 destination address of the candidate object.
+  inline uint64_t get_h2_dst_addr();
+
   // Mark an object with 'id' to be moved in H2. H2 allocator uses the
   // 'id' to locate objects with the same 'id' by to the same region.
   // 'id' is defined by the application.

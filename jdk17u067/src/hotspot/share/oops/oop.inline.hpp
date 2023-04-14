@@ -55,9 +55,21 @@ markWord* oopDesc::mark_addr() const {
 }
 
 #ifdef TERA_FLAG
-  // Mark an object with 'id' to be moved in H2. H2 allocator uses the
-  // 'id' to locate objects with the same 'id' by to the same region.
-  // 'id' is defined by the application.
+// Save the H2 destination address of the object. By saving the
+// destination address to the teraflag we avoid to overwrite the
+// mark word of the object
+void oopDesc::set_h2_dst_addr(uint64_t addr) {
+  _tera_flag = addr;
+}
+
+// Get the H2 destination address of the candidate object.
+inline uint64_t oopDesc::get_h2_dst_addr() {
+  return _tera_flag;
+}
+
+// Mark an object with 'id' to be moved in H2. H2 allocator uses the
+// 'id' to locate objects with the same 'id' by to the same region.
+// 'id' is defined by the application.
 void oopDesc::mark_move_h2(uint64_t rdd_id, uint64_t part_id) { 
   _tera_flag = (part_id << 48);
   _tera_flag |= (rdd_id << 32);

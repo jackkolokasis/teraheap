@@ -2,10 +2,10 @@
 
 MODE=""
 PARALLEL_GC_THREADS=()
-STRIPE_SIZE=2048
+STRIPE_SIZE=32768
 
-JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-fastdebug/jdk/bin/java"
-#JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-release/jdk/bin/java"
+#JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-fastdebug/jdk/bin/java"
+JAVA="$(pwd)/../jdk17u067/build/linux-x86_64-server-release/jdk/bin/java"
 
 EXEC=("Array" "Array_List" "Array_List_Int" "List_Large" "MultiList" \
 	"Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference" \
@@ -21,6 +21,12 @@ export_env_vars() {
 	export PATH=${PROJECT_DIR}/allocator/include/:$PATH
 	export C_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$C_INCLUDE_PATH
 	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$CPLUS_INCLUDE_PATH
+	
+  export LIBRARY_PATH=${PROJECT_DIR}/tera_malloc/lib/:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/tera_malloc/lib/:$LD_LIBRARY_PATH
+	export PATH=${PROJECT_DIR}/tera_malloc/include/:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$C_INCLUDE_PATH
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$CPLUS_INCLUDE_PATH
 }
 
 # Run tests using only interpreter mode
@@ -236,6 +242,9 @@ do
     if [ "${exec_file}" == "ClassInstance" ]
     then
       XMS=2
+    elif [ "${exec_file}" == "Array_List" ]
+    then
+      XMS=3
     else
       XMS=1
     fi

@@ -1,19 +1,22 @@
 #include "precompiled.hpp"
-#include "gc/shared/collectedHeap.hpp"
 #include "gc/teraHeap/teraForwardingTable.hpp"
-#include "memory/universe.hpp"
-#include "utilities/hashtable.inline.hpp"
-#include "gc/shared/oopStorage.hpp"
-#include "jvmtifiles/jvmtiEnv.hpp"
+#include "gc/shared/collectedHeap.hpp"
+//#include "gc/teraHeap/teraForwardingTable.hpp"
+//#include "memory/universe.hpp"
+//#include "utilities/hashtable.inline.hpp"
+//#include "gc/shared/oopStorage.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
+//#include "jvmtifiles/jvmtiEnv.hpp"
 #include "logging/log.hpp"
-#include "memory/allocation.hpp"
-#include "memory/resourceArea.hpp"
-#include "oops/oop.inline.hpp"
-#include "oops/weakHandle.inline.hpp"
-#include "prims/jvmtiEventController.inline.hpp"
-#include "prims/jvmtiExport.hpp"
+//#include "memory/allocation.hpp"
+//#include "memory/resourceArea.hpp"
+//#include "oops/oop.inline.hpp"
+//#include "oops/weakHandle.inline.hpp"
+//#include "prims/jvmtiEventController.inline.hpp"
+//#include "prims/jvmtiExport.hpp"
 #include "prims/jvmtiTagMapTable.hpp"
-#include "utilities/hashtable.inline.hpp"
+#include "utilities/terahashtable.hpp"
+#include "utilities/terahashtable.inline.hpp"
 #include "utilities/macros.hpp"
 
 unsigned int TeraForwardingTable::compute_hash(HeapWord *addr) {
@@ -24,7 +27,7 @@ unsigned int TeraForwardingTable::compute_hash(HeapWord *addr) {
 
 // Entries are C_Heap allocated
 TeraForwardingTableEntry* TeraForwardingTable::new_entry(unsigned int hash, HeapWord *h2_addr) {
-  TeraForwardingTableEntry* entry = (TeraForwardingTableEntry*)Hashtable<HeapWord *, mtGC>::new_entry(hash, h2_addr);
+  TeraForwardingTableEntry* entry = (TeraForwardingTableEntry*)TeraHashtable<HeapWord *, mtNMT>::new_entry(hash, h2_addr);
   return entry;
 }
 
@@ -36,11 +39,11 @@ TeraForwardingTableEntry* TeraForwardingTable::add(HeapWord *src_addr, HeapWord 
   // One was added while acquiring the lock
   assert(find(index, hash, dst_addr) == NULL, "shouldn't already be present");
   TeraForwardingTableEntry* entry = new_entry(hash, dst_addr);
-  Hashtable<HeapWord *, mtGC>::add_entry(index, entry);
+  TeraHashtable<HeapWord *, mtNMT>::add_entry(index, entry);
   log_trace(teraheap, fdtable)("TeraForwardingTable: Key = %d | Value = %p", index, dst_addr);
   
   // Resize if the table is getting too big.
-  resize_if_needed();
+  //resize_if_needed();
 
   return entry;
 }
@@ -83,7 +86,7 @@ void TeraForwardingTable::resize_if_needed() {
 }
 
 void TeraForwardingTable::free_entry(TeraForwardingTableEntry* entry) {
-  BasicHashtable<mtGC>::free_entry(entry);
+  TeraBasicHashtable<mtNMT>::free_entry(entry);
 }
 
 void TeraForwardingTable::clear() {
@@ -103,9 +106,9 @@ void TeraForwardingTable::clear() {
 }
 
 TeraForwardingTable::TeraForwardingTable()
-  : Hashtable<HeapWord *, mtGC>(_table_size, sizeof(TeraForwardingTableEntry)) {}
+  : TeraHashtable<HeapWord *, mtNMT>(_table_size, sizeof(TeraForwardingTableEntry)) {}
 
 TeraForwardingTable::~TeraForwardingTable() {
-  clear();
-  // base class ~BasicHashtable deallocates the buckets.
+  //clear();
+  // base class ~TeraBasicHashtable deallocates the buckets.
 }

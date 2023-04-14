@@ -6,6 +6,7 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/mutexLocker.hpp"
+#include <tera_allocator.h>
 
 char *TeraHeap::_start_addr = NULL;
 char *TeraHeap::_stop_addr = NULL;
@@ -420,6 +421,11 @@ oop* TeraHeap::h2_adjust_next_back_reference() {
   return (!_tc_adjust_stack.is_empty() ? _tc_adjust_stack.pop() : NULL);
 }
 
+// Check if the collector transfers and adjust H2 candidate objects.
+bool TeraHeap::compact_h2_candidate_obj_enabled() {
+  return obj_h1_addr != NULL;
+}
+
 // Enables groupping with region of obj
 void TeraHeap::enable_groups(HeapWord *old_addr, HeapWord* new_addr){
     enable_region_groups((char*) new_addr);
@@ -706,9 +712,6 @@ void TeraHeap::h2_move_obj(HeapWord *src, HeapWord *dst, size_t size) {
   assert(dst != NULL, "Dst address should not be null");
   assert(size > 0, "Size should not be zero");
 
-  // Change the value of teraflag when the objects is in memory
-  !H2LivenessAnalysis ? cast_to_oop(src)->set_in_h2() : cast_to_oop(src)->set_live();
-
 #if defined(SYNC)
   h2_write((char *)src, (char *)dst, size);
 #elif defined(FMAP)
@@ -756,3 +759,15 @@ TeraStatistics* TeraHeap::get_tera_stats() {
   return tera_stats;
 }
 #endif
+
+// Init the allocator to reserve dram space for the allocation of
+// forwarding tables 
+void TeraHeap::init_tera_dram_allocator(uint64_t entries) {
+  init_arena(entries);
+}
+
+// Destroy the reserved dram space
+void TeraHeap::destroy_tera_dram_allocator() {
+  free_arena();
+}
+

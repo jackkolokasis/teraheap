@@ -5,6 +5,7 @@
 TeraStatistics::TeraStatistics() {
   total_objects = 0;
   total_objects_size = 0;
+  num_fwd_tables = 0;
 
   forward_ref = NEW_C_HEAP_ARRAY(size_t, ParallelGCThreads, mtGC);
   memset(forward_ref, 0, ParallelGCThreads * sizeof(size_t));
@@ -59,6 +60,11 @@ void TeraStatistics::update_object_distribution(size_t size) {
   assert(count <=2, "Array out of range");
   obj_distr_size[count]++;
 }
+  
+// Update the number of forwarding tables 
+void TeraStatistics::add_fwd_tables() {
+  num_fwd_tables++;
+}
 
 // Print the statistics of TeraHeap at the end of each FGC
 // Will print:
@@ -73,6 +79,7 @@ void TeraStatistics::print_major_gc_stats() {
   for (unsigned int i = 0; i < ParallelGCThreads; i++)
     total_fwd_ref += forward_ref[i];
 
+	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_TABLES = %lu\n", num_fwd_tables);
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_FORWARD_PTRS = %lu\n", total_fwd_ref);
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_BACK_PTRS = %lu\n", backward_ref);
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_TRANS_OBJ = %lu\n", moved_objects_per_gc);
@@ -87,4 +94,5 @@ void TeraStatistics::print_major_gc_stats() {
   memset(forward_ref, 0, ParallelGCThreads * sizeof(uint64_t));
   backward_ref = 0;
   moved_objects_per_gc = 0;
+  num_fwd_tables = 0;
 }

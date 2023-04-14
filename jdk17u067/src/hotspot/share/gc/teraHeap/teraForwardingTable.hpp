@@ -1,33 +1,33 @@
 #ifndef SHARE_GC_TERAHEAP_TERAFORWARDINGTABLE_HPP
 #define SHARE_GC_TERAHEAP_TERAFORWARDINGTABLE_HPP
 
-#include "utilities/hashtable.hpp"
-#include "utilities/hashtable.inline.hpp"
+#include "utilities/terahashtable.hpp"
+#include "utilities/terahashtable.inline.hpp"
 
 // Hashtable to record oops used for JvmtiTagMap
-class TeraForwardingTableEntry : public HashtableEntry<HeapWord *, mtGC> {
+class TeraForwardingTableEntry : public TeraHashtableEntry<HeapWord *, mtNMT> {
 public:
   TeraForwardingTableEntry* next() const {
-    return (TeraForwardingTableEntry*)HashtableEntry<HeapWord *, mtGC>::next();
+    return (TeraForwardingTableEntry*)TeraHashtableEntry<HeapWord *, mtNMT>::next();
   }
 
   TeraForwardingTableEntry** next_addr() {
-    return (TeraForwardingTableEntry**)HashtableEntry<HeapWord *, mtGC>::next_addr();
+    return (TeraForwardingTableEntry**)TeraHashtableEntry<HeapWord *, mtNMT>::next_addr();
   }
 }; 
 
-class TeraForwardingTable : public Hashtable<HeapWord *, mtGC> {
+class TeraForwardingTable : public TeraHashtable<HeapWord *, mtNMT> {
   enum Constants {
-    _table_size = 100
+    _table_size = 1000
   };
 
 private:
   TeraForwardingTableEntry* bucket(int i) {
-    return (TeraForwardingTableEntry*) Hashtable<HeapWord *, mtGC>::bucket(i);
+    return (TeraForwardingTableEntry*) TeraHashtable<HeapWord *, mtNMT>::bucket(i);
   }
   
   TeraForwardingTableEntry** bucket_addr(int i) {
-    return (TeraForwardingTableEntry**) Hashtable<HeapWord *, mtGC>::bucket_addr(i);
+    return (TeraForwardingTableEntry**) TeraHashtable<HeapWord *, mtNMT>::bucket_addr(i);
   }
   
   // Done

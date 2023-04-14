@@ -13,6 +13,8 @@ private:
   size_t  moved_objects_per_gc;        //< Total number of objects transfered to
                                        //< TeraHeap per FGC
 
+  size_t num_fwd_tables;               //< Number of forwarding tables
+
   size_t obj_distr_size[3];            //< Object size distribution between B, KB, MB
 
 public:
@@ -36,6 +38,9 @@ public:
   // Update the distribution of objects size. We divide the objects
   // into three categories: (1) Bytes, (2) KBytes, and (3) MBytes
   void update_object_distribution(size_t size);
+  
+  // Update the number of forwarding tables 
+  void add_fwd_tables();
   
   // Print the statistics of TeraHeap at the end of each FGC
   // Will print:
