@@ -116,6 +116,9 @@ inline void ParCompactionManager::tera_mark_and_push(T* p) {
       uint64_t group_id = Universe::teraHeap()->h2_get_region_groupId((void *) p);
       uint64_t part_id = Universe::teraHeap()->h2_get_region_partId((void *) p);
       obj->mark_move_h2(group_id, part_id);
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+      increase_h2_candidate_size(obj->size());
+#endif
     }
 
     if (mark_bitmap()->is_unmarked(obj) && PSParallelCompact::mark_obj(obj)) {
@@ -137,10 +140,17 @@ inline void ParCompactionManager::mark_and_push(T* p) {
                  assert(ParallelScavengeHeap::heap()->is_in(obj), "should be in heap");
                });
 
+#ifdef TERA_STATS
+    if (EnableTeraHeap && TeraHeapStatistics)
+      _traced_obj_has_ref = true;
+#endif
+
     if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj)) {
       Universe::teraHeap()->mark_used_region(cast_from_oop<HeapWord *>(obj));
+#ifdef TERA_STATS
       if (TeraHeapStatistics)
         increase_fwd_ptrs();
+#endif
       return;
     }
 
@@ -154,6 +164,9 @@ inline void ParCompactionManager::mark_and_push(T* p) {
     if (!Universe::teraHeap()->is_metadata(obj) && mark_bitmap()->is_h2_unmarked(obj)
         && PSParallelCompact::mark_h2_candidate_obj(obj)) {
       obj->mark_move_h2(_h2_group_id, _h2_part_id);
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+      increase_h2_candidate_size(obj->size());
+#endif
     }
     
     if (mark_bitmap()->is_unmarked(obj) && PSParallelCompact::mark_obj(obj)) {

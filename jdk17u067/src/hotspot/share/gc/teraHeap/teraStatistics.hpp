@@ -2,6 +2,7 @@
 #define SHARE_GC_TERAHEAP_TERASTATISTICS_HPP
 
 #include "memory/allocation.hpp"
+#include "oops/oop.hpp"
 
 class TeraStatistics: public CHeapObj<mtInternal> {
 private:
@@ -16,6 +17,14 @@ private:
   size_t num_fwd_tables;               //< Number of forwarding tables
 
   size_t obj_distr_size[3];            //< Object size distribution between B, KB, MB
+
+  size_t primitive_arrays_size;        //< Total size of promitive arrays
+  size_t primitive_obj_size;           //< Total size of objects with ONLY primitive type fields 
+  size_t non_primitive_obj_size;       //< Total size of objects with non primitive type fields
+  
+  size_t num_primitive_arrays;         //< Total number of promitive arrays instances
+  size_t num_primitive_obj;            //< Total number of objects with ONLY primitive type fields 
+  size_t num_non_primitive_obj;        //< Total size of objects with non primitive type fields
 
 public:
 
@@ -50,6 +59,18 @@ public:
   //	- the current total size of objects in H2
   //	- the current total objects that are moved in H2
   void print_major_gc_stats();
+
+  // Update the statistics for primitive arrays (e.g., char[], int[]).
+  // Keep the number of 'instances' and their 'total_size' per major GC.
+  void add_primitive_arrays_stats(size_t instances, size_t total_size);
+  
+  // Update the statistics for objects with only primitive type fields.
+  // Keep the number of 'instances' and their 'total_size' per major GC.
+  void add_primitive_obj_stats(size_t instances, size_t total_size);
+  
+  // Update the statistics for objects with non primitive type fields.
+  // Keep the number of 'instances' and their 'total_size' per major GC.
+  void add_non_primitive_obj_stats(size_t instances, size_t total_size);
 };
 
 #endif // SHARE_GC_TERAHEAP_TERASTATISTICS_HPP

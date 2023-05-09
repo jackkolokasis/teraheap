@@ -73,6 +73,26 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   bool                          _is_h2_candidate = false;
   uint64_t                      _h2_group_id = 0;
   uint64_t                      _h2_part_id = 0;
+  size_t                        _h2_candidate_obj_size = 0;
+#ifdef TERA_STATS
+  // Locate the objects that pop from stack and start scanning its
+  // references. If this object has no reference fields then we
+  // increase the statistics.
+  oop                           _traced_obj = NULL;
+  bool                          _traced_obj_has_ref = false;
+  // Total size of primitive arrays
+  size_t                        _primitive_arrays_size = 0; 
+  // Total size of primitive objects 
+  size_t                        _primitive_obj_size = 0;       
+  // Total size of non-primitive objects 
+  size_t                        _non_primitive_obj_size = 0;       
+  // Total number of promitive arrays instances
+  size_t                        _num_primitive_arrays = 0;
+  // Total number of primitive objects instances
+  size_t                        _num_primitive_obj = 0;
+  // Total number of non-primitive objects instances
+  size_t                        _num_non_primitive_obj = 0;
+#endif //TERA_STATS
 #endif // TERA_MAJOR_GC
   size_t                        _next_shadow_region;
 
@@ -117,6 +137,27 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   unsigned int get_fwd_ptrs() { return _fwd_ptrs_h1_h2++; };
   void reset_fwd_ptrs() { _fwd_ptrs_h1_h2 = 0; };
   void set_h2_candidate_flags(oop obj);
+  // Each compaction thread has a counter that keep the size of each
+  // candidate objects that will be moved to H2. We use per thread
+  // counter to avoid synchronization.
+  void increase_h2_candidate_size(size_t size) { _h2_candidate_obj_size += size;};
+  size_t get_h2_candidate_size() { return _h2_candidate_obj_size;};
+  // Reset counters that we use for statistics and calculating
+  // candidate object closure.
+  static void reset_h2_counters();
+
+#ifdef TERA_STATS
+  // Locate the objects that pop from stack and start scanning its
+  // references. If this object has no reference fields then we
+  // increase the statistics.
+  void set_traced_obj_ref()    { _traced_obj_has_ref = true; }
+  // Check traced object if is primitive type array, or object with
+  // primitive fields.
+  void check_traced_obj();
+  // Collect object statistics from marking phase
+  static void collect_obj_stats();
+#endif //TERA_STATS
+
 #endif // TERA_MAJOR_GC
 
  public:
@@ -149,6 +190,10 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   void set_last_query_return(size_t new_ret) { _last_query_ret = new_ret; }
 
   static void reset_all_bitmap_query_caches();
+
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+  static void set_h2_candidate_obj_size();
+#endif
 
   RegionTaskQueue* region_stack()                { return &_region_stack; }
 

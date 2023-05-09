@@ -759,17 +759,19 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
       // Get the last bit where the object ends
       size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
 
-      // Get the new object location in H2 and create an entry in the forwarding table
-      HeapWord* h2_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(obj, size);
-      fd_table->add(h1_addr, h2_addr);
-      obj->set_h2_dst_addr((uint64_t) h2_addr);
-      assert(h2_addr == fd_table->find(h1_addr)->literal(), "Sanity check");
+      if (Universe::teraHeap()->h2_promotion_policy(obj, Universe::teraHeap()->is_direct_promote())) {
+        // Get the new object location in H2 and create an entry in the forwarding table
+        HeapWord* h2_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(obj, size);
+        fd_table->add(h1_addr, h2_addr);
+        obj->set_h2_dst_addr((uint64_t) h2_addr);
+        assert(h2_addr == fd_table->find(h1_addr)->literal(), "Sanity check");
 
-      // Clear the bits from obj_beg and obj_end bitmaps. We mark the
-      // H2 candidate objects as dead to exclude them from the summary
-      // phase calculations of H1.
-      mark_bitmap.unmark_obj(obj, size);
-      summary_data.remove_obj(obj, size);
+        // Clear the bits from obj_beg and obj_end bitmaps. We mark the
+        // H2 candidate objects as dead to exclude them from the summary
+        // phase calculations of H1.
+        mark_bitmap.unmark_obj(obj, size);
+        summary_data.remove_obj(obj, size);
+      }
 
       if (tmp_end >= range_end)
         break;
@@ -812,13 +814,15 @@ void ParallelCompactData::compact_h2_candidate_objects(HeapWord* source_beg,
       size_t size = obj->size();
       size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
 
-      // Enable grouping of objects
-      Universe::teraHeap()->enable_groups(h1_addr, h2_addr);
-      cm->update_contents(obj);
-      Universe::teraHeap()->disable_groups();
+      if (Universe::teraHeap()->is_in_h2(h2_addr)) {
+        // Enable grouping of objects
+        Universe::teraHeap()->enable_groups(h1_addr, h2_addr);
+        cm->update_contents(obj);
+        Universe::teraHeap()->disable_groups();
 
-      // Move objects to H2
-      Universe::teraHeap()->h2_move_obj(h1_addr, h2_addr, size);
+        // Move objects to H2
+        Universe::teraHeap()->h2_move_obj(h1_addr, h2_addr, size);
+      }
 
       if (tmp_end >= range_end)
         break;
@@ -1217,6 +1221,12 @@ void PSParallelCompact::pre_compact()
   DEBUG_ONLY(summary_data().verify_clear();)
 
   ParCompactionManager::reset_all_bitmap_query_caches();
+
+#ifdef TERA_MAJOR_GC
+  if (EnableTeraHeap) {
+    ParCompactionManager::reset_h2_counters();
+  }
+#endif
 }
 
 void PSParallelCompact::post_compact()
@@ -1845,8 +1855,14 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
   GCTraceTime(Info, gc, phases) tm("Summary Phase", &_gc_timer);
 
   if (EnableTeraHeap) {
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+    // Initialize the couner for the size of H2 candidate object
+    ParCompactionManager::set_h2_candidate_obj_size();
+    Universe::teraHeap()->set_low_promotion_threshold();
+#endif
     // Assign to H2 candidate objects a new address from H2
     Universe::teraHeap()->init_tera_dram_allocator(500000000);
+
     precompact_h2_candidate_objects();
   }
 
@@ -2070,6 +2086,11 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
     marking_phase(vmthread_cm, maximum_heap_compaction, &_gc_tracer);
 
+#ifdef TERA_STATS
+    if (EnableTeraHeap && TeraHeapStatistics)
+      ParCompactionManager::collect_obj_stats();
+#endif
+
     bool max_on_system_gc = UseMaximumCompactionOnSystemGC
       && GCCause::is_user_requested_gc(gc_cause);
     summary_phase(vmthread_cm, maximum_heap_compaction || max_on_system_gc);
@@ -2200,6 +2221,18 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
       log_debug(gc, ergo)("AdaptiveSizeStop: collection: %d ", heap->total_collections());
     }
+
+#ifdef TERA_MAJOR_GC
+    if (EnableTeraHeap) {
+      size_t old_live = old_gen->used_in_bytes();
+      size_t max_old_gen_size = old_gen->max_gen_size(); 
+      Universe::teraHeap()->set_direct_promotion(old_live, max_old_gen_size);
+
+#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+      Universe::teraHeap()->h2_reset_total_marked_obj_size();
+#endif
+    }
+#endif // TERA_MAJOR_GC
 
     if (UsePerfData) {
       PSGCAdaptivePolicyCounters* const counters = heap->gc_policy_counters();

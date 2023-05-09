@@ -14,6 +14,14 @@ TeraStatistics::TeraStatistics() {
   moved_objects_per_gc = 0;
 
   memset(obj_distr_size, 0, sizeof(obj_distr_size));
+
+  primitive_arrays_size = 0;
+  primitive_obj_size = 0;
+  non_primitive_obj_size = 0;
+
+  num_primitive_arrays = 0;
+  num_primitive_obj = 0;
+  num_non_primitive_obj = 0;
 }
 
 TeraStatistics::~TeraStatistics() {
@@ -88,6 +96,14 @@ void TeraStatistics::print_major_gc_stats() {
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
 	thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
 			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
+
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_ARRAYS  = %lu\n", num_primitive_arrays);
+	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_ARRAYS_SIZE  = %lu\n", primitive_arrays_size);
+  thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_OBJ  = %lu\n", num_primitive_obj);
+	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_OBJ_SIZE  = %lu\n", primitive_obj_size);
+  thlog_or_tty->print_cr("[STATISTICS] | NUM_NON_PRIMITIVE_OBJ  = %lu\n", num_non_primitive_obj);
+	thlog_or_tty->print_cr("[STATISTICS] | NON_PRIMITIVE_OBJ_SIZE  = %lu\n", non_primitive_obj_size);
+
   thlog_or_tty->flush();
 
   // Init the statistics counters of TeraHeap to zero for the next GC
@@ -95,4 +111,32 @@ void TeraStatistics::print_major_gc_stats() {
   backward_ref = 0;
   moved_objects_per_gc = 0;
   num_fwd_tables = 0;
+  primitive_arrays_size = 0;
+  primitive_obj_size = 0;
+  non_primitive_obj_size = 0;
+  num_primitive_arrays = 0;
+  num_primitive_obj = 0;
+  num_non_primitive_obj = 0;
+}
+
+
+// Update the statistics for primitive arrays (e.g., char[], int[]).
+// Keep the number of 'instances' and their 'total_size' per major GC.
+void TeraStatistics::add_primitive_arrays_stats(size_t instances, size_t total_size) {
+  num_primitive_arrays += instances;
+  primitive_arrays_size += total_size;
+}
+
+// Update the statistics for objects with only primitive type fields.
+// Keep the number of 'instances' and their 'total_size' per major GC.
+void TeraStatistics::add_primitive_obj_stats(size_t instances, size_t total_size) {
+  num_primitive_obj += instances;
+  primitive_obj_size += total_size;
+}
+  
+// Update the statistics for objects with non primitive type fields.
+// Keep the number of 'instances' and their 'total_size' per major GC.
+void TeraStatistics::add_non_primitive_obj_stats(size_t instances, size_t total_size) {
+  num_non_primitive_obj += instances;
+  non_primitive_obj_size += total_size;
 }
