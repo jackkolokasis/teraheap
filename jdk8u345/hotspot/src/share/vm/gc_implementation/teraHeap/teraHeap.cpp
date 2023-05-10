@@ -869,7 +869,7 @@ void TeraHeap::update_obj_stats() {
     return;
   }
 
-  non_primitive_obj_size += trace_obj->size();
-  num_non_primitive_obj++;
+  primitive_obj_size += trace_obj->size();
+  num_primitive_obj++;
 }
 #endif
