@@ -66,6 +66,19 @@ TeraHeap::TeraHeap() {
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
 	total_marked_obj_for_h2 = 0;
 #endif
+
+#ifdef OBJ_STATS
+  primitive_arrays_size = 0;
+  primitive_obj_size = 0;
+  non_primitive_obj_size = 0;
+
+  num_primitive_arrays = 0;
+  num_primitive_obj = 0;
+  num_non_primitive_obj = 0;
+
+  trace_obj = NULL;
+  traced_obj_has_ref_field = false;
+#endif
 }
 
 // Return H2 start address
@@ -462,9 +475,28 @@ void TeraHeap::h2_print_stats() {
 	thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
 			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
 
+#ifdef OBJ_STATS
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_ARRAYS = %lu\n", num_primitive_arrays);
+	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_ARRAYS_SIZE = %lu\n", primitive_arrays_size);
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_OBJ = %lu\n", num_primitive_obj);
+	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_OBJ_SIZE = %lu\n", primitive_obj_size);
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_NON_PRIMITIVE_OBJ = %lu\n", num_non_primitive_obj);
+	thlog_or_tty->print_cr("[STATISTICS] | NON_PRIMITIVE_OBJ_SIZE = %lu\n", non_primitive_obj_size);
+  
+  // Reinitializwe counters
+  primitive_arrays_size = 0;
+  primitive_obj_size = 0;
+  non_primitive_obj_size = 0;
+  num_primitive_arrays = 0;
+  num_primitive_obj = 0;
+  num_non_primitive_obj = 0;
+  thlog_or_tty->flush();
+#endif
+
 #ifdef FWD_REF_STAT
 	h2_print_fwd_ref_stat();
 #endif
+
 }
 
 #ifdef FWD_REF_STAT
@@ -822,3 +854,22 @@ int TeraHeap::h2_continuous_regions(HeapWord *addr){
 bool TeraHeap::h2_object_starts_in_region(HeapWord *obj) {
   return object_starts_from_region((char *)obj);
 }
+
+#ifdef OBJ_STATS
+void TeraHeap::update_obj_stats() {
+  if (traced_obj_has_ref_field) {
+    non_primitive_obj_size += trace_obj->size();
+    num_non_primitive_obj++;
+    return;
+  }
+
+  if (trace_obj->is_typeArray()) {
+    primitive_arrays_size += trace_obj->size();
+    num_primitive_arrays++;
+    return;
+  }
+
+  non_primitive_obj_size += trace_obj->size();
+  num_non_primitive_obj++;
+}
+#endif

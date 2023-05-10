@@ -83,6 +83,9 @@
                                   // will be flushed to the device because the
                                   // memory of fast map is different from
                                   // buffer cache. 
+#define OBJ_STATS                 //< Take object statistics about
+                                  //primitive types and non primitive
+                                  //types
 
 /**********************************
  * Statistics

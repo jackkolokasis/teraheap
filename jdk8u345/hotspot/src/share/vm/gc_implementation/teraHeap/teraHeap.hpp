@@ -85,6 +85,19 @@ private:
   bool direct_promotion;            // Indicate to move tagged objects
                                     // to H2 without waiting any hint
                                     // from the framework
+
+#ifdef OBJ_STATS
+  size_t primitive_arrays_size;     //< Total size of promitive arrays
+  size_t primitive_obj_size;        //< Total size of objects with ONLY primitive type fields
+  size_t non_primitive_obj_size;    //< Total size of objects with non primitive type fields
+
+  size_t num_primitive_arrays;      //< Total number of promitive arrays instances
+  size_t num_primitive_obj;         //< Total number of objects with ONLY primitive type fields
+  size_t num_non_primitive_obj;     //< Total size of objects with non primitive type fields
+
+  oop trace_obj;                    //< Object that we scan for statisic purposes
+  bool traced_obj_has_ref_field;               //< Object that we scan its references for static purposes
+#endif
  
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
@@ -358,6 +371,20 @@ public:
 
   // Check where the object starts
   bool h2_object_starts_in_region(HeapWord *obj);
+
+#ifdef OBJ_STATS
+  // Set traced obj
+  void set_traced_obj(oop obj) { trace_obj = obj; }
+  
+  // Reset object ref field flag
+  void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false; }
+  
+  // Enable the flag if the object has reference fields
+  void set_obj_ref_field_flag() { traced_obj_has_ref_field = true; }
+
+  // Update object statistics
+  void update_obj_stats();
+#endif
 };
 
 #endif
