@@ -129,6 +129,13 @@ void PSMarkSweepDecorator::precompact() {
     // Check if the object needs to be moved in TeraCache based on the
     // current policy
     if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(oop(q), Universe::teraHeap()->is_direct_promote())) {
+#ifdef OBJ_STATS
+        if (TeraHeapStatistics) {
+          if (oop(q)->is_typeArray())
+            Universe::teraHeap()->update_stats_h2_primitive_arrays(size);
+        }
+#endif
+      
       // Take a pointer from the region
       HeapWord* h2_obj_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(oop(q), size);
       assert(Universe::teraHeap()->is_obj_in_h2(oop(h2_obj_addr)), "Pointer from H2 is not valid");

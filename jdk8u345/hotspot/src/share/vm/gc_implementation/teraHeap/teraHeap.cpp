@@ -78,6 +78,9 @@ TeraHeap::TeraHeap() {
 
   trace_obj = NULL;
   traced_obj_has_ref_field = false;
+  
+  num_h2_primitive_array = 0;
+  h2_primitive_array_size = 0;
 #endif
 }
 
@@ -482,6 +485,8 @@ void TeraHeap::h2_print_stats() {
 	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_OBJ_SIZE = %lu\n", primitive_obj_size);
 	thlog_or_tty->print_cr("[STATISTICS] | NUM_NON_PRIMITIVE_OBJ = %lu\n", num_non_primitive_obj);
 	thlog_or_tty->print_cr("[STATISTICS] | NON_PRIMITIVE_OBJ_SIZE = %lu\n", non_primitive_obj_size);
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_H2_PRIMITIVE_ARRAYS = %lu\n", num_h2_primitive_array);
+	thlog_or_tty->print_cr("[STATISTICS] | H2_PRIMITIVE_ARRAYS_SIZE = %lu\n", h2_primitive_array_size);
   
   // Reinitializwe counters
   primitive_arrays_size = 0;
@@ -490,6 +495,8 @@ void TeraHeap::h2_print_stats() {
   num_primitive_arrays = 0;
   num_primitive_obj = 0;
   num_non_primitive_obj = 0;
+  num_h2_primitive_array = 0;
+  h2_primitive_array_size = 0;
   thlog_or_tty->flush();
 #endif
 
@@ -871,5 +878,12 @@ void TeraHeap::update_obj_stats() {
 
   primitive_obj_size += trace_obj->size();
   num_primitive_obj++;
+}
+
+
+// Update counter for object H2 objects 
+void TeraHeap::update_stats_h2_primitive_arrays(size_t size) {
+  num_h2_primitive_array++;
+  h2_primitive_array_size += size;
 }
 #endif

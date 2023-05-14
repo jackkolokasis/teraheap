@@ -95,6 +95,9 @@ private:
   size_t num_primitive_obj;         //< Total number of objects with ONLY primitive type fields
   size_t num_non_primitive_obj;     //< Total size of objects with non primitive type fields
 
+  size_t h2_primitive_array_size;    //< Total size of H2 objects that are primitive arrays 
+  size_t num_h2_primitive_array;    //< Total number of H2 objects that are primitive arrays
+
   oop trace_obj;                    //< Object that we scan for statisic purposes
   bool traced_obj_has_ref_field;               //< Object that we scan its references for static purposes
 #endif
@@ -384,6 +387,9 @@ public:
 
   // Update object statistics
   void update_obj_stats();
+
+  // Update counter for object H2 objects 
+  void update_stats_h2_primitive_arrays(size_t size);
 #endif
 };
 
