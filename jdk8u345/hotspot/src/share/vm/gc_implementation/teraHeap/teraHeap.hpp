@@ -95,12 +95,12 @@ private:
   size_t num_primitive_obj;         //< Total number of objects with ONLY primitive type fields
   size_t num_non_primitive_obj;     //< Total size of objects with non primitive type fields
 
-  size_t h2_primitive_array_size;    //< Total size of H2 objects that are primitive arrays 
+  size_t h2_primitive_array_size;   //< Total size of H2 objects that are primitive arrays 
   size_t num_h2_primitive_array;    //< Total number of H2 objects that are primitive arrays
-
-  oop trace_obj;                    //< Object that we scan for statisic purposes
-  bool traced_obj_has_ref_field;               //< Object that we scan its references for static purposes
 #endif
+  bool traced_obj_has_ref_field;    //< Indicate that the object we
+                                    // scan in the marking phase of the
+                                    // major gc has references to other objects 
  
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
@@ -244,7 +244,7 @@ public:
   // We need to make an fsync when we use fastmap
   void h2_fsync();
 
-#if PR_BUFFER
+#ifdef PR_BUFFER
   // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
   // used to know where the object will move to H2. We use promotion buffer to
   // reduce the number of system calls for small sized objects.
@@ -375,18 +375,25 @@ public:
   // Check where the object starts
   bool h2_object_starts_in_region(HeapWord *obj);
 
-#ifdef OBJ_STATS
-  // Set traced obj
-  void set_traced_obj(oop obj) { trace_obj = obj; }
-  
   // Reset object ref field flag
   void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false; }
   
   // Enable the flag if the object has reference fields
   void set_obj_ref_field_flag() { traced_obj_has_ref_field = true; }
 
-  // Update object statistics
-  void update_obj_stats();
+  // We set the object type based on the 'traced_obj_has_ref_field
+  // flag value. We divide objects into three categories
+  // - primitive arrays
+  // - leaf objects which are the objects with only primitive type fields
+  // - non-primitive objets which are the objects with reference fields
+  void set_obj_primitive_state(oop obj);
+
+#ifdef OBJ_STATS
+  // Update counter for objects. We divide objects into three categories
+  // - primitive arrays
+  // - leaf objects which are the objects with only primitive type fields
+  // - non-primitive objets which are the objects with reference fields
+  void update_obj_stats(int type, size_t size);
 
   // Update counter for object H2 objects 
   void update_stats_h2_primitive_arrays(size_t size);

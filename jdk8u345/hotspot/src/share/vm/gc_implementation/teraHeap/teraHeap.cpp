@@ -76,7 +76,6 @@ TeraHeap::TeraHeap() {
   num_primitive_obj = 0;
   num_non_primitive_obj = 0;
 
-  trace_obj = NULL;
   traced_obj_has_ref_field = false;
   
   num_h2_primitive_array = 0;
@@ -797,13 +796,16 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
     if (!obj->is_marked_move_h2())
       return false;
 
+    if (!obj->is_primitive())
+      return false;
+
     return check_low_promotion_threshold(obj->size());
   }
 	
   if (direct_promotion)
     return obj->is_marked_move_h2();
 
-	return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+	return (obj->is_marked_move_h2() && obj->is_primitive() && obj->get_obj_group_id() <=  promote_tag);
 
 #elif defined(NOHINT_HIGH_WATERMARK)
 	if (direct_promotion)
@@ -863,23 +865,59 @@ bool TeraHeap::h2_object_starts_in_region(HeapWord *obj) {
 }
 
 #ifdef OBJ_STATS
-void TeraHeap::update_obj_stats() {
+
+void TeraHeap::set_obj_primitive_state(oop obj) {
+  // Object is a non-primitive object. Its fields are references. Thus
+  // the object has references to other objects in the heap.
   if (traced_obj_has_ref_field) {
-    non_primitive_obj_size += trace_obj->size();
-    num_non_primitive_obj++;
+#ifdef OBJ_STATS
+    update_obj_stats(0, obj->size());
+#endif
+    obj->set_non_primitive();
     return;
   }
-
-  if (trace_obj->is_typeArray()) {
-    primitive_arrays_size += trace_obj->size();
-    num_primitive_arrays++;
+  
+  // Object is a prrimitive array
+  if (obj->is_typeArray()) {
+#ifdef OBJ_STATS
+    update_obj_stats(1, obj->size());
+#endif
+    obj->set_primitive(true);
     return;
   }
-
-  primitive_obj_size += trace_obj->size();
-  num_primitive_obj++;
+  
+  // Object is a leaf object
+#ifdef OBJ_STATS
+    update_obj_stats(2, obj->size());
+#endif
+  obj->set_primitive(false);
 }
 
+// Update counter for objects. We divide objects into three categories
+// - primitive arrays
+// - leaf objects which are the objects with only primitive type fields
+// - non-primitive objets which are the objects with reference fields
+void TeraHeap::update_obj_stats(int type, size_t size) {
+  if (!TeraHeapStatistics)
+    return;
+
+  switch (type) {
+    case 0: // Non-primitive objects
+      non_primitive_obj_size += size;
+      num_non_primitive_obj++;
+    break;
+
+    case 1: // Primitive array obects
+      primitive_arrays_size += size;
+      num_primitive_arrays++;
+    break;
+
+    case 2: // Leaf objects
+      primitive_obj_size += size;
+      num_primitive_obj++;
+    break;
+  }
+}
 
 // Update counter for object H2 objects 
 void TeraHeap::update_stats_h2_primitive_arrays(size_t size) {

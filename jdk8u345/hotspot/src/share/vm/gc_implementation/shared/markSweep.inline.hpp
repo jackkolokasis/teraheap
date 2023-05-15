@@ -120,10 +120,8 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-#ifdef OBJ_STATS
-    if (EnableTeraHeap && TeraHeapStatistics)
+    if (EnableTeraHeap)
       Universe::teraHeap()->set_obj_ref_field_flag();
-#endif
 
     if (EnableTeraHeap && (Universe::teraHeap()->is_obj_in_h2(obj)))
     {
@@ -196,10 +194,8 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
-#ifdef OBJ_STATS
-    if (EnableTeraHeap && TeraHeapStatistics)
+    if (EnableTeraHeap)
       Universe::teraHeap()->set_obj_ref_field_flag();
-#endif
 
 #ifdef TERA_MAJOR_GC
 		if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj))
