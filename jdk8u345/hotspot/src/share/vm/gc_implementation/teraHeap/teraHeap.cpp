@@ -796,8 +796,10 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
     if (!obj->is_marked_move_h2())
       return false;
 
+#ifdef P_PRIMITIVE
     if (!obj->is_primitive())
       return false;
+#endif
 
     return check_low_promotion_threshold(obj->size());
   }
@@ -805,7 +807,11 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
   if (direct_promotion)
     return obj->is_marked_move_h2();
 
+#ifdef P_PRIMITIVE
 	return (obj->is_marked_move_h2() && obj->is_primitive() && obj->get_obj_group_id() <=  promote_tag);
+#else
+	return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+#endif
 
 #elif defined(NOHINT_HIGH_WATERMARK)
 	if (direct_promotion)
@@ -852,7 +858,8 @@ bool TeraHeap::check_low_promotion_threshold(size_t sz) {
 }
 
 void TeraHeap::set_low_promotion_threshold() {
-  h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
+  //h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
+  h2_low_promotion_threshold = total_marked_obj_for_h2;
 }
 #endif
 
@@ -863,8 +870,6 @@ int TeraHeap::h2_continuous_regions(HeapWord *addr){
 bool TeraHeap::h2_object_starts_in_region(HeapWord *obj) {
   return object_starts_from_region((char *)obj);
 }
-
-#ifdef OBJ_STATS
 
 void TeraHeap::set_obj_primitive_state(oop obj) {
   // Object is a non-primitive object. Its fields are references. Thus
@@ -892,6 +897,8 @@ void TeraHeap::set_obj_primitive_state(oop obj) {
 #endif
   obj->set_primitive(false);
 }
+
+#ifdef OBJ_STATS
 
 // Update counter for objects. We divide objects into three categories
 // - primitive arrays

@@ -71,15 +71,19 @@ void MarkSweep::follow_stack() {
       oop obj = _marking_stack.pop();
       assert (obj->is_gc_marked(), "p must be marked");
 
+#ifdef P_PRIMITIVE
       if (EnableTeraHeap) {
         Universe::teraHeap()->reset_obj_ref_field_flag();
       }
+#endif
 
       obj->follow_contents();
 
+#ifdef P_PRIMITIVE
       if (EnableTeraHeap) {
         Universe::teraHeap()->set_obj_primitive_state(obj);
       }
+#endif
     }
     // Process ObjArrays one at a time to avoid marking stack bloat.
     if (!_objarray_stack.is_empty()) {
