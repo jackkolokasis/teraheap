@@ -128,7 +128,7 @@ void PSMarkSweepDecorator::precompact() {
 #ifdef TERA_MAJOR_GC
     // Check if the object needs to be moved in TeraCache based on the
     // current policy
-    if (EnableTeraHeap && Universe::teraHeap()->h2_promotion_policy(oop(q), Universe::teraHeap()->is_direct_promote())) {
+    if (EnableTeraHeap && Universe::teraHeap()->h2_transfer_policy(oop(q))) {
 #ifdef OBJ_STATS
         if (TeraHeapStatistics) {
           if (oop(q)->is_typeArray())

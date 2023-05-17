@@ -353,7 +353,18 @@ public:
   // Get promote label value
   long get_promote_tag();
 
-  bool h2_promotion_policy(oop obj, bool is_direct = false);
+  // This function determines which of the H2 candidate objects found
+  // during marking phase we are going to move to H2. According to the
+  // policy that we enabled in the sharedDefines.h file we do the
+  // appropriate action. This function is used only in the
+  // precompaction phase.
+  bool h2_transfer_policy(oop obj);
+  
+  // Promotion policy for H2 candidate objects. This function is used
+  // during the marking phase of the major GC. According to the policy
+  // that we enabled in the sharedDefines.h file we do the appropriate
+  // action.
+  bool h2_promotion_policy(oop obj);
 
   void set_direct_promotion(size_t old_live, size_t max_old_gen_size);
 

@@ -136,7 +136,9 @@
 
 #define HINT_HIGH_LOW_WATERMARK     //< Promotion hint with high and low watermark
 
-//#define P_PRIMITIVE                //< Move only primitive arrays and
-                                   // primitive objects to H2
+#define P_PRIMITIVE                 //< Move only primitive arrays and
+                                    // primitive objects to H2. This
+                                    // policy is used with
+                                    // HINT_HIGH_LOW_WATERMARK
 
 #endif  // _SHARE_DEFINES_H_

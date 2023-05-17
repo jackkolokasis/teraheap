@@ -784,7 +784,45 @@ long TeraHeap::get_promote_tag() {
   return promote_tag;
 }
 
-bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
+// Promotion policy for H2 candidate objects. This function is used
+// during the marking phase of the major GC. According to the policy
+// that we enabled in the sharedDefines.h file we do the appropriate
+// action
+bool TeraHeap::h2_promotion_policy(oop obj) {
+#ifdef P_NO_TRANSFER
+  return false;
+
+#elif defined(SPARK_POLICY)
+  return obj->is_marked_move_h2();
+
+#elif defined(HINT_HIGH_LOW_WATERMARK)
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
+  if (direct_promotion)
+    return obj->is_marked_move_h2();
+
+  return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+
+#elif defined(NOHINT_HIGH_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
+  if (direct_promotion)
+    return obj->is_marked_move_h2();
+
+  return false;
+
+#else
+  return obj->is_marked_move_h2();
+
+#endif
+}
+
+// This function determines which of the H2 candidate objects found
+// during marking phase we are going to move to H2. According to the
+// policy that we enabled in the sharedDefines.h file we do the
+// appropriate action. This function is used only in the
+// precompaction phase.
+bool TeraHeap::h2_transfer_policy(oop obj) {
 #ifdef P_NO_TRANSFER
 	return false;
 
@@ -792,7 +830,9 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
 	return obj->is_marked_move_h2();
 
 #elif defined(HINT_HIGH_LOW_WATERMARK)
-  if (is_direct) {
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
+  if (direct_promotion) {
     if (!obj->is_marked_move_h2())
       return false;
 
@@ -803,30 +843,29 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
 
     return check_low_promotion_threshold(obj->size());
   }
-	
-  if (direct_promotion)
-    return obj->is_marked_move_h2();
 
 #ifdef P_PRIMITIVE
-	return (obj->is_marked_move_h2() && obj->is_primitive() && obj->get_obj_group_id() <=  promote_tag);
+  return (obj->is_marked_move_h2() && obj->is_primitive() && obj->get_obj_group_id() <=  promote_tag);
 #else
-	return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+  return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
 #endif
 
 #elif defined(NOHINT_HIGH_WATERMARK)
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
 	if (direct_promotion)
 		return obj->is_marked_move_h2();
 
 	return false;
 
 #elif defined(NOHINT_HIGH_LOW_WATERMARK)
-	if (is_direct)
-		return check_low_promotion_threshold(obj->size());
-	
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
 	if (direct_promotion)
-		return obj->is_marked_move_h2();
+		return check_low_promotion_threshold(obj->size());
 
 	return false;
+
 #else
 	return obj->is_marked_move_h2();
 #endif
@@ -858,8 +897,7 @@ bool TeraHeap::check_low_promotion_threshold(size_t sz) {
 }
 
 void TeraHeap::set_low_promotion_threshold() {
-  //h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
-  h2_low_promotion_threshold = total_marked_obj_for_h2;
+  h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
 }
 #endif
 
