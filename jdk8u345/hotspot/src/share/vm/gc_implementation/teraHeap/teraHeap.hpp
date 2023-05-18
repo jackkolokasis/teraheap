@@ -101,13 +101,16 @@ private:
   bool traced_obj_has_ref_field;    //< Indicate that the object we
                                     // scan in the marking phase of the
                                     // major gc has references to other objects 
+#ifdef P_PRIMITIVE_OUT_CLOSURE
+  bool trace_static_object;         //< Inidcate that we trace a static object
+#endif // P_PRIMITIVE_OUT_CLOSURE
  
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
   // references (H2 to H1)
   std::map<oop *, std::tr1::tuple<int, int, int> > histogram;
   oop *back_ref_obj;
-#endif
+#endif // P_PRIMITIVE_OUT_CLOSURE
 
 #ifdef FWD_REF_STAT
   // This histogram keeps internally statistics for the forward references
@@ -378,7 +381,7 @@ public:
   bool check_low_promotion_threshold(size_t sz);
 
   void set_low_promotion_threshold();
-#endif
+#endif // NOHINT_HIGH_LOW_WATERMARK || HINT_HIGH_LOW_WATERMARK
 
   // Check if the object with `addr` span multiple regions
   int h2_continuous_regions(HeapWord *addr);
@@ -387,7 +390,7 @@ public:
   bool h2_object_starts_in_region(HeapWord *obj);
 
   // Reset object ref field flag
-  void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false; }
+  void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false; trace_static_object = false;}
   
   // Enable the flag if the object has reference fields
   void set_obj_ref_field_flag() { traced_obj_has_ref_field = true; }
@@ -408,7 +411,13 @@ public:
 
   // Update counter for object H2 objects 
   void update_stats_h2_primitive_arrays(size_t size);
-#endif
+#endif // OBJ_STATS
+
+#ifdef P_PRIMITIVE_OUT_CLOSURE
+  void set_trace_static_obj() { trace_static_object = true; }
+
+  bool is_trace_static_obj() { return trace_static_object; }
+#endif // P_PRIMITIVE_OUT_CLOSURE
 };
 
 #endif

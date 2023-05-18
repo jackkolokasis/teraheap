@@ -604,7 +604,7 @@ void TeraHeap::disable_groups(void){
 	obj_h2_addr = NULL;
 }
 
-#if PR_BUFFER
+#ifdef PR_BUFFER
 
 // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
 // used to know where the object will move to H2. We use promotion buffer to
@@ -833,8 +833,13 @@ bool TeraHeap::h2_transfer_policy(oop obj) {
   // We detect high memory presure in H1 heap and we are going to find
   // the transitive closure for all marked objects
   if (direct_promotion) {
-    if (!obj->is_marked_move_h2())
+    if (!obj->is_marked_move_h2()) {
+#ifdef P_PRIMITIVE_OUT_CLOSURE
+      return obj->is_primitive();
+#else
       return false;
+#endif
+    }
 
 #ifdef P_PRIMITIVE
     if (!obj->is_primitive())

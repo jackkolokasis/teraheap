@@ -173,6 +173,13 @@ void InstanceMirrorKlass::oop_follow_contents(oop obj) {
     obj->init_obj_state();
 #endif
 
+#ifdef P_PRIMITIVE_OUT_CLOSURE
+  if (EnableTeraHeap) {
+    Universe::teraHeap()->set_trace_static_obj();
+    obj->set_static_obj();
+  }
+#endif
+
   InstanceKlass::oop_follow_contents(obj);
 
   // Follow the klass field in the mirror.

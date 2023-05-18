@@ -116,6 +116,10 @@
 
 #define NON_PRIMITIVE     419     //< Non primitive object
 
+#define STATIC_FIELD      938     //< Static field
+
+#define WEAK_REF_FIELD    553     //< Weak/Sorft/Phantom reference field
+
 /**********************************
  * Policies for TeraCache
  **********************************/
@@ -140,5 +144,8 @@
                                     // primitive objects to H2. This
                                     // policy is used with
                                     // HINT_HIGH_LOW_WATERMARK
+
+#define P_PRIMITIVE_OUT_CLOSURE     //< Move primitive arrays that are
+                                    //not in the transitive closure
 
 #endif  // _SHARE_DEFINES_H_

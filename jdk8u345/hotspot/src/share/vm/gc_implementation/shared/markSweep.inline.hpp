@@ -224,6 +224,12 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 		DEBUG_ONLY(if (EnableTeraHeap) { assert(obj->get_obj_state() == MOVE_TO_TERA || obj->get_obj_state() == INIT_TF, "Fix clone operation"); });
 #endif
 
+#ifdef P_PRIMITIVE_OUT_CLOSURE
+    if (EnableTeraHeap && Universe::teraHeap()->is_trace_static_obj()) {
+      obj->set_static_obj();
+    }
+#endif
+
     if (!obj->mark()->is_marked()) {
       mark_object(obj);
       _marking_stack.push(obj);
