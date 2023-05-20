@@ -39,11 +39,11 @@
 // support is provided. Allocation by the interpreter and compiled code is done inline
 // and bails out to Scavenge::invoke_and_allocate.
 
-class TeraHeap;
 class CollectedHeap;
 class DeferredObjAllocEvent;
 class OopStorage;
 class ReservedHeapSpace;
+class TeraHeap;
 
 // A helper class for caching a Method* when the user of the cache
 // only cares about the latest version of the Method*.  This cache safely

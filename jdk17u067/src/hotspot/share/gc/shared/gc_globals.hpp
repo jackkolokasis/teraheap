@@ -714,7 +714,11 @@
 								                                    										    \
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
-          range(0, max_juint)
+          range(0, max_juint)                                               \
+								                                    										    \
+  product(ccstr, TeraHeapPolicy, "DefaultPolicy",                           \
+          "TeraHeapPolicy for moving objects to H2. The possible values "   \
+          "are: DefaultPolicy, SparkPrimitivePolicy")
 
 // end of GC_FLAGS
 

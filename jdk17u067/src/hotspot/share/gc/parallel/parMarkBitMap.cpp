@@ -110,6 +110,8 @@ ParMarkBitMap::mark_obj(HeapWord* addr, size_t size)
 }
 
 #ifdef TERA_MAJOR_GC
+// Unmak H2 candidate object from the begin bitmap and end bitmap.
+// We exclude these objects from the summary phase and compactions
 void
 ParMarkBitMap::unmark_obj(HeapWord* addr, size_t size)
 {
@@ -129,6 +131,16 @@ ParMarkBitMap::mark_h2_candidate_obj(HeapWord* addr)
 
   return false;
 }
+
+// According to the policy some of the H2 candidate objects should
+// be remain in H1. For this purpose we unmark them from
+// h2_candidate_objects bitmap.
+void
+ParMarkBitMap::unmark_h2_candidate_obj(HeapWord* addr) {
+  const idx_t candidate_obj_bit = addr_to_bit(addr);
+  _h2_candidate_bits.clear_bit(candidate_obj_bit);
+}
+
 #endif //TERA_MAJOR_GC
 
 inline bool

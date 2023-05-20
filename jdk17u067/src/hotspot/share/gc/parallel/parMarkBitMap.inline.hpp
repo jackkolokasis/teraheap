@@ -194,6 +194,13 @@ inline void ParMarkBitMap::unmark_obj(oop obj, int size) {
 inline bool ParMarkBitMap::mark_h2_candidate_obj(oop obj) {
   return mark_h2_candidate_obj(cast_from_oop<HeapWord*>(obj));
 }
+
+// According to the policy some of the H2 candidate objects should
+// be remain in H1. For this purpose we unmark them from
+// h2_candidate_objects bitmap.
+inline void ParMarkBitMap::unmark_h2_candidate_obj(oop obj) {
+  unmark_h2_candidate_obj(cast_from_oop<HeapWord*>(obj));
+}
 #endif //TERA_MAJOR_GC
 
 inline ParMarkBitMap::idx_t ParMarkBitMap::addr_to_bit(HeapWord* addr) const {

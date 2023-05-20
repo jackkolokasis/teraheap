@@ -74,12 +74,11 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   uint64_t                      _h2_group_id = 0;
   uint64_t                      _h2_part_id = 0;
   size_t                        _h2_candidate_obj_size = 0;
-#ifdef TERA_STATS
   // Locate the objects that pop from stack and start scanning its
   // references. If this object has no reference fields then we
   // increase the statistics.
-  oop                           _traced_obj = NULL;
   bool                          _traced_obj_has_ref = false;
+#if defined(TERA_STATS) && defined(OBJ_STATS)
   // Total size of primitive arrays
   size_t                        _primitive_arrays_size = 0; 
   // Total size of primitive objects 
@@ -92,7 +91,7 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   size_t                        _num_primitive_obj = 0;
   // Total number of non-primitive objects instances
   size_t                        _num_non_primitive_obj = 0;
-#endif //TERA_STATS
+#endif //TERA_STATS && OBJ_STATS
 #endif // TERA_MAJOR_GC
   size_t                        _next_shadow_region;
 
@@ -146,17 +145,19 @@ class ParCompactionManager : public CHeapObj<mtGC> {
   // candidate object closure.
   static void reset_h2_counters();
 
-#ifdef TERA_STATS
   // Locate the objects that pop from stack and start scanning its
   // references. If this object has no reference fields then we
   // increase the statistics.
   void set_traced_obj_ref()    { _traced_obj_has_ref = true; }
-  // Check traced object if is primitive type array, or object with
-  // primitive fields.
-  void check_traced_obj();
+  // Check if an object that is marked to be moved to H2 is primitive
+  // type array, or a leaf object. Leaf objects have only primitive
+  // type fields.
+  void check_for_primitive_objects(oop obj);
+  // Update object statistics that shows the number of primitive
+  // arrays, leaf objects, and non-primitive objects
+  void update_obj_stats(oop obj); 
   // Collect object statistics from marking phase
   static void collect_obj_stats();
-#endif //TERA_STATS
 
 #endif // TERA_MAJOR_GC
 
@@ -191,9 +192,7 @@ class ParCompactionManager : public CHeapObj<mtGC> {
 
   static void reset_all_bitmap_query_caches();
 
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
   static void set_h2_candidate_obj_size();
-#endif
 
   RegionTaskQueue* region_stack()                { return &_region_stack; }
 

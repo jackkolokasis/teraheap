@@ -4,6 +4,7 @@
 #include "gc/parallel/objectStartArray.hpp"
 #include "gc/shared/collectedHeap.inline.hpp"
 #include "gc/teraHeap/teraTimers.hpp"
+#include "gc/teraHeap/teraTransferPolicy.hpp"
 #include "gc/teraHeap/teraStatistics.hpp"
 #include "utilities/stack.inline.hpp"
 #include "memory/sharedDefines.h"
@@ -18,11 +19,11 @@
 
 class TeraHeap: public CHeapObj<mtInternal> {
 private:
-  static char *_start_addr; // TeraHeap start address of mmap region
-  static char *_stop_addr;  // TeraHeap ends address of mmap region
+  static char *_start_addr;         // TeraHeap start address of mmap region
+  static char *_stop_addr;          // TeraHeap ends address of mmap region
 
-  ObjectStartArray _start_array; // Keeps track of where objects
-                                        // start in a 2^CARD_SEGMENT_SIZE block
+  ObjectStartArray _start_array;    // Keeps track of where objects
+                                    // start in a 2^CARD_SEGMENT_SIZE block
 
   /*-----------------------------------------------
    * Stacks
@@ -64,22 +65,8 @@ private:
                                     // to H2 if it has back ptrs
                                     // to H1
 
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
-  size_t total_marked_obj_for_h2;   // Total marked objects to be moved in H2
+  TransferPolicy *tera_policy;      //< Transfer policy for H2
 
-  size_t h2_low_promotion_threshold;    // Promotion threshold
-#endif
-  
-  long non_promote_tag;             // Object with this label cannot be promoted to H2
-
-  long promote_tag;                 // Objects with labels less than
-                                    // the promote_tag can be moved to
-                                    // H2 during major GC
-
-  bool direct_promotion;            // Indicate to move tagged objects
-                                    // to H2 without waiting any hint
-                                    // from the framework
- 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
   // references (H2 to H1)
@@ -99,6 +86,36 @@ private:
   void h2_count_marked_objects();
 
   void h2_reset_marked_objects();
+
+  // Create a transfer policy for moving ojects from H1 to H2
+  TransferPolicy* create_transfer_policy();
+
+  // Explicit (using systemcall) write 'data' with 'size' to the specific
+  // 'offset' in the file.
+  void h2_write(char *data, char *offset, size_t size);
+
+  // Explicit (using systemcall) asynchronous write 'data' with 'size' to
+  // the specific 'offset' in the file.
+  void h2_awrite(char *data, char *offset, size_t size);
+
+  // We need to ensure that all the writes in TeraHeap using asynchronous
+  // I/O have been completed succesfully.
+  int h2_areq_completed();
+
+  // Fsync writes in TeraHeap
+  // We need to make an fsync when we use fastmap
+  void h2_fsync();
+
+#ifdef PR_BUFFER
+  // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
+  // used to know where the object will move to H2. We use promotion buffer to
+  // reduce the number of system calls for small sized objects.
+  void h2_promotion_buffer_insert(char *obj, char *new_adr, size_t size);
+
+  // At the end of the major GC flush and free all the promotion
+  // buffers.
+  void h2_free_promotion_buffers();
+#endif
 
 public:
   // Constructor
@@ -181,33 +198,6 @@ public:
   // Get the next backward reference from the stack to adjust
   oop* h2_adjust_next_back_reference();
 
-  // Explicit (using systemcall) write 'data' with 'size' to the specific
-  // 'offset' in the file.
-  void h2_write(char *data, char *offset, size_t size);
-
-  // Explicit (using systemcall) asynchronous write 'data' with 'size' to
-  // the specific 'offset' in the file.
-  void h2_awrite(char *data, char *offset, size_t size);
-
-  // We need to ensure that all the writes in TeraHeap using asynchronous
-  // I/O have been completed succesfully.
-  int h2_areq_completed();
-
-  // Fsync writes in TeraHeap
-  // We need to make an fsync when we use fastmap
-  void h2_fsync();
-
-#if PR_BUFFER
-  // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
-  // used to know where the object will move to H2. We use promotion buffer to
-  // reduce the number of system calls for small sized objects.
-  void h2_promotion_buffer_insert(char *obj, char *new_adr, size_t size);
-
-  // At the end of the major GC flush and free all the promotion
-  // buffers.
-  void h2_free_promotion_buffers();
-#endif
-
   // Resets the used field of all regions
   void h2_reset_used_field(void);
 
@@ -235,25 +225,11 @@ public:
   // Disables region groupping
   void disable_groups(void);
 
-  void print_object_name(HeapWord *obj, const char *name);
+  //void print_object_name(HeapWord *obj, const char *name);
 
   // Add a new entry to `obj1` region dependency list that reference
   // `obj2` region
   void group_regions(HeapWord *obj1, HeapWord *obj2);
-
-  // We save the current object group 'id' for tera-marked object to
-  // promote this 'id' to its reference objects
-  void set_cur_obj_group_id(long int id);
-
-  // Get the saved current object group id
-  long int get_cur_obj_group_id(void);
-
-  // We save the current object partition 'id' for tera-marked object to
-  // promote this 'id' to its reference objects
-  void set_cur_obj_part_id(long int id);
-
-  // Get the saved current object partition id
-  long int get_cur_obj_part_id(void);
 
   // Iterate over all objects in each region and print their states
   // This function is for debugging purposes to understand and fix the
@@ -296,19 +272,9 @@ public:
   // H1 and results in 'obj' in H2
   void h2_add_fwd_ref_stat(oop obj);
 #endif
-		
-  // Set non promote label value
-  void set_non_promote_tag(long val);
 
-  // Set promote label value
-  void set_promote_tag(long val);
+  TransferPolicy* get_policy() { return tera_policy; }
 
-  // Get non promote label value
-  long get_non_promote_tag();
-
-  // Get promote label value
-  long get_promote_tag();
-  
   // Check if the object `obj` is an instance of the following
   // metadata class:
   // - Instance Mirror Klass
@@ -316,22 +282,6 @@ public:
   // - Instance Class Loader Klass
   // If yes return true, otherwise false
   bool is_metadata(oop obj);
-
-  bool h2_promotion_policy(oop obj, bool is_direct = false);
-
-  void set_direct_promotion(size_t old_live, size_t max_old_gen_size);
-
-  bool is_direct_promote();
-
-#if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
-  void h2_incr_total_marked_obj_size(size_t size);
-
-  void h2_reset_total_marked_obj_size();
-
-  bool check_low_promotion_threshold(size_t sz);
-
-  void set_low_promotion_threshold();
-#endif
 
   // Check if the object with `addr` span multiple regions
   int h2_continuous_regions(HeapWord *addr);

@@ -31,13 +31,7 @@ TeraHeap::TeraHeap() {
   obj_h1_addr = NULL;
   obj_h2_addr = NULL;
 
-  non_promote_tag = 0;
-  promote_tag = -1;
-  direct_promotion = false;
-
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
-	total_marked_obj_for_h2 = 0;
-#endif
+  tera_policy = create_transfer_policy();
 
 #ifdef TERA_TIMERS
   teraTimer = new TeraTimers();
@@ -49,6 +43,7 @@ TeraHeap::TeraHeap() {
 }
 
 TeraHeap::~TeraHeap() {
+  delete tera_policy;
 #ifdef TERA_TIMERS
   delete teraTimer;
 #endif
@@ -57,6 +52,7 @@ TeraHeap::~TeraHeap() {
   delete tera_stats;
 #endif
 }
+
 
 // Return H2 start address
 char* TeraHeap::h2_start_addr(void) {
@@ -341,6 +337,20 @@ void TeraHeap::h2_reset_marked_objects() {
   }
 }
 
+// Create a transfer policy for moving ojects from H1 to H2
+TransferPolicy* TeraHeap::create_transfer_policy() {
+  if (!strcmp(TeraHeapPolicy, "SparkPrimitivePolicy"))
+    return new SparkPrimitivePolicy();
+
+  if (!strcmp(TeraHeapPolicy, "HintHighLowWatermarkPolicy"))
+    return new HintHighLowWatermarkPolicy();
+
+  if (!strcmp(TeraHeapPolicy, "HintHighLowWatermarkPrimitivePolicy"))
+    return new HintHighLowWatermarkPrimitivePolicy();
+  
+  return new DefaultPolicy();
+}
+
 void TeraHeap::h2_mark_live_objects_per_region() {
   HeapWord *next_region;
   HeapWord *obj_addr;
@@ -442,7 +452,7 @@ void TeraHeap::disable_groups(void){
 	obj_h2_addr = NULL;
 }
 
-#if PR_BUFFER
+#ifdef PR_BUFFER
 
 // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
 // used to know where the object will move to H2. We use promotion buffer to
@@ -529,28 +539,6 @@ char* TeraHeap::h2_add_object(oop obj, size_t size) {
 	return pos;
 }
 
-// We save the current object group 'id' for tera-marked object to
-// promote this 'id' to its reference objects
-void TeraHeap::set_cur_obj_group_id(long int id) {
-	cur_obj_group_id = id;
-}
-
-// Get the saved current object group id 
-long int TeraHeap::get_cur_obj_group_id(void) {
-	return cur_obj_group_id;
-}
-
-// We save the current object partition 'id' for tera-marked object to
-// promote this 'id' to its reference objects
-void TeraHeap::set_cur_obj_part_id(long int id) {
-	cur_obj_part_id = id;
-}
-
-// Get the saved current object partition id 
-long int TeraHeap::get_cur_obj_part_id(void) {
-	return cur_obj_part_id;
-}
-
 // If obj is in a different H2 region than the region enabled, they
 // are grouped 
 void TeraHeap::group_region_enabled(HeapWord* obj, void *obj_field) {
@@ -583,26 +571,6 @@ void TeraHeap::group_region_enabled(HeapWord* obj, void *obj_field) {
 
   ct->th_write_ref_field(h2_obj_field);
 }
-
-// Set non promote label value
-void TeraHeap::set_non_promote_tag(long val) {
-  non_promote_tag = val;
-}
-
-// Set promote tag value
-void TeraHeap::set_promote_tag(long val) {
-  promote_tag = val;
-}
-
-// Get non promote tag value
-long TeraHeap::get_non_promote_tag() {
-  return non_promote_tag;
-}
-
-// Get promote tag value
-long TeraHeap::get_promote_tag() {
-  return promote_tag;
-}
   
 // Check if the object `obj` is an instance of the following
 // metadata class:
@@ -626,75 +594,6 @@ bool TeraHeap::is_metadata(oop obj) {
 
   return false;
 }
-
-bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
-#ifdef P_NO_TRANSFER
-	return false;
-
-#elif defined(SPARK_POLICY)
-	return obj->is_marked_move_h2();
-
-#elif defined(HINT_HIGH_LOW_WATERMARK)
-  if (is_direct) {
-    if (!obj->is_marked_move_h2())
-      return false;
-
-    return check_low_promotion_threshold(obj->size());
-  }
-	
-  if (direct_promotion)
-    return obj->is_marked_move_h2();
-
-	return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
-
-#elif defined(NOHINT_HIGH_WATERMARK)
-	if (direct_promotion)
-		return obj->is_marked_move_h2();
-
-	return false;
-
-#elif defined(NOHINT_HIGH_LOW_WATERMARK)
-	if (is_direct)
-		return check_low_promotion_threshold(obj->size());
-	
-	if (direct_promotion)
-		return obj->is_marked_move_h2();
-
-	return false;
-#else
-	return obj->is_marked_move_h2();
-#endif
-}
-		
-void TeraHeap::set_direct_promotion(size_t old_live, size_t max_old_gen_size) {
-	direct_promotion = ((float) old_live / (float) max_old_gen_size) >= 0.85 ? true : false;
-}
-
-bool TeraHeap::is_direct_promote() {
-	return direct_promotion;
-}
-
-#if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
-void TeraHeap::h2_incr_total_marked_obj_size(size_t sz) {
-	total_marked_obj_for_h2 += sz;
-}
-		
-void TeraHeap::h2_reset_total_marked_obj_size() {
-	total_marked_obj_for_h2 = 0;
-}
-		
-bool TeraHeap::check_low_promotion_threshold(size_t sz) {
-	if (h2_low_promotion_threshold == 0 || sz > h2_low_promotion_threshold)
-		return false;
-
-	h2_low_promotion_threshold -= sz;
-	return true;
-}
-
-void TeraHeap::set_low_promotion_threshold() {
-  h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
-}
-#endif
 
 int TeraHeap::h2_continuous_regions(HeapWord *addr){
   assert(is_in_h2(addr), "Error");
@@ -735,7 +634,7 @@ void TeraHeap::h2_complete_transfers() {
 #elif defined(ASYNC) && !defined(PR_BUFFER)
   while(!h2_areq_completed());
 #elif defined(FMAP)
-  tc_fsync();
+  h2_fsync();
 #endif
 }
   

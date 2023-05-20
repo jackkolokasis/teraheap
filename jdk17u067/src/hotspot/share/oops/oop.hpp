@@ -65,14 +65,16 @@ class oopDesc {
   //+-------+----------------------------------------------------------------+
   //| Bits  | Description                                                    |
   //+-------+----------------------------------------------------------------+
-  //| 63-48 | Represent the RDD partition Id                                 |
+  //| 63-48 | Represent the sublabel Id                                      |
   //+-------+----------------------------------------------------------------+
-  //| 32-47 | Represent the RDD Id											 |
+  //| 32-47 | Represent the label Id										                     |
   //+-------+----------------------------------------------------------------+
-  //| 31-0  | Represent the state of the object                              |
+  //| 16-47 | Represent if object is leaf or primitive_array                 |
+  //+-------+----------------------------------------------------------------+
+  //| 15-0  | Represent the state of the object                              |
   //+-------+----------------------------------------------------------------+
 
-  volatile uint64_t _tera_flag;      //< MarkTeracache objects
+  volatile uint64_t _tera_flag;      //< Mark TeraHeap objects
 #endif // TERA_FLAG
 
  public:
@@ -120,6 +122,25 @@ class oopDesc {
   inline void set_visited();
 
   inline bool is_visited();
+
+#ifdef P_PRIMITIVE
+  // Set object flag if is promitive array or leaf object. Leaf
+  // objects are the objects that contain only primitive fields and no
+  // references to other objects
+  inline void set_primitive(bool is_primitive_array);
+
+  // Set object flag if is a non primitive object
+  inline void set_non_primitive();
+  
+  // Check if the object is primitive array or leaf object. Leaf
+  // objects are the objects that contain only primitive fields and no
+  // references to other objects
+  inline bool is_primitive();
+
+  // Check if the object is non-primitive. 
+  inline bool is_non_primitive();
+  
+#endif // P_PRIMITIVE
 #endif // TERA_FLAG
 
   inline void set_mark(markWord m);

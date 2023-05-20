@@ -52,12 +52,15 @@ public:
     // We exclude these objects from the summary phase and compactions
     void unmark_obj(HeapWord* addr, size_t size);
     inline void unmark_obj(oop obj, int size);
-#endif // TERA_MAJOR_GC
+    // Atomically mark the object as a candidate to be moved to H2
+    bool mark_h2_candidate_obj(HeapWord* addr);
+    inline bool mark_h2_candidate_obj(oop obj);
 
-#ifdef TERA_MAJOR_GC
-  // Atomically mark the object as a candidate to be moved to H2
-  bool mark_h2_candidate_obj(HeapWord* addr);
-  inline bool mark_h2_candidate_obj(oop obj);
+    // According to the policy some of the H2 candidate objects should
+    // be remain in H1. For this purpose we unmark them from
+    // h2_candidate_objects bitmap.
+    void unmark_h2_candidate_obj(HeapWord* addr);
+    inline void unmark_h2_candidate_obj(oop obj);
 #endif // TERA_MAJOR_GC
 
   // Return whether the specified begin or end bit is set.

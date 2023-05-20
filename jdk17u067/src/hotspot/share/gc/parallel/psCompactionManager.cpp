@@ -116,10 +116,7 @@ void ParCompactionManager::reset_h2_counters() {
   uint parallel_gc_threads = ParallelScavengeHeap::heap()->workers().total_workers();
   for (uint i=0; i<=parallel_gc_threads; i++) {
     _manager_array[i]->_is_h2_candidate = false;
-
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
     _manager_array[i]->_h2_candidate_obj_size = 0;
-#endif
 
 #ifdef TERA_STATS
     _manager_array[i]->_primitive_arrays_size   = 0;
@@ -133,14 +130,12 @@ void ParCompactionManager::reset_h2_counters() {
 }
 #endif
 
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
 void ParCompactionManager::set_h2_candidate_obj_size() {
   uint parallel_gc_threads = ParallelScavengeHeap::heap()->workers().total_workers();
   for (uint i=0; i<=parallel_gc_threads; i++) {
-    Universe::teraHeap()->h2_incr_total_marked_obj_size(_manager_array[i]->get_h2_candidate_size());
+    Universe::teraHeap()->get_policy()->h2_incr_total_marked_obj_size(_manager_array[i]->get_h2_candidate_size());
   }
 }
-#endif
 
 ParCompactionManager*
 ParCompactionManager::gc_thread_compaction_manager(uint index) {
@@ -153,33 +148,55 @@ ParCompactionManager::gc_thread_compaction_manager(uint index) {
 void ParCompactionManager::set_h2_candidate_flags(oop obj) {
   _is_h2_candidate = (EnableTeraHeap 
                       && !Universe::teraHeap()->is_metadata(obj)
-                      && Universe::teraHeap()->h2_promotion_policy(obj)) ? true : false;
+                      && Universe::teraHeap()->get_policy()->h2_promotion_policy(obj)) ? true : false;
   _h2_group_id     = (EnableTeraHeap && _is_h2_candidate) ? obj->get_obj_group_id() : 0;
   _h2_part_id      = (EnableTeraHeap && _is_h2_candidate) ? obj->get_obj_part_id() : 0;
 
-#ifdef TERA_STATS
-  if (EnableTeraHeap && TeraHeapStatistics) {
-    _traced_obj = obj;
-    _traced_obj_has_ref = false;
-  }
-#endif
+  _traced_obj_has_ref = false;
 }
 
-#ifdef TERA_STATS
-void ParCompactionManager::check_traced_obj() {
+// Check if an object that is marked to be moved to H2 is primitive
+// type array, or a leaf object. Leaf objects have only primitive
+// type fields.
+// NOTE: To avoid using extra synchronization for changing tera_flag
+// value, we set if an object is primitive or not only if it is
+// marked as candidate for H2 transfer. 
+void ParCompactionManager::check_for_primitive_objects(oop obj) {
+  if (!EnableTeraHeap) 
+    return;
+
+#if defined(TERA_STATS) && defined(OBJ_STATS)
+  update_obj_stats(obj);
+#endif
+
+  if (!_is_h2_candidate)
+    return;
+
   if (_traced_obj_has_ref) {
-    _non_primitive_obj_size += _traced_obj->size();
+    obj->set_non_primitive();
+    return;
+  }
+
+  obj->set_primitive(obj->is_typeArray());
+}
+
+#if defined(TERA_STATS) && defined(OBJ_STATS)
+// Update object statistics that shows the number of primitive
+// arrays, leaf objects, and non-primitive objects
+void ParCompactionManager::update_obj_stats(oop obj) {
+  if (_traced_obj_has_ref) {
+    _non_primitive_obj_size += obj->size();
     _num_non_primitive_obj++;
     return;
   }
 
-  if (_traced_obj->is_typeArray()) {
-    _primitive_arrays_size += _traced_obj->size();
+  if (obj->is_typeArray()) {
+    _primitive_arrays_size += obj->size();
     _num_primitive_arrays++;
     return;
   }
 
-  _primitive_obj_size += _traced_obj->size();
+  _primitive_obj_size += obj->size();
   _num_primitive_obj++;
 }
 
@@ -194,7 +211,7 @@ void ParCompactionManager::collect_obj_stats() {
       _manager_array[i]->_num_non_primitive_obj, _manager_array[i]->_non_primitive_obj_size);
   }
 }
-#endif // TERA_STATS
+#endif // TERA_STATS && OBJ_STATS
 
 #endif // TERA_MAJOR_GC
 
@@ -205,18 +222,12 @@ void ParCompactionManager::follow_marking_stacks() {
     while (marking_stack()->pop_overflow(obj)) {
       set_h2_candidate_flags(obj);
       follow_contents(obj);
-#ifdef TERA_STATS
-      if (EnableTeraHeap && TeraHeapStatistics)
-        check_traced_obj();
-#endif
+      check_for_primitive_objects(obj);
     }
     while (marking_stack()->pop_local(obj)) {
       set_h2_candidate_flags(obj);
       follow_contents(obj);
-#ifdef TERA_STATS
-      if (EnableTeraHeap && TeraHeapStatistics)
-        check_traced_obj();
-#endif
+      check_for_primitive_objects(obj);
     }
 
     // Process ObjArrays one at a time to avoid marking stack bloat.

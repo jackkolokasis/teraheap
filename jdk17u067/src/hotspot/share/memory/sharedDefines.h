@@ -65,9 +65,9 @@
                                   // with fastmap with enabled
                                   // -XX:AllocateHeapAt="/mnt/dir"
                                   // or -XX:AllocateOldGenAt="/mnt/dir"
-//#define TERA_TIMERS
 
-//#define TERA_STATS
+#define DO_NOT_UNLOAD_CLASSES     // Prevent klass unloading and their methods
+
 
 /**********************************
  * Write Mode to H2
@@ -86,12 +86,20 @@
                                   // will be flushed to the device because the
                                   // memory of fast map is different from
                                   // buffer cache. 
-#define DO_NOT_UNLOAD_CLASSES     // Prevent klass unloading and their methods
 
 /**********************************
  * Statistics
  **********************************/
 //#define FWD_REF_STAT               //< Collect statistics for class object
+
+//#define TERA_TIMERS             //< Enable timers for performance
+                                  //analysis
+
+//#define TERA_STATS                //< Statistics for objects in H2
+
+//#define OBJ_STATS                 //< Take object statistics about
+                                  //primitive types and non primitive
+                                  //types. This work with TERA_STATS
 
 /**********************************
  * States of TeraFlag  
@@ -101,7 +109,7 @@
 #define TERA_TO_OLD		    328	    //< Pointer from TeraCache to Old Gen. Move
                                   // this object to TeraCache
 
-#define IN_TERA_CACHE     2147483561	//< This object is located in TeraCache
+#define IN_TERA_HEAP     2147483561	//< This object is located in TeraCache
 
 #define INIT_TF				    2035	  //< Initial object state
 
@@ -111,24 +119,24 @@
 
 #define VISITED_TERA_OBJ  203     //< Object visited during GC Analysis
 
+#define PRIMITIVE_ARRAY   529     //< Object is primitive array
+
+#define LEAF_OBJECT       535     //< Leaf object (with only primitive fields)
+
+#define NON_PRIMITIVE     419     //< Non primitive object
+
+#define STATIC_OBJ        938     //< Static field
+
+#define WEAK_REF_OBJ      553     //< Weak/Sorft/Phantom reference field
+
 /**********************************
  * Policies for TeraCache
  **********************************/
-#define SPARK_POLICY				      //< Policy that we use for Spark
-
-#define P_SD_BACK_REF_CLOSURE	 	  //< Find the transitive closure of backward
-                                  // edges
-
-//#define P_NO_TRANSFER           //< This policy is ONLY for debugging.
-
 #define P_SD_EXCLUDE_CLOSURE	 	  //< Exclude objects from the closure
 
 #define P_SD_REF_EXCLUDE_CLOSURE  //< Exclude reference objects from the closure
 
-//#define NOHINT_HIGH_WATERMARK     //< No prootion hint with high watermark only
-
-//#define NOHINT_HIGH_LOW_WATERMARK //< No promotion hint with high and low watermark
-
-//#define HINT_HIGH_LOW_WATERMARK   //< Promotion hint with high and low watermark
+#define P_PRIMITIVE               //< Move only primitive arrays and
+                                  // primitive objects to H2.
 
 #endif  // SHARE_MEMORY_SHAREDDEFINES_H

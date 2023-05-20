@@ -73,29 +73,30 @@ inline uint64_t oopDesc::get_h2_dst_addr() {
 void oopDesc::mark_move_h2(uint64_t rdd_id, uint64_t part_id) { 
   _tera_flag = (part_id << 48);
   _tera_flag |= (rdd_id << 32);
+  _tera_flag |= (0 << 16);
   _tera_flag |= MOVE_TO_TERA;
 }
 
 // Check if an object is marked to be moved in H2
 bool oopDesc::is_marked_move_h2() { 
-  return (_tera_flag & 0xffffffff) == MOVE_TO_TERA ;
+  return (_tera_flag & 0xffff) == MOVE_TO_TERA ;
 }
 
-// Mark this object that is located in TeraCache
+// Mark this object that is located in H2 - TeraHeap
 void oopDesc::set_in_h2() { 
   uint64_t part_id = (_tera_flag >> 48);
   uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
-  uint64_t state   = _tera_flag & 0xffffffff;
+  uint64_t primitive = (_tera_flag >> 16) & 0xffff;
 
   _tera_flag = (part_id << 48);
   _tera_flag |= (rdd_id << 32);
-  _tera_flag |= IN_TERA_CACHE;
+  _tera_flag |= (primitive << 16);
+  _tera_flag |= IN_TERA_HEAP;
 }
 
 // Get the state of the object
 uint64_t oopDesc::get_obj_state() { 
-  // Get the object state. The state is saved in the lowes 32bit 
-  return (_tera_flag & 0xffffffff);
+  return (_tera_flag & 0xffff);
 }
 
 // Init the object state 
@@ -113,40 +114,102 @@ uint64_t oopDesc::get_obj_part_id() {
   return _tera_flag >> 48;
 }
 
+// This function is used only for statistic purposes to count how
+// many objects in H2 are alive and how many are dead. 
+// Return true if the objects in H2 is live
+//        false otherwise
 bool oopDesc::is_live() {
-  return (get_obj_state() == LIVE_TERA_OBJ || 
-  get_obj_state() == VISITED_TERA_OBJ || 
-  get_obj_state() == MOVE_TO_TERA);
+  uint64_t state = _tera_flag & 0xffff;
+  return (state == LIVE_TERA_OBJ || state == VISITED_TERA_OBJ || state == MOVE_TO_TERA);
 }
 
+// This function is used only for statistic purposes to count how
+// many objects in H2 are alive and how many are dead. 
+// We reset the object state for the next major GC.
 void oopDesc::reset_live() {
   set_in_h2();
 }
 
+// This function is used only for statistic purposes to count how
+// many objects in H2 are alive and how many are dead. 
+// This funtion set the teraflag to indicate that the object is live.
 void oopDesc::set_live() {
   uint64_t part_id = (_tera_flag >> 48);
-  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
-  uint64_t state   = _tera_flag & 0xffffffff;
+  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
+  uint64_t primitive = (_tera_flag >> 16) & 0xffff;
 
   _tera_flag = (part_id << 48);
   _tera_flag |= (rdd_id << 32);
+  _tera_flag |= (primitive << 16);
   _tera_flag |= LIVE_TERA_OBJ;
 }
 
+// This function is used only for statistic purposes to count how many
+// objects in H2 are alive and how many are dead. This funtion set the
+// teraflag to indicate that the object is visited during marking
+// phase.
 void oopDesc::set_visited() {
   uint64_t part_id = (_tera_flag >> 48);
-  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
-  uint64_t state   = _tera_flag & 0xffffffff;
+  uint64_t rdd_id = (_tera_flag >> 32) & 0xffff;
+  uint64_t primitive = (_tera_flag >> 16) & 0xffff;
 
   _tera_flag = (part_id << 48);
   _tera_flag |= (rdd_id << 32);
+  _tera_flag |= (primitive << 16);
   _tera_flag |= VISITED_TERA_OBJ;
 }
 
+// This function is used only for statistic purposes to count how many
+// objects in H2 are alive and how many are dead. 
+// Return true if the object is visited
+//        false otherwise
 bool oopDesc::is_visited() {
-  return (get_obj_state() == VISITED_TERA_OBJ);
+  uint64_t state = _tera_flag & 0xffff;
+  return (state == VISITED_TERA_OBJ);
 }
 
+#ifdef P_PRIMITIVE
+  // Set object flag if is promitive array or leaf object. Leaf
+  // objects are the objects that contain only primitive fields and no
+  // references to other objects
+void oopDesc::set_primitive(bool is_primitive_array) {
+  uint64_t part_id = (_tera_flag >> 48);
+  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
+  uint64_t state = _tera_flag & 0xffff;
+
+  _tera_flag = (part_id << 48);
+  _tera_flag |= (rdd_id << 32);
+  _tera_flag |= is_primitive_array ? (PRIMITIVE_ARRAY << 16) : (LEAF_OBJECT << 16);
+  _tera_flag |= state;
+}
+
+// Set object flag if is a non primitive object
+void oopDesc::set_non_primitive() {
+  uint64_t part_id = (_tera_flag >> 48);
+  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
+  uint64_t state = _tera_flag & 0xffff;
+
+  _tera_flag = (part_id << 48);
+  _tera_flag |= (rdd_id << 32);
+  _tera_flag |= (NON_PRIMITIVE << 16);
+  _tera_flag |= state;
+}
+  
+  // Check if the object is primitive array or leaf object. Leaf
+  // objects are the objects that contain only primitive fields and no
+  // references to other objects
+bool oopDesc::is_primitive() {
+    uint64_t state = ((_tera_flag >> 16) & 0xffff);
+	  return (state == PRIMITIVE_ARRAY) || (state == LEAF_OBJECT);
+}
+
+// Check if the object is non-primitive. 
+bool oopDesc::is_non_primitive() {
+  uint64_t state = ((_tera_flag >> 16) & 0xffff);
+  return state == NON_PRIMITIVE;
+}
+
+#endif // P_PRIMITIVE
 #endif // TERA_FLAG
 
 void oopDesc::set_mark(markWord m) {

@@ -759,7 +759,7 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
       // Get the last bit where the object ends
       size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
 
-      if (Universe::teraHeap()->h2_promotion_policy(obj, Universe::teraHeap()->is_direct_promote())) {
+      if (Universe::teraHeap()->get_policy()->h2_transfer_policy(obj)) {
         // Get the new object location in H2 and create an entry in the forwarding table
         HeapWord* h2_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(obj, size);
         fd_table->add(h1_addr, h2_addr);
@@ -771,6 +771,14 @@ void ParallelCompactData::precompact_h2_candidate_objects(HeapWord* source_beg,
         // phase calculations of H1.
         mark_bitmap.unmark_obj(obj, size);
         summary_data.remove_obj(obj, size);
+      } else {
+        // If the candidate objects is a non-primitive type then we
+        // change its state. In that way, we avoid to handle this
+        // object as an 'h2 candidate objects' in the next major GC.
+        if (obj->is_non_primitive())
+          obj->init_obj_state();
+
+        mark_bitmap.unmark_h2_candidate_obj(obj);
       }
 
       if (tmp_end >= range_end)
@@ -814,7 +822,7 @@ void ParallelCompactData::compact_h2_candidate_objects(HeapWord* source_beg,
       size_t size = obj->size();
       size_t tmp_end = mark_bitmap.addr_to_bit(h1_addr + size - 1);
 
-      if (Universe::teraHeap()->is_in_h2(h2_addr)) {
+      //if (Universe::teraHeap()->is_in_h2(h2_addr)) {
         // Enable grouping of objects
         Universe::teraHeap()->enable_groups(h1_addr, h2_addr);
         cm->update_contents(obj);
@@ -822,7 +830,7 @@ void ParallelCompactData::compact_h2_candidate_objects(HeapWord* source_beg,
 
         // Move objects to H2
         Universe::teraHeap()->h2_move_obj(h1_addr, h2_addr, size);
-      }
+      //}
 
       if (tmp_end >= range_end)
         break;
@@ -1855,11 +1863,9 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
   GCTraceTime(Info, gc, phases) tm("Summary Phase", &_gc_timer);
 
   if (EnableTeraHeap) {
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
     // Initialize the couner for the size of H2 candidate object
     ParCompactionManager::set_h2_candidate_obj_size();
-    Universe::teraHeap()->set_low_promotion_threshold();
-#endif
+    Universe::teraHeap()->get_policy()->set_low_promotion_threshold();
     // Assign to H2 candidate objects a new address from H2
     Universe::teraHeap()->init_tera_dram_allocator(500000000);
 
@@ -2086,7 +2092,7 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
     marking_phase(vmthread_cm, maximum_heap_compaction, &_gc_tracer);
 
-#ifdef TERA_STATS
+#if defined(TERA_STATS) && defined(OBJ_STATS)
     if (EnableTeraHeap && TeraHeapStatistics)
       ParCompactionManager::collect_obj_stats();
 #endif
@@ -2226,11 +2232,8 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
     if (EnableTeraHeap) {
       size_t old_live = old_gen->used_in_bytes();
       size_t max_old_gen_size = old_gen->max_gen_size(); 
-      Universe::teraHeap()->set_direct_promotion(old_live, max_old_gen_size);
-
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
-      Universe::teraHeap()->h2_reset_total_marked_obj_size();
-#endif
+      Universe::teraHeap()->get_policy()->set_direct_promotion(old_live, max_old_gen_size);
+      Universe::teraHeap()->get_policy()->h2_reset_total_marked_obj_size();
     }
 #endif // TERA_MAJOR_GC
 
