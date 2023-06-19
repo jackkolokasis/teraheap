@@ -208,26 +208,6 @@ class oopDesc {
 	  return (state == PRIMITIVE_ARRAY) || (state == LEAF_OBJECT);
   }
   
-#ifdef P_PRIMITIVE_OUT_CLOSURE
-  // Set object flag if is a field of a static objects
-  void set_static_obj() {
-	  uint64_t part_id = (_tera_flag >> 48);
-	  uint64_t rdd_id  = (_tera_flag >> 32) & 0xffff;
-	  uint64_t state = _tera_flag & 0xffff;
-
-	  _tera_flag = (part_id << 48);
-	  _tera_flag |= (rdd_id << 32);
-	  _tera_flag |= (STATIC_FIELD << 16);
-	  _tera_flag |= state;
-  }
-  
-  // Check if the object is a field of a class object
-  bool is_static_field() {
-    uint64_t state = ((_tera_flag >> 16) & 0xffff);
-	  return (state == STATIC_FIELD);
-  }
-#endif // P_PRIMITIVE_OUT_CLOSURE
-
 #endif // TERA_FLAG
 
   void set_mark(volatile markOop m)      { _mark = m;   }

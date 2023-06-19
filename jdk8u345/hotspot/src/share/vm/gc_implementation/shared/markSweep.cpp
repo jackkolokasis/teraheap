@@ -81,8 +81,7 @@ void MarkSweep::follow_stack() {
 
 #ifdef P_PRIMITIVE
       if (EnableTeraHeap) {
-        if (!obj->is_static_field())
-          Universe::teraHeap()->set_obj_primitive_state(obj);
+        Universe::teraHeap()->set_obj_primitive_state(obj);
       }
 #endif
     }

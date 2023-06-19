@@ -145,7 +145,4 @@
                                     // policy is used with
                                     // HINT_HIGH_LOW_WATERMARK
 
-#define P_PRIMITIVE_OUT_CLOSURE     //< Move primitive arrays that are
-                                    //not in the transitive closure
-
 #endif  // _SHARE_DEFINES_H_

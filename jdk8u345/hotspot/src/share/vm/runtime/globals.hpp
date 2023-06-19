@@ -2507,6 +2507,9 @@ class CommandLineFlags {
           "The percentage of the used heap that the instances of a class "  \
           "must occupy for the class to generate a trace event")            \
                                                                             \
+  product(bool, DynamicHeapResizing, false,                                 \
+          "Enable dynamic heap resizing for TeraHeap")                      \
+                                                                            \
   product(bool, EnableTeraHeap, false,                                      \
           "Enable TeraHeap. Works only with ParallelScavenge Collector")    \
                                                                             \

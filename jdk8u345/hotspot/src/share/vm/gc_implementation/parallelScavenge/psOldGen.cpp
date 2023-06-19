@@ -329,6 +329,7 @@ bool PSOldGen::expand_to_reserved() {
 void PSOldGen::shrink(size_t bytes) {
   assert_lock_strong(ExpandHeap_lock);
   assert_locked_or_safepoint(Heap_lock);
+  fprintf(stderr, "Shrink by %lu\n", bytes);
 
   size_t size = align_size_down(bytes, virtual_space()->alignment());
   if (size > 0) {
@@ -355,8 +356,44 @@ void PSOldGen::resize(size_t desired_free_space) {
     // Overflowed the addition.
     new_size = gen_size_limit();
   }
-  // Adjust according to our min and max
-  new_size = MAX2(MIN2(new_size, gen_size_limit()), min_gen_size());
+  static int i = 0;
+  i++;
+
+  if (EnableTeraHeap && DynamicHeapResizing && i >= 2) {
+    double used_ratio = (double) used_in_bytes() / capacity_in_bytes(); 
+
+    if (Universe::teraHeap()->need_to_grow_h1()) {
+      new_size = used_in_bytes() + (1.5 * used_in_bytes());
+
+    } else if (Universe::teraHeap()->need_to_shink_h1()) {
+      size_t diff = capacity_in_bytes() - used_in_bytes();
+      new_size = used_in_bytes() + (0.4 * diff);
+
+      /*
+    } else if (used_ratio >= 0.75) {
+      new_size = used_in_bytes() + (size_t)(used_in_bytes() * 0.4);
+
+    } else if (Universe::teraHeap()->is_direct_promote()) {
+      size_t diff = capacity_in_bytes() - used_in_bytes();
+      new_size = used_in_bytes() + (size_t) (0.6 * diff);
+      fprintf(stderr, "New Size %lu\n", new_size);
+      */
+
+    } else {
+      new_size = used_in_bytes() + desired_free_space;
+    }
+    //fprintf(stderr, "--------------------------------\n");
+    //fprintf(stderr, "capacity in bytes = %lu\n", capacity_in_bytes());
+    //fprintf(stderr, "used_in_bytes = %lu\n", used_in_bytes());
+    //fprintf(stderr, "max_gen_size = %lu\n", max_gen_size());
+    //fprintf(stderr, "min_gen_size = %lu\n", min_gen_size());
+    //fprintf(stderr, "--------------------------------\n");
+
+    //new_size = MIN2(MAX2(new_size, min_gen_size()), max_gen_size());
+  } else {
+    // Adjust according to our min and max
+    new_size = MAX2(MIN2(new_size, gen_size_limit()), min_gen_size());
+  }
 
   assert(gen_size_limit() >= reserved().byte_size(), "max new size problem?");
   new_size = align_size_up(new_size, alignment);

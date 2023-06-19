@@ -182,6 +182,11 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     TraceMemoryManagerStats tms(true /* Full GC */,gc_cause);
 
     if (TraceGen1Time) accumulated_time()->start();
+  
+    if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy::gc_start();
+      Universe::teraHeap()->get_resizing_policy()->reset_h2_candidate_size();
+    }
 
     // Let the size policy know we're starting
     size_policy->major_collection_begin();
@@ -388,7 +393,7 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     }
 
 #ifdef TERA_MAJOR_GC
-    if (EnableTeraHeap) {
+    if (EnableTeraHeap && !DynamicHeapResizing) {
       size_t old_live = old_gen->used_in_bytes();
       size_t max_old_gen_size = old_gen->max_gen_size(); 
       Universe::teraHeap()->set_direct_promotion(old_live, max_old_gen_size);
@@ -461,6 +466,10 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
   _gc_timer->register_gc_end();
 
   _gc_tracer->report_gc_end(_gc_timer->gc_end(), _gc_timer->time_partitions());
+
+  if (DynamicHeapResizing) {
+    TeraDynamicResizingPolicy::gc_end((_gc_timer->gc_end().milliseconds() - _gc_timer->gc_start().milliseconds()), os::elapsedTime());
+  }
 
   return true;
 }

@@ -81,6 +81,9 @@ TeraHeap::TeraHeap() {
   num_h2_primitive_array = 0;
   h2_primitive_array_size = 0;
 #endif
+  shrink_h1 = false;
+  grow_h1 = false;
+  dynamic_resizing_policy = new TeraDynamicResizingPolicy();
 }
 
 // Return H2 start address
@@ -798,10 +801,11 @@ bool TeraHeap::h2_promotion_policy(oop obj) {
 #elif defined(HINT_HIGH_LOW_WATERMARK)
   // We detect high memory presure in H1 heap and we are going to find
   // the transitive closure for all marked objects
-  if (direct_promotion)
-    return obj->is_marked_move_h2();
+  //if (direct_promotion)
+  //  return obj->is_marked_move_h2();
 
-  return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+  //return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+  return obj->is_marked_move_h2();
 
 #elif defined(NOHINT_HIGH_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
   // We detect high memory presure in H1 heap and we are going to find
@@ -834,11 +838,7 @@ bool TeraHeap::h2_transfer_policy(oop obj) {
   // the transitive closure for all marked objects
   if (direct_promotion) {
     if (!obj->is_marked_move_h2()) {
-#ifdef P_PRIMITIVE_OUT_CLOSURE
-      return obj->is_primitive();
-#else
       return false;
-#endif
     }
 
 #ifdef P_PRIMITIVE
@@ -902,7 +902,8 @@ bool TeraHeap::check_low_promotion_threshold(size_t sz) {
 }
 
 void TeraHeap::set_low_promotion_threshold() {
-  h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
+  //h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
+  h2_low_promotion_threshold = dynamic_resizing_policy->get_h2_candidate_size() * 0.5;
 }
 #endif
 
@@ -924,7 +925,13 @@ void TeraHeap::set_obj_primitive_state(oop obj) {
     obj->set_non_primitive();
     return;
   }
-  
+
+  // Track the size of H2 candidate objects in H1. Based on this size
+  // we determine when to move objects to H2.
+  if (DynamicHeapResizing && obj->is_marked_move_h2()) {
+    dynamic_resizing_policy->increase_h2_candidate_size(obj->size());
+  }
+
   // Object is a prrimitive array
   if (obj->is_typeArray()) {
 #ifdef OBJ_STATS

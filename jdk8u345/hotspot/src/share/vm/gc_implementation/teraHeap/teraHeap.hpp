@@ -2,6 +2,7 @@
 #define SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERAHEAP_HPP
 
 #include "gc_implementation/parallelScavenge/objectStartArray.hpp"
+#include "gc_implementation/teraHeap/teraDynamicResizingPolicy.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
 #include "memory/sharedDefines.h"
 #include "oops/oop.hpp"
@@ -69,6 +70,12 @@ private:
                                     // object that will be moved
                                     // to H2 if it has back ptrs
                                     // to H1
+  bool shrink_h1;                   //< This flag indicate that H1
+                                    // should be shrinked
+  bool grow_h1;                     //< This flag indicate that H1
+                                    // should be grown
+  
+  TeraDynamicResizingPolicy* dynamic_resizing_policy; 
 
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
   size_t total_marked_obj_for_h2;   // Total marked objects to be moved in H2
@@ -101,16 +108,12 @@ private:
   bool traced_obj_has_ref_field;    //< Indicate that the object we
                                     // scan in the marking phase of the
                                     // major gc has references to other objects 
-#ifdef P_PRIMITIVE_OUT_CLOSURE
-  bool trace_static_object;         //< Inidcate that we trace a static object
-#endif // P_PRIMITIVE_OUT_CLOSURE
- 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
   // references (H2 to H1)
   std::map<oop *, std::tr1::tuple<int, int, int> > histogram;
   oop *back_ref_obj;
-#endif // P_PRIMITIVE_OUT_CLOSURE
+#endif // BACK_REF_STAT
 
 #ifdef FWD_REF_STAT
   // This histogram keeps internally statistics for the forward references
@@ -390,7 +393,7 @@ public:
   bool h2_object_starts_in_region(HeapWord *obj);
 
   // Reset object ref field flag
-  void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false; trace_static_object = false;}
+  void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false;}
   
   // Enable the flag if the object has reference fields
   void set_obj_ref_field_flag() { traced_obj_has_ref_field = true; }
@@ -413,11 +416,37 @@ public:
   void update_stats_h2_primitive_arrays(size_t size);
 #endif // OBJ_STATS
 
-#ifdef P_PRIMITIVE_OUT_CLOSURE
-  void set_trace_static_obj() { trace_static_object = true; }
+  // The state machine uses this function to set if the GC should
+  // shrink H1 as a result to free the physical pages. Then the OS
+  // will reclaim the physical pahges and will use them as part of the
+  // buffer cache.
+  void set_shrink_h1() { shrink_h1 = true; }
+  // Reinitalize the shrink_h1 flag
+  void unset_shrink_h1() { shrink_h1 = false; }
+  // Check if the state machine identifies that we need to shrink H1.
+  bool  need_to_shink_h1() { return shrink_h1; }
+  
+  // The state machine uses this function to set if the GC should
+  // grow H1.
+  void set_grow_h1() { grow_h1 = true; }
+  // Reinitalize the grow_h1 flag to the default value
+  void unset_grow_h1() { grow_h1 = false; }
+  // Check if the state machine identifies that we need to grow H1.
+  bool  need_to_grow_h1() { return grow_h1; }
 
-  bool is_trace_static_obj() { return trace_static_object; }
-#endif // P_PRIMITIVE_OUT_CLOSURE
+  TeraDynamicResizingPolicy* get_resizing_policy() {
+    return dynamic_resizing_policy;
+  }
+
+  void set_direct_promotion() {
+    direct_promotion = true;
+  }
+
+  void unset_direct_promotion() {
+    direct_promotion = false;
+  }
+
+  
 };
 
 #endif

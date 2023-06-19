@@ -242,6 +242,50 @@ bool PSScavenge::invoke() {
   const bool need_full_gc = !scavenge_done ||
     policy->should_full_GC(heap->old_gen()->free_in_bytes());
   bool full_gc_done = false;
+  bool need_resizing = false;
+
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    switch (Universe::teraHeap()->get_resizing_policy()->action()) {
+      case TeraDynamicResizingPolicy::S_MOVE_H2:
+        fprintf(stderr, "STATE = S_MOVE_H2\n");
+        Universe::teraHeap()->set_direct_promotion();
+        need_resizing = true;
+        break;
+
+      case TeraDynamicResizingPolicy::S_SHRINK_H1:
+        fprintf(stderr, "STATE = S_SHRINK_H1\n");
+        Universe::teraHeap()->set_shrink_h1();
+        ParallelScavengeHeap::old_gen()->resize(10000);
+        Universe::teraHeap()->unset_shrink_h1();
+        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        //need_resizing = true;
+        break;
+
+      case TeraDynamicResizingPolicy::S_GROW_H1:
+        fprintf(stderr, "STATE = S_GROW_H1\n");
+        Universe::teraHeap()->set_grow_h1();
+        ParallelScavengeHeap::old_gen()->resize(10000);
+        Universe::teraHeap()->unset_grow_h1();
+        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        //need_resizing = true;
+        break;
+
+      case TeraDynamicResizingPolicy::S_MOVE_BACK:
+        //assert(false, "Please implement this case");
+        //fprintf(stderr, "STATE = S_MOVE_BACK\n");
+        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        break;
+
+      case TeraDynamicResizingPolicy::S_NO_ACTION:
+        //fprintf(stderr, "STATE = S_NO_ACTION\n");
+        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        break;
+
+      case TeraDynamicResizingPolicy::S_CONTINUE:
+        //fprintf(stderr, "STATE = S_CONTINUE\n");
+        break;
+    }
+  }
 
   if (UsePerfData) {
     PSGCAdaptivePolicyCounters* const counters = heap->gc_policy_counters();
@@ -249,7 +293,7 @@ bool PSScavenge::invoke() {
     counters->update_full_follows_scavenge(ffs_val);
   }
 
-  if (need_full_gc) {
+  if (need_full_gc || need_resizing) {
     GCCauseSetter gccs(heap, GCCause::_adaptive_size_policy);
     CollectorPolicy* cp = heap->collector_policy();
     const bool clear_all_softrefs = cp->should_clear_all_soft_refs();
@@ -262,8 +306,15 @@ bool PSScavenge::invoke() {
   }
 
 #ifdef TERA_MINOR_GC
-  if (EnableTeraHeap)
+  if (EnableTeraHeap) {
 	  Universe::teraHeap()->h2_clear_back_ref_stacks();
+    if (DynamicHeapResizing && need_resizing) {
+      Universe::teraHeap()->unset_shrink_h1();
+      Universe::teraHeap()->unset_grow_h1();
+      Universe::teraHeap()->unset_direct_promotion();
+      Universe::teraHeap()->get_resizing_policy()->reset_counters();
+    }
+  }
 #endif // TERA_MINOR_GC
 
   return full_gc_done;

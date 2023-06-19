@@ -2824,6 +2824,10 @@ void os::pd_commit_memory_or_exit(char* addr, size_t size, bool exec,
 #define MADV_HUGEPAGE 14
 #endif
 
+#ifndef MADV_FREE
+  #define MADV_FREE 8
+#endif
+
 int os::Linux::commit_memory_impl(char* addr, size_t size,
                                   size_t alignment_hint, bool exec) {
   int err = os::Linux::commit_memory_impl(addr, size, exec);
@@ -3145,6 +3149,12 @@ struct bitmask* os::Linux::_numa_all_nodes_ptr;
 struct bitmask* os::Linux::_numa_nodes_ptr;
 
 bool os::pd_uncommit_memory(char* addr, size_t size) {
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    int result = ::madvise(addr, size, MADV_FREE);
+    if (result != 0) {
+      fprintf(stderr, "Madvise ERROR %d\n", result);
+    }
+  }
   uintptr_t res = (uintptr_t) ::mmap(addr, size, PROT_NONE,
                 MAP_PRIVATE|MAP_FIXED|MAP_NORESERVE|MAP_ANONYMOUS, -1, 0);
   return res  != (uintptr_t) MAP_FAILED;

@@ -117,13 +117,13 @@ template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
 
-  if (!oopDesc::is_null(heap_oop)) {
-    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
-
 #ifdef P_PRIMITIVE
     if (EnableTeraHeap)
       Universe::teraHeap()->set_obj_ref_field_flag();
 #endif
+
+  if (!oopDesc::is_null(heap_oop)) {
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
     if (EnableTeraHeap && (Universe::teraHeap()->is_obj_in_h2(obj)))
     {
@@ -193,13 +193,12 @@ template <class T> inline void MarkSweep::h2_liveness_analysis(T* p) {
 
 template <class T> inline void MarkSweep::mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
-  if (!oopDesc::is_null(heap_oop)) {
-    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
-
 #ifdef P_PRIMITIVE
     if (EnableTeraHeap)
       Universe::teraHeap()->set_obj_ref_field_flag();
 #endif
+  if (!oopDesc::is_null(heap_oop)) {
+    oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
 #ifdef TERA_MAJOR_GC
 		if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj))
@@ -222,12 +221,6 @@ template <class T> inline void MarkSweep::mark_and_push(T* p) {
 
 #ifdef TEST_CLONE
 		DEBUG_ONLY(if (EnableTeraHeap) { assert(obj->get_obj_state() == MOVE_TO_TERA || obj->get_obj_state() == INIT_TF, "Fix clone operation"); });
-#endif
-
-#ifdef P_PRIMITIVE_OUT_CLOSURE
-    if (EnableTeraHeap && Universe::teraHeap()->is_trace_static_obj()) {
-      obj->set_static_obj();
-    }
 #endif
 
     if (!obj->mark()->is_marked()) {
