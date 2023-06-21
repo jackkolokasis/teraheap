@@ -8,20 +8,7 @@
 #define WINDOW_INTERVAL ((30LL * 1000))
 #define TRANSFER_THRESHOLD 0.4f
 #define GC_FREQUENCY (120)
-#define IO_WEIGHT 1.5
-
-unsigned long long TeraDynamicResizingPolicy::iowait_start;
-unsigned long long TeraDynamicResizingPolicy::cpu_start;
-unsigned long long TeraDynamicResizingPolicy::gc_iowait_start;
-unsigned long long TeraDynamicResizingPolicy::gc_cpu_start;
-
-double TeraDynamicResizingPolicy::gc_iowait_time_ms;
-uint64_t TeraDynamicResizingPolicy::gc_dev_time;
-uint64_t TeraDynamicResizingPolicy::gc_dev_start;
-uint64_t TeraDynamicResizingPolicy::dev_time_start;
-double TeraDynamicResizingPolicy::gc_time;
-double TeraDynamicResizingPolicy::last_full_gc_ms;
-
+  
 // Calculate ellapsed time
 double TeraDynamicResizingPolicy::ellapsed_time(uint64_t start_time,
                                                 uint64_t end_time) {
@@ -78,28 +65,26 @@ void TeraDynamicResizingPolicy::gc_end(double gc_duration, double last_full_gc) 
 void TeraDynamicResizingPolicy::read_cpu_stats(unsigned long long* cpu_iowait,
                                                unsigned long long* total_cpu) {
   FILE* stat_file = fopen("/proc/stat", "r");
-  char buffer[BUFFER_SIZE];
-  int res;
-
   if (!stat_file) {
     fprintf(stderr, "Failed to open /proc/stat\n");
     return;
   }
 
+  char buffer[BUFFER_SIZE];
   unsigned long long user, nice, system, idle, iowait, irq, softirq;
 
   while (fgets(buffer, BUFFER_SIZE, stat_file)) {
     if (strncmp(buffer, "cpu", 3) == 0) {
       sscanf(buffer, "%*s %llu %llu %llu %llu %llu %llu %llu", &user, &nice, &system, &idle, &iowait, &irq, &softirq);
 
-      *total_cpu = user + nice + system + idle + iowait + irq + softirq;
+      *total_cpu = user + nice + system + iowait + irq + softirq;
       *cpu_iowait = iowait;
 
       break;
     }
   }
 
-  res = fclose(stat_file);
+  int res = fclose(stat_file);
   if (res != 0) {
     fprintf(stderr, "Error closing file");
   }
@@ -120,23 +105,28 @@ void TeraDynamicResizingPolicy::calc_iowait_time(unsigned long long cpu_iowait_b
   unsigned long long iowait_diff = cpu_iowait_after - cpu_iowait_before;
   unsigned long long cpu_diff = total_cpu_after - total_cpu_before;
 
-  *iowait_time =  ((double) iowait_diff / cpu_diff) * duration;
+  if (cpu_diff == 0) {
+    *iowait_time = 0;
+    fprintf(stderr, "iowait_time = 0\n");
+  }
+  else
+    *iowait_time = ((double) iowait_diff / cpu_diff) * duration;
 }
 
 uint64_t TeraDynamicResizingPolicy::get_device_active_time(const char* device) {
-  char stat_file_path[256];
-  int res;
+  char file_path[256];
+  snprintf(file_path, sizeof(file_path), "/sys/block/%s/stat", device);
+  FILE* dev_file = fopen(file_path, "r");
 
-  snprintf(stat_file_path, sizeof(stat_file_path), "/sys/block/%s/stat", device);
-  FILE* stat_file = fopen(stat_file_path, "r");
-
-  if (stat_file == NULL) {
+  if (!dev_file) {
     printf("Failed to open device statistics file.\n");
     return 0;
   }
 
-  char line[1024];
-  while (fgets(line, sizeof(line), stat_file) != NULL) {
+  char line[BUFFER_SIZE];
+  int res;
+  
+  while (fgets(line, sizeof(line), dev_file) != NULL) {
     uint64_t readIOs, readMerges, readSectors, readTicks, writeIOs, writeMerges, writeSectors, writeTicks;
     res = sscanf(line, "%lu %lu %lu %lu %lu %lu %lu %lu", &readIOs, &readMerges, &readSectors, &readTicks, &writeIOs, &writeMerges, &writeSectors, &writeTicks);
 
@@ -144,8 +134,8 @@ uint64_t TeraDynamicResizingPolicy::get_device_active_time(const char* device) {
       fprintf (stderr, "Error reading device usage\n");
       return 0;
     }
-
-    res = fclose(stat_file);
+  
+    res = fclose(dev_file);
     if (res != 0) {
       fprintf(stderr, "Error closing file");
       return 0;
@@ -154,17 +144,8 @@ uint64_t TeraDynamicResizingPolicy::get_device_active_time(const char* device) {
     return readTicks + writeTicks;
   }
 
-  res = fclose(stat_file);
-  if (res != 0) {
-    fprintf(stderr, "Error closing file");
-    return 0;
-  }
-
   return 0;
 }
-
-// Read cpu percentage
-
 
 // According to the usage of the old generation and the io wait time
 // we perform an action. This action triggers to grow H1 or shrink
@@ -192,9 +173,9 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::action() {
   assert(device_active_time_ms <= interval, "GC time should be less than the window interval");
 
   // This is for debugging
-  debug_print(iowait_time_ms, device_active_time_ms, interval);
+  // debug_print(iowait_time_ms, device_active_time_ms, interval);
 
-  if (gc_time + iowait_time_ms * IO_WEIGHT < (0.1 * interval)) {
+  if (gc_time + iowait_time_ms < (0.1 * interval)) {
     if (os::elapsedTime() -  last_full_gc_ms >= GC_FREQUENCY) {
       prev_action = S_SHRINK_H1;
       return S_SHRINK_H1;
@@ -207,23 +188,23 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::action() {
   // We calculate the ratio of the h2 candidate objects in H1 
   double h2_candidate_ratio = (double) h2_cand_size_in_bytes / Universe::heap()->capacity();
 
-  if (gc_time >= iowait_time_ms * IO_WEIGHT &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
+  if (gc_time >= iowait_time_ms &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
     prev_action = S_MOVE_H2;
     return S_MOVE_H2;
   }
   
-  if (gc_time >= iowait_time_ms * IO_WEIGHT &&  h2_candidate_ratio < TRANSFER_THRESHOLD
+  if (gc_time >= iowait_time_ms && h2_candidate_ratio < TRANSFER_THRESHOLD
       && ParallelScavengeHeap::old_gen()->capacity_in_bytes() < ParallelScavengeHeap::old_gen()->max_gen_size()) {
     prev_action = S_GROW_H1;
     return S_GROW_H1;
   }
 
-  if (iowait_time_ms * IO_WEIGHT > gc_time && device_active_time_ms > 0) {
+  if (iowait_time_ms > gc_time && device_active_time_ms > 0) {
     prev_action = S_SHRINK_H1;
     return S_SHRINK_H1;
   }
 
-  if (os::elapsedTime() -  last_full_gc_ms >= GC_FREQUENCY) {
+  if (os::elapsedTime() - last_full_gc_ms >= GC_FREQUENCY) {
     prev_action = S_SHRINK_H1;
     return S_SHRINK_H1;
   }

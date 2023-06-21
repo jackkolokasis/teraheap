@@ -184,7 +184,7 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     if (TraceGen1Time) accumulated_time()->start();
   
     if (DynamicHeapResizing) {
-      TeraDynamicResizingPolicy::gc_start();
+      Universe::teraHeap()->get_resizing_policy()->gc_start();
       Universe::teraHeap()->get_resizing_policy()->reset_h2_candidate_size();
     }
 
@@ -468,7 +468,7 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
   _gc_tracer->report_gc_end(_gc_timer->gc_end(), _gc_timer->time_partitions());
 
   if (DynamicHeapResizing) {
-    TeraDynamicResizingPolicy::gc_end((_gc_timer->gc_end().milliseconds() - _gc_timer->gc_start().milliseconds()), os::elapsedTime());
+    Universe::teraHeap()->get_resizing_policy()->gc_end((_gc_timer->gc_end().milliseconds() - _gc_timer->gc_start().milliseconds()), os::elapsedTime());
   }
 
   return true;
