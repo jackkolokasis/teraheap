@@ -45,12 +45,12 @@ CC = gcc
 BINFLAG = -c
 DEBUGFLAG = -g
 OFLAG = -o
-WALLFLAG = -Wall -Werror -pedantic
+WALLFLAG = -Wall -pedantic
 OPTIMZEFLAG = -O3
 AIOFLAG = -lrt
 
 LDFLAGS = $(AIOFLAG)
-CFLAGS = $(BINFLAG) $(WALLFLAG) $(OPTIMIZEFLAG)
+CFLAGS = $(BINFLAG) $(WALLFLAG) $(OPTIMIZEFLAG) $(DEBUGFLAG)
 
 ## Commands
 RM = rm -fr

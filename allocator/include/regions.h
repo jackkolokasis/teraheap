@@ -19,6 +19,8 @@ extern "C" {
 #define INT_PTR unsigned int
 #endif
 
+#define H2_DYNAMIC_FILE_ALLOCATION
+
 	struct _mem_pool{
 		char *mmap_start;					//< Memory mapped allocation start addresss
 		char* start_address;				//< Aligned start address of TeraCache
@@ -40,8 +42,11 @@ extern "C" {
 
 	// Initialize allocator with start address 'heap_end + 1'. The end of the
 	// heap.
-	void       init(uint64_t alignment);
-	
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
+  void       init(uint64_t alignment);
+#else
+  void       init(uint64_t alignment,const char* l_dev,uint64_t l_dev_size);
+#endif
 	// Return the start address of the memory allocation pool
 	char*      start_addr_mem_pool(void);
 	

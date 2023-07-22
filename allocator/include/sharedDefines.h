@@ -6,8 +6,15 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEV "/mnt/fmap/file.txt"	     //< Device name
-#define DEV_SIZE (700*1024LU*1024*1024)  //< Device size (in bytes)
+#define H2_DYNAMIC_FILE_ALLOCATION
+
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
+	#define DEV "/mnt/fmap/file.txt"	     //< Device name
+	#define DEV_SIZE (700*1024LU*1024*1024)  //< Device size (in bytes)
+#else
+	extern char dev[150];
+	extern uint64_t dev_size;
+#endif
 
 //#define ASSERT
 
@@ -27,7 +34,7 @@
 
 #define MALLOC_ON	1				  //< Allocate buffers dynamically
 
-#define REGION_SIZE	(16*1024LU*1024) //< Region size (in bytes) for allignment
+#define REGION_SIZE	(256*1024LU*1024) //< Region size (in bytes) for allignment
 									                    // version
 
 #if ANONYMOUS
@@ -40,15 +47,28 @@
 #define MAX_RDD_ID ((REGION_ARRAY_SIZE)/(MAX_PARTITIONS)) //< Total different rdds
 
 #else
-#define REGION_ARRAY_SIZE ((DEV_SIZE)/(REGION_SIZE))
+
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
+	#define REGION_ARRAY_SIZE ((DEV_SIZE)/(REGION_SIZE))
+#else
+	extern uint64_t  region_array_size;
+#endif
 
 #define MAX_PARTITIONS 256			  // Maximum partitions per RDD, affects 
 									  // id array size
-#define MAX_RDD_ID ((REGION_ARRAY_SIZE)/(MAX_PARTITIONS)) //< Total different rdds
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
+	#define MAX_RDD_ID ((REGION_ARRAY_SIZE)/(MAX_PARTITIONS)) //< Total different rdds
+#else
+	extern uint64_t max_rdd_id;
+#endif
 
 #endif
 
-#define GROUP_ARRAY_SIZE ((REGION_ARRAY_SIZE)/2)
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
+	#define GROUP_ARRAY_SIZE ((REGION_ARRAY_SIZE)/2)
+#else
+	extern uint64_t group_array_size;
+#endif
 
 #define MMAP_SIZE (4*1024*1024)       //< Size of small mmaps in Anonymous mode
 

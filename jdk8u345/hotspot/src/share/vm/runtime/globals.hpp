@@ -2534,6 +2534,12 @@ class CommandLineFlags {
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
 								                                    										    \
+  product(uintx, H2FileSize, 0,                                             \
+         "Region Size of H2Heap (bytes e.g 20gb=21474836480)")              \
+                                                                            \
+  product(ccstr, AllocateH2At, NULL,                                        \
+          "Path to the directory where the H2 Heap temporary file will be created") \
+                                                                            \
   product(ccstr, AllocateHeapAt, NULL,                                      \
           "Path to the directory where a temporary file will be created "   \
           "to use as a banking store for Java heap.")                       \

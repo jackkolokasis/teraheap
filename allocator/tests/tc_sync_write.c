@@ -36,7 +36,11 @@ int main() {
 	char *tmp, *tmp2, *tmp3, *tmp4;
 	
 	// Init allocator
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
 	init(CARD_SIZE * PAGE_SIZE);
+#else
+	init(CARD_SIZE * PAGE_SIZE,"/mnt/fmap/file.txt",161061273600);
+#endif
 
 	tmp = malloc(SIZE_80B * sizeof(char));
 	memset(tmp, '1', SIZE_80B);

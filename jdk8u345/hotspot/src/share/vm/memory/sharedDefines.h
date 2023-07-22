@@ -66,6 +66,8 @@
                                   // -XX:AllocateHeapAt="/mnt/dir"
                                   // or -XX:AllocateOldGenAt="/mnt/dir"
 
+#define H2_DYNAMIC_FILE_ALLOCATION // Enable dynamic file allocation for H2
+
 /**********************************
  * Write Mode to H2
  **********************************/

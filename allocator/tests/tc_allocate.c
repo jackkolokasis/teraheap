@@ -27,7 +27,11 @@ int main() {
     char *obj1, *obj2, *obj3, *obj4, *obj5, *obj6, *obj7, *obj8, *obj9;
 
     // Init allocator
+#ifndef H2_DYNAMIC_FILE_ALLOCATION
     init(CARD_SIZE * PAGE_SIZE);
+#else
+    init(CARD_SIZE * PAGE_SIZE,"/mnt/fmap/file.txt", 161061273600);
+#endif
 
     //obj1 should be in region 0
     obj1 = allocate(1, 0, 0);
