@@ -221,3 +221,9 @@ void TeraTimers::print_malloc_time() {
 	thlog_or_tty->print_cr("[STATISTICS] | MALLOC %f\n", malloc_time_per_gc);
   malloc_time_per_gc = 0;
 }
+
+//void TeraTimers::print_action_state() {
+//  thlog_or_tty->stamp(true);
+//  thlog_or_tty->print("");
+//
+//}

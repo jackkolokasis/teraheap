@@ -14,7 +14,7 @@ bool DefaultPolicy::h2_transfer_policy(oop obj) {
 }
 
 bool DefaultPolicy::h2_promotion_policy(oop obj) {
-    return obj->is_marked_move_h2();
+    return (transfer_on && obj->is_marked_move_h2());
 }
 
 bool SparkPrimitivePolicy::h2_transfer_policy(oop obj) {
@@ -22,7 +22,7 @@ bool SparkPrimitivePolicy::h2_transfer_policy(oop obj) {
 }
 
 bool SparkPrimitivePolicy::h2_promotion_policy(oop obj) {
-    return obj->is_marked_move_h2();
+    return (transfer_on && obj->is_marked_move_h2());
 }
 
 // Constructor
@@ -32,6 +32,7 @@ HintHighLowWatermarkPolicy::HintHighLowWatermarkPolicy() {
   h2_low_promotion_threshold = 0;
   non_promote_tag = 0;
   promote_tag = -1;
+  transfer_on = false;
 }
 
 bool HintHighLowWatermarkPolicy::check_low_promotion_threshold(size_t sz) {

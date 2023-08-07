@@ -366,8 +366,8 @@ UNSAFE_ENTRY(void, Unsafe_h2TagAndMoveRoot(JNIEnv *env, jobject unsafe,
   if (Universe::teraHeap()->is_obj_in_h2(o))
   	return;
 
-  // Initialize object's teraflag
-  o->mark_move_h2(label, 0);
+  // Initialize object's teraflag. Group them in H2 based on partition ID.
+  o->mark_move_h2(label, partId);
 UNSAFE_END
 
 UNSAFE_ENTRY(void, Unsafe_h2TagRoot(JNIEnv *env, jobject unsafe,

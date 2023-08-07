@@ -4,11 +4,13 @@
 #include "memory/allocation.hpp"
 #include "oops/oopsHierarchy.hpp"
 
-
 #define LOW_THRESHOLD_WEIGHT 0.5f
 #define HIGH_THRESHOLD 0.85
 
 class TransferPolicy : public CHeapObj<mtInternal> {
+protected:
+  bool transfer_on;
+
 public:
   // Set non promote label value
   virtual void set_non_promote_tag(long val) = 0;
@@ -36,10 +38,15 @@ public:
   // that we enabled in the sharedDefines.h file we do the appropriate
   // action.
   virtual bool h2_promotion_policy(oop obj) = 0;
+
+  void set_move_h2() { transfer_on = true;}
+  void unset_move_h2() { transfer_on = false;}
+  bool is_tranfer_on() { return transfer_on; }
 };
 
 class DefaultPolicy : public TransferPolicy {
 public:
+  DefaultPolicy() { transfer_on = false; }
   void set_non_promote_tag(long val) override {}
   void set_promote_tag(long val) override {}
   long get_non_promote_tag() override { return 0; }
@@ -56,6 +63,7 @@ public:
 
 class SparkPrimitivePolicy : public TransferPolicy {
 public:
+  SparkPrimitivePolicy() { transfer_on = false; }
   void set_non_promote_tag(long val) override {}
   void set_promote_tag(long val) override {}
   long get_non_promote_tag() override { return 0; }
@@ -116,6 +124,7 @@ public:
 
 class HintHighLowWatermarkPrimitivePolicy : public HintHighLowWatermarkPolicy {
 public:
+  HintHighLowWatermarkPrimitivePolicy() { transfer_on = false; }
   bool h2_transfer_policy(oop obj) override;
 };
 

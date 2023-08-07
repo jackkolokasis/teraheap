@@ -129,8 +129,7 @@ inline void PSParallelCompact::adjust_pointer(T* p, ParCompactionManager* cm) {
                assert(ParallelScavengeHeap::heap()->is_in(obj), "should be in heap");
                });
 
-    oop new_obj = (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj)) ? 
-      obj : cast_to_oop(summary_data().calc_new_pointer(obj, cm));
+    oop new_obj = (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj)) ? obj : cast_to_oop(summary_data().calc_new_pointer(obj, cm));
 		
     if (EnableTeraHeap)
 			Universe::teraHeap()->group_region_enabled(cast_from_oop<HeapWord *>(new_obj), (void *) p);

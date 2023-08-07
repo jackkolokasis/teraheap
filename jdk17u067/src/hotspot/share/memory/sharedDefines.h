@@ -139,4 +139,6 @@
 #define P_PRIMITIVE               //< Move only primitive arrays and
                                   // primitive objects to H2.
 
+#define DYNAMIC_HEAP_RESIZING_TEST     // Dynamic heap resizing
+
 #endif  // SHARE_MEMORY_SHAREDDEFINES_H

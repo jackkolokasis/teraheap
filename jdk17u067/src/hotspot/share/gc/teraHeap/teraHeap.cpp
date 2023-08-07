@@ -40,6 +40,11 @@ TeraHeap::TeraHeap() {
 #ifdef TERA_STATS
   tera_stats = new TeraStatistics();
 #endif
+
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  if (DynamicHeapResizing)
+    dynamic_resizing_policy = new TeraDynamicResizingPolicy();
+#endif
 }
 
 TeraHeap::~TeraHeap() {
@@ -51,8 +56,12 @@ TeraHeap::~TeraHeap() {
 #ifdef TERA_STATS
   delete tera_stats;
 #endif
-}
 
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  if (DynamicHeapResizing)
+    delete dynamic_resizing_policy;
+#endif
+}
 
 // Return H2 start address
 char* TeraHeap::h2_start_addr(void) {

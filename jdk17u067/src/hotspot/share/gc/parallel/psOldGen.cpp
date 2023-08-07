@@ -32,6 +32,7 @@
 #include "gc/shared/cardTableBarrierSet.hpp"
 #include "gc/shared/gcLocker.hpp"
 #include "gc/shared/spaceDecorator.inline.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "logging/log.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/java.hpp"
@@ -311,6 +312,33 @@ void PSOldGen::resize(size_t desired_free_space) {
     // Overflowed the addition.
     new_size = max_gen_size();
   }
+  static int i = 0;
+  i++;
+
+  if (EnableTeraHeap && DynamicHeapResizing && i >= 2) {
+    double used_ratio = (double) used_in_bytes() / capacity_in_bytes(); 
+
+    if (Universe::teraHeap()->need_to_grow_h1()) {
+      new_size = max_gen_size();
+    }
+    else if (Universe::teraHeap()->need_to_shink_h1()) {
+      size_t diff = capacity_in_bytes() - used_in_bytes();
+      new_size = used_in_bytes() + (diff - (size_t) (diff * 0.7));
+    } 
+    else if (used_ratio >= 0.75) {
+      new_size = used_in_bytes() + (size_t)(used_in_bytes() * 0.4);
+
+    } else {
+      new_size = capacity_in_bytes();
+    }
+    //fprintf(stderr, "--------------------------------\n");
+    //fprintf(stderr, "capacity in bytes = %lu\n", capacity_in_bytes());
+    //fprintf(stderr, "used_in_bytes = %lu\n", used_in_bytes());
+    //fprintf(stderr, "max_gen_size = %lu\n", max_gen_size());
+    //fprintf(stderr, "min_gen_size = %lu\n", min_gen_size());
+    //fprintf(stderr, "--------------------------------\n");
+  }
+  
   // Adjust according to our min and max
   new_size = clamp(new_size, min_gen_size(), max_gen_size());
 

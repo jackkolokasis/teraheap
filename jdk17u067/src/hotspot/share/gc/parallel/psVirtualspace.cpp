@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "gc/parallel/psVirtualspace.hpp"
+#include "gc/shared//gc_globals.hpp"
 #include "memory/virtualspace.hpp"
 #include "runtime/os.hpp"
 
@@ -120,6 +121,25 @@ bool PSVirtualSpace::shrink_by(size_t bytes) {
 
   return result;
 }
+
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+bool PSVirtualSpace::tera_shrink_by(size_t bytes) {
+  assert(is_aligned(bytes), "arg not aligned");
+  DEBUG_ONLY(PSVirtualSpaceVerifier this_verifier(this));
+
+  if (committed_size() < bytes) {
+    return false;
+  }
+
+  char* const base_addr = committed_high_addr() - bytes;
+  bool result = special() || os::tera_uncommit_memory(base_addr, bytes);
+  if (result) {
+    _committed_high_addr -= bytes;
+  }
+
+  return result;
+}
+#endif
 
 size_t
 PSVirtualSpace::expand_into(PSVirtualSpace* other_space, size_t bytes) {

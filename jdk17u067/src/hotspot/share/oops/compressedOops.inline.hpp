@@ -107,7 +107,15 @@ inline oop CompressedOops::decode_not_null(oop v) {
 }
 
 inline oop CompressedOops::decode(oop v) {
+#ifdef TERA_ASSERT
+  DEBUG_ONLY(if (EnableTeraHeap) {
+               assert(Universe::is_in_h2_or_null(v) || Universe::is_in_heap_or_null(v), "object not in heap " PTR_FORMAT, p2i((void*) v));
+             } else {
+               assert(Universe::is_in_heap_or_null(v), "object not in heap " PTR_FORMAT, p2i((void*) v));
+             })
+#else
   assert(Universe::is_in_heap_or_null(v), "object not in heap " PTR_FORMAT, p2i((void*) v));
+#endif
   return v;
 }
 

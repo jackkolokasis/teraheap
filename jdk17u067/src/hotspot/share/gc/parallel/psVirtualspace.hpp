@@ -95,6 +95,9 @@ class PSVirtualSpace : public CHeapObj<mtGC> {
   inline  void   set_committed(char* low_addr, char* high_addr);
   virtual bool   expand_by(size_t bytes);
   virtual bool   shrink_by(size_t bytes);
+
+  bool   tera_shrink_by(size_t bytes);
+
   virtual size_t expand_into(PSVirtualSpace* space, size_t bytes);
   void           release();
 

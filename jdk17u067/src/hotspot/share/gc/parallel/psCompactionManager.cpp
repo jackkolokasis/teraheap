@@ -118,7 +118,7 @@ void ParCompactionManager::reset_h2_counters() {
     _manager_array[i]->_is_h2_candidate = false;
     _manager_array[i]->_h2_candidate_obj_size = 0;
 
-#ifdef TERA_STATS
+#ifdef OBJ_STATS
     _manager_array[i]->_primitive_arrays_size   = 0;
     _manager_array[i]->_primitive_obj_size      = 0;
     _manager_array[i]->_non_primitive_obj_size  = 0;

@@ -145,6 +145,7 @@ class os: AllStatic {
                                          size_t alignment_hint,
                                          bool executable, const char* mesg);
   static bool   pd_uncommit_memory(char* addr, size_t bytes, bool executable);
+  static bool   pd_tera_uncommit_memory(char* addr, size_t bytes, bool executable);
   static bool   pd_release_memory(char* addr, size_t bytes);
 
   static char*  pd_attempt_map_memory_to_file_at(char* addr, size_t bytes, int file_desc);
@@ -364,6 +365,9 @@ class os: AllStatic {
                                       size_t alignment_hint,
                                       bool executable, const char* mesg);
   static bool   uncommit_memory(char* addr, size_t bytes, bool executable = false);
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  static bool   tera_uncommit_memory(char* addr, size_t bytes, bool executable = false);
+#endif
   static bool   release_memory(char* addr, size_t bytes);
 
   // A diagnostic function to print memory mappings in the given range.

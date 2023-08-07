@@ -308,7 +308,7 @@ bool PSYoungGen::resize_generation(size_t eden_size, size_t survivor_size) {
     desired_change = limit_gen_shrink(desired_change);
 
     if (desired_change > 0) {
-      virtual_space()->shrink_by(desired_change);
+      virtual_space()->tera_shrink_by(desired_change);
       reset_survivors_after_shrink();
 
       size_changed = true;

@@ -60,6 +60,7 @@
 #include "gc/shared/weakProcessor.inline.hpp"
 #include "gc/shared/workerPolicy.hpp"
 #include "gc/shared/workgroup.hpp"
+#include "gc/teraHeap/teraDynamicResizingPolicy.hpp"
 #include "logging/log.hpp"
 #include "memory/iterator.inline.hpp"
 #include "memory/metaspaceUtils.hpp"
@@ -1862,7 +1863,7 @@ void PSParallelCompact::summary_phase(ParCompactionManager* cm,
 #endif //TERA_TIMERS
   GCTraceTime(Info, gc, phases) tm("Summary Phase", &_gc_timer);
 
-  if (EnableTeraHeap) {
+  if (EnableTeraHeap && Universe::teraHeap()->get_policy()->is_tranfer_on()) {
     // Initialize the couner for the size of H2 candidate object
     ParCompactionManager::set_h2_candidate_obj_size();
     Universe::teraHeap()->get_policy()->set_low_promotion_threshold();
@@ -2011,6 +2012,13 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
   ParallelScavengeHeap* heap = ParallelScavengeHeap::heap();
 
   GCIdMark gc_id_mark;
+
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  if (DynamicHeapResizing) {
+    TeraDynamicResizingPolicy::gc_start();
+  }
+#endif // DYNAMIC_HEAP_RESIZING_TEST 
+
   _gc_timer.register_gc_start();
   _gc_tracer.report_gc_start(heap->gc_cause(), _gc_timer.gc_start());
 
@@ -2109,7 +2117,8 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 #ifdef TERA_MAJOR_GC
     // Adjust the references of H2 candidate objects and 
     if (EnableTeraHeap) {
-      compact_h2_candidate_objects();
+      if (Universe::teraHeap()->get_policy()->is_tranfer_on())
+        compact_h2_candidate_objects();
       adjust_backward_references();
     }
 #endif
@@ -2132,7 +2141,9 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
       // Wait to complete all the transfers to H2 and then continue
       Universe::teraHeap()->h2_complete_transfers();
 
-      Universe::teraHeap()->destroy_tera_dram_allocator();
+      if (Universe::teraHeap()->get_policy()->is_tranfer_on()) {
+        Universe::teraHeap()->destroy_tera_dram_allocator();
+      }
 
       if (TeraHeapAllocatorStatistics)
         Universe::teraHeap()->print_region_groups();
@@ -2293,6 +2304,12 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
   _gc_tracer.report_dense_prefix(dense_prefix(old_space_id));
   _gc_tracer.report_gc_end(_gc_timer.gc_end(), _gc_timer.time_partitions());
+
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  if (DynamicHeapResizing) {
+    TeraDynamicResizingPolicy::gc_end(_gc_timer.gc_end().milliseconds() - _gc_timer.gc_start().milliseconds());
+  }
+#endif // DYNAMIC_HEAP_RESIZING_TEST 
 
   return true;
 }
@@ -2654,6 +2671,7 @@ void PSParallelCompact::adjust_backward_references() {
 
   while (obj != NULL) {
     Universe::teraHeap()->enable_groups(NULL, (HeapWord*) obj);
+    fprintf(stderr, "Adjust backward ref: %p | %s\n", obj, (*obj)->klass()->internal_name());
     adjust_pointer(obj, cm);
     Universe::teraHeap()->disable_groups();
     obj = Universe::teraHeap()->h2_adjust_next_back_reference();

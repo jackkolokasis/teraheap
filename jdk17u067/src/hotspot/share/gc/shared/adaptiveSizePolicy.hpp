@@ -435,6 +435,9 @@ class AdaptiveSizePolicy : public CHeapObj<mtGC> {
                                SoftRefPolicy* soft_ref_policy);
 
   static bool should_update_promo_stats(GCCause::Cause cause) {
+    if (EnableTeraHeap && DynamicHeapResizing)
+      return true;
+
     return ((GCCause::is_user_requested_gc(cause)  &&
                UseAdaptiveSizePolicyWithSystemGC) ||
             GCCause::is_tenured_allocation_failure_gc(cause));

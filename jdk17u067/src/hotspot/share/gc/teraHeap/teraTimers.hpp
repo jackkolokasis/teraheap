@@ -2,6 +2,7 @@
 #define SHARE_GC_TERAHEAP_TERATIMERS_HPP
 
 #include "memory/allocation.hpp"
+#include "gc/teraHeap/teraDynamicResizingPolicy.hpp"
 #include <sys/time.h>
 
 class TeraTimers: public CHeapObj<mtInternal> {
@@ -105,5 +106,8 @@ public:
   void print_malloc_time();
 
   void print_card_table_scanning_time();
+
+  // Keep 
+  //void print_action_state(TeraDynamicResizingPolicy::state action);
 };
 #endif

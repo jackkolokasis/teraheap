@@ -3,6 +3,7 @@
 
 #include "gc/parallel/objectStartArray.hpp"
 #include "gc/shared/collectedHeap.inline.hpp"
+#include "gc/teraHeap/teraDynamicResizingPolicy.hpp"
 #include "gc/teraHeap/teraTimers.hpp"
 #include "gc/teraHeap/teraTransferPolicy.hpp"
 #include "gc/teraHeap/teraStatistics.hpp"
@@ -66,6 +67,16 @@ private:
                                     // to H1
 
   TransferPolicy *tera_policy;      //< Transfer policy for H2
+
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  bool shrink_h1 = false;           //< This flag indicate that H1
+                                    // should be shrinked
+  bool grow_h1 = false;             //< This flag indicate that H1
+                                    // should be grown
+  
+  TeraDynamicResizingPolicy* dynamic_resizing_policy; 
+
+#endif
 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
@@ -321,6 +332,30 @@ public:
 
   // Destroy the reserved dram space
   void destroy_tera_dram_allocator();
+
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  // The state machine uses this function to set if the GC should
+  // shrink H1 as a result to free the physical pages. Then the OS
+  // will reclaim the physical pahges and will use them as part of the
+  // buffer cache.
+  void set_shrink_h1() { shrink_h1 = true; }
+  // Reinitalize the shrink_h1 flag
+  void unset_shrink_h1() { shrink_h1 = false; }
+  // Check if the state machine identifies that we need to shrink H1.
+  bool  need_to_shink_h1() { return shrink_h1; }
+  
+  // The state machine uses this function to set if the GC should
+  // grow H1.
+  void set_grow_h1() { grow_h1 = true; }
+  // Reinitalize the grow_h1 flag to the default value
+  void unset_grow_h1() { grow_h1 = false; }
+  // Check if the state machine identifies that we need to grow H1.
+  bool  need_to_grow_h1() { return grow_h1; }
+
+  TeraDynamicResizingPolicy* get_resizing_policy() {
+    return dynamic_resizing_policy;
+  }
+#endif
 };
 
 #endif

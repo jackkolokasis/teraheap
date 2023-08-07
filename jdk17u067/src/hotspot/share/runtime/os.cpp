@@ -1827,6 +1827,22 @@ bool os::uncommit_memory(char* addr, size_t bytes, bool executable) {
   return res;
 }
 
+#ifdef DYNAMIC_HEAP_RESIZING_TEST
+bool os::tera_uncommit_memory(char* addr, size_t bytes, bool executable) {
+  bool res;
+  if (MemTracker::tracking_level() > NMT_minimal) {
+    Tracker tkr(Tracker::uncommit);
+    res = pd_tera_uncommit_memory(addr, bytes, executable);
+    if (res) {
+      tkr.record((address)addr, bytes);
+    }
+  } else {
+    res = pd_tera_uncommit_memory(addr, bytes, executable);
+  }
+  return res;
+}
+#endif
+
 bool os::release_memory(char* addr, size_t bytes) {
   bool res;
   if (MemTracker::tracking_level() > NMT_minimal) {

@@ -77,7 +77,7 @@ export_env_vars()
 {
 	local PROJECT_DIR="$(pwd)/.."
 
-	export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
+	export JAVA_HOME="/usr/lib/jvm/java17"
 
 	### TeraHeap Allocator
 	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib:$LIBRARY_PATH
@@ -85,6 +85,12 @@ export_env_vars()
 	export PATH=${PROJECT_DIR}/allocator/include:$PATH
 	export C_INCLUDE_PATH=${PROJECT_DIR}/allocator/include:$C_INCLUDE_PATH                                                                                         
 	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include:$CPLUS_INCLUDE_PATH
+	
+  export LIBRARY_PATH=${PROJECT_DIR}/tera_malloc/lib:$LIBRARY_PATH
+	export LD_LIBRARY_PATH=${PROJECT_DIR}/tera_malloc/lib:$LD_LIBRARY_PATH                                                                                           
+	export PATH=${PROJECT_DIR}/tera_malloc/include:$PATH
+	export C_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include:$C_INCLUDE_PATH                                                                                         
+	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include:$CPLUS_INCLUDE_PATH
 }
 
 while getopts ":drcmh" opt

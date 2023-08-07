@@ -718,7 +718,11 @@
 								                                    										    \
   product(ccstr, TeraHeapPolicy, "DefaultPolicy",                           \
           "TeraHeapPolicy for moving objects to H2. The possible values "   \
-          "are: DefaultPolicy, SparkPrimitivePolicy")
+          "are: DefaultPolicy, SparkPrimitivePolicy")                       \
+                                                                            \
+  product(bool, DynamicHeapResizing, false,                                 \
+          "Enable dynamic heap resizing for TeraHeap")
+
 
 // end of GC_FLAGS
 
