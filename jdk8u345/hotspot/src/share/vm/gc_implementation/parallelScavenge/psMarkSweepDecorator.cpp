@@ -136,7 +136,8 @@ void PSMarkSweepDecorator::precompact() {
         }
 #endif
 
-        Universe::teraHeap()->get_resizing_policy()->decrease_h2_candidate_size(oop(q)->size());
+      if (DynamicHeapResizing)
+          Universe::teraHeap()->get_resizing_policy()->decrease_h2_candidate_size(oop(q)->size());
       
       // Take a pointer from the region
       HeapWord* h2_obj_addr = (HeapWord*) Universe::teraHeap()->h2_add_object(oop(q), size);

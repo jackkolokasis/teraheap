@@ -77,6 +77,15 @@ void MarkSweep::follow_stack() {
       }
 #endif
 
+#ifndef P_PRIMITIVE
+    if (EnableTeraHeap && DynamicHeapResizing && obj->is_marked_move_h2()) {
+      Universe::teraHeap()->get_resizing_policy()->increase_h2_candidate_size(obj->size());
+    }
+
+    if (EnableTeraHeap && !DynamicHeapResizing && obj->is_marked_move_h2()) {
+      Universe::teraHeap()->h2_incr_total_marked_obj_size(obj->size());
+    }
+#endif
       obj->follow_contents();
 
 #ifdef P_PRIMITIVE

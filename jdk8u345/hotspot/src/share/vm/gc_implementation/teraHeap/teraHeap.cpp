@@ -875,7 +875,7 @@ bool TeraHeap::h2_transfer_policy(oop obj) {
 	return obj->is_marked_move_h2();
 #endif
 }
-		
+
 void TeraHeap::set_direct_promotion(size_t old_live, size_t max_old_gen_size) {
 	direct_promotion = ((float) old_live / (float) max_old_gen_size) >= 0.85 ? true : false;
 }
@@ -888,22 +888,23 @@ bool TeraHeap::is_direct_promote() {
 void TeraHeap::h2_incr_total_marked_obj_size(size_t sz) {
 	total_marked_obj_for_h2 += sz;
 }
-		
+
 void TeraHeap::h2_reset_total_marked_obj_size() {
 	total_marked_obj_for_h2 = 0;
 }
-		
+
 bool TeraHeap::check_low_promotion_threshold(size_t sz) {
-	if (h2_low_promotion_threshold == 0 || sz > h2_low_promotion_threshold)
+	if (h2_low_promotion_threshold == 0 || (sz * HeapWordSize) > h2_low_promotion_threshold)
 		return false;
 
-	h2_low_promotion_threshold -= sz;
+	h2_low_promotion_threshold -= (sz * HeapWordSize);
 	return true;
 }
 
 void TeraHeap::set_low_promotion_threshold() {
-  //h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
-  h2_low_promotion_threshold = dynamic_resizing_policy->get_h2_candidate_size() * 0.5;
+  h2_low_promotion_threshold = DynamicHeapResizing ? 
+    dynamic_resizing_policy->get_h2_candidate_size() * 0.5 :
+    total_marked_obj_for_h2 * 0.5;
 }
 #endif
 
