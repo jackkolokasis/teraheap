@@ -1,4 +1,4 @@
-# TeraCache Region-Based Allocator
+# TeraHeap Region-Based Allocator
 
 ## Prepare TeraHeap Allocator
 Before compiling TeraHeap allocator edit the  following variables in

@@ -29,13 +29,22 @@ cd -
 Read the README.md file in allocator directory to export the specific
 environment variables
 
-2. Set your gcc/g++ path/alias 
+2. Build tera_malloc.
+```sh
+cd tera_malloc
+./build.sh
+cd -
+```
+Read the README.md file in tera_malloc directory to export the
+specific environment variables
+
+3. Set your gcc/g++ path/alias 
 ```sh
 cd jdk8u345 
 ```
 and set CC and CXX variables inside compile.sh to your gcc path/alias
 
-3. Build JVM (release mode)
+4. Build JVM (release mode)
 ```sh
 ./compile.sh -r
 cd -
