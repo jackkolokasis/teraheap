@@ -65,6 +65,9 @@ private:
   
   size_t prev_page_cache_size;         // current size of page cache
                                       // before shrink operation
+  double last_shrink_action;          // last shrink operation
+  
+  uint64_t window_interval;             // window_interval;
 
 
   // Check if the window limit exceed time
@@ -122,6 +125,8 @@ public:
       hist_iowait_time[i] = 0;
       hist_gc_time[i] = 0;
     }
+    last_shrink_action = 0;
+    window_interval = 30000;
   }
 
   // Destructor
@@ -218,6 +223,16 @@ public:
 
   void set_current_size_page_cache() {
     prev_page_cache_size = get_buffer_cache_space();
+  }
+
+  bool should_grow_h1_after_shrink();
+
+  uint64_t get_window_interval() {
+    return window_interval;
+  }
+
+  void set_previous_state(enum state last_action) {
+    prev_action = last_action;
   }
 };
 

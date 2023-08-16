@@ -5,9 +5,9 @@
 
 #define BUFFER_SIZE 1024
 #define CYCLES_PER_SECOND 2.4e9; // CPU frequency of 2.4 GHz
-#define WINDOW_INTERVAL ((60LL * 1000))
+//#define WINDOW_INTERVAL ((30LL * 1000))
 #define TRANSFER_THRESHOLD 0.4f
-#define GC_FREQUENCY (120)
+#define GC_FREQUENCY (25)
   
 // Calculate ellapsed time
 double TeraDynamicResizingPolicy::ellapsed_time(uint64_t start_time,
@@ -25,6 +25,8 @@ void TeraDynamicResizingPolicy::reset_counters() {
   gc_dev_time = 0;
   gc_iowait_time_ms = 0;
   dev_time_start = get_device_active_time("nvme1n1");
+  window_interval = (prev_action == S_MOVE_H2) ? 5000 : 30000;
+  //window_interval = 30000;
   //gc_mjr_faults = 0;
   //mjr_faults = 0;
   //mjr_faults_start = get_mjr_faults();
@@ -36,7 +38,7 @@ bool TeraDynamicResizingPolicy::is_window_limit_exeed() {
   window_end_time = rdtsc();
   interval = ellapsed_time(window_start_time, window_end_time);
 
-  return (interval >= WINDOW_INTERVAL) ? true : false;
+  return (interval >= window_interval) ? true : false;
 }
 
 // Init the iowait timer at the begining of the major GC.
@@ -234,6 +236,7 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::action() {
         return S_NO_ACTION;
       }
     }
+    last_shrink_action = os::elapsedTime();
     prev_action = S_SHRINK_H1;
     return S_SHRINK_H1;
   }
@@ -357,4 +360,11 @@ double TeraDynamicResizingPolicy::calc_avg_time(double *arr) {
   }
 
   return sum / HIST_SIZE;
+}
+
+bool TeraDynamicResizingPolicy::should_grow_h1_after_shrink() {
+  if (prev_action == S_SHRINK_H1 && (os::elapsedTime() - last_shrink_action) < GC_FREQUENCY) {
+    return true;
+  }
+  return false;
 }

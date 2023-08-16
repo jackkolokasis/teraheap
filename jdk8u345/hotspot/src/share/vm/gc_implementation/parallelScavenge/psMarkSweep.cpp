@@ -184,6 +184,23 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     return false;
   }
 
+  if (EnableTeraHeap && DynamicHeapResizing && Universe::teraHeap()->get_resizing_policy()->should_grow_h1_after_shrink()) {
+    if (TeraHeapStatistics) {
+      thlog_or_tty->stamp(true);
+      thlog_or_tty->print_cr("STATE = S_GROW_H1\n");
+      thlog_or_tty->flush();
+    }
+
+    TeraHeap *th = Universe::teraHeap();
+
+    th->set_grow_h1();
+    ParallelScavengeHeap::old_gen()->resize(10000);
+    th->unset_grow_h1();
+    th->get_resizing_policy()->set_previous_state(TeraDynamicResizingPolicy::S_GROW_H1);
+    th->get_resizing_policy()->reset_counters();
+    return true;
+  }
+
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
   assert(heap->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
   GCCause::Cause gc_cause = heap->gc_cause();

@@ -431,7 +431,8 @@ bool should_gc() {
   // State machine executed at the end of each minor gc. If the
   // interval between minor GCs is higher than windows interval then
   // perform a minor gc.
-  if (os::elapsedTime() - Universe::teraHeap()->get_resizing_policy()->get_last_minor_gc() > 60) {
+  TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+  if (os::elapsedTime() - tera_policy->get_last_minor_gc() > tera_policy->get_window_interval()) {
     fprintf(stderr, "should_scavenge = true\n");
     Universe::teraHeap()->get_resizing_policy()->action_enabled();
     return true;
