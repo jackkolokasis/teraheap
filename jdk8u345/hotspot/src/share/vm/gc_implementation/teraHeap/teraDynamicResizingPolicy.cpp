@@ -8,6 +8,9 @@
 //#define WINDOW_INTERVAL ((30LL * 1000))
 #define TRANSFER_THRESHOLD 0.4f
 #define GC_FREQUENCY (25)
+#define SMALL_INTERVAL ((5LL * 1000)) 
+#define REGULAR_INTERVAL ((30LL * 1000)) 
+#define HIGH_PRESSURE 0.75
   
 // Calculate ellapsed time
 double TeraDynamicResizingPolicy::ellapsed_time(uint64_t start_time,
@@ -25,7 +28,8 @@ void TeraDynamicResizingPolicy::reset_counters() {
   gc_dev_time = 0;
   gc_iowait_time_ms = 0;
   dev_time_start = get_device_active_time("nvme1n1");
-  window_interval = (prev_action == S_MOVE_H2) ? 5000 : 30000;
+  window_interval = (prev_action == S_MOVE_H2) ? SMALL_INTERVAL : REGULAR_INTERVAL;
+  //high_mem_pressure = false;
   //window_interval = 30000;
   //gc_mjr_faults = 0;
   //mjr_faults = 0;
@@ -38,6 +42,10 @@ bool TeraDynamicResizingPolicy::is_window_limit_exeed() {
   window_end_time = rdtsc();
   interval = ellapsed_time(window_start_time, window_end_time);
 
+  if (prev_action == S_SHRINK_H1 || prev_action == S_MOVE_H2)
+    return (interval >= window_interval) ? true : false;
+  
+  //return (interval >= window_interval || high_mem_pressure) ? true : false;
   return (interval >= window_interval) ? true : false;
 }
 
@@ -65,6 +73,10 @@ void TeraDynamicResizingPolicy::gc_end(double gc_duration, double last_full_gc) 
 
   gc_time += gc_duration;
   last_full_gc_ms = last_full_gc;
+  // At the end of each major GC check if there is high memory
+  // pressure.
+  //PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
+  //high_mem_pressure = ((double) old_gen->used_in_bytes() / old_gen->capacity_in_bytes() >= HIGH_PRESSURE);
 
   //gc_mjr_faults += get_mjr_faults() - gc_mjr_faults_start;
 }
@@ -213,13 +225,14 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::action() {
   // We calculate the ratio of the h2 candidate objects in H1 
   double h2_candidate_ratio = (double) h2_cand_size_in_bytes / Universe::heap()->capacity();
 
-  if (avg_gc_time >= avg_iowait_time &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
+  if (prev_action != S_SHRINK_H1 && avg_gc_time >= avg_iowait_time &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
     prev_action = S_MOVE_H2;
     return S_MOVE_H2;
   }
+
+  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
   
-  if (avg_gc_time >= avg_iowait_time && h2_candidate_ratio < TRANSFER_THRESHOLD
-    && ParallelScavengeHeap::old_gen()->capacity_in_bytes() < ParallelScavengeHeap::old_gen()->max_gen_size()) {
+  if (avg_gc_time >= avg_iowait_time && old_gen->capacity_in_bytes() < old_gen->max_gen_size()) {
     prev_action = S_GROW_H1;
     return S_GROW_H1;
   }
@@ -363,7 +376,8 @@ double TeraDynamicResizingPolicy::calc_avg_time(double *arr) {
 }
 
 bool TeraDynamicResizingPolicy::should_grow_h1_after_shrink() {
-  if (prev_action == S_SHRINK_H1 && (os::elapsedTime() - last_shrink_action) < GC_FREQUENCY) {
+  //if (prev_action == S_SHRINK_H1 && (os::elapsedTime() - last_shrink_action) < GC_FREQUENCY) {
+  if (prev_action == S_SHRINK_H1) {
     return true;
   }
   return false;

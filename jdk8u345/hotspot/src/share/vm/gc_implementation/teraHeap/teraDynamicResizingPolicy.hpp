@@ -67,7 +67,10 @@ private:
                                       // before shrink operation
   double last_shrink_action;          // last shrink operation
   
-  uint64_t window_interval;             // window_interval;
+  uint64_t window_interval;           // window_interval;
+  
+  bool high_mem_pressure;             // Indicate that after a full GC
+                                      // there is still high memory pressure
 
 
   // Check if the window limit exceed time
@@ -127,6 +130,7 @@ public:
     }
     last_shrink_action = 0;
     window_interval = 30000;
+    high_mem_pressure = false;
   }
 
   // Destructor
@@ -228,7 +232,7 @@ public:
   bool should_grow_h1_after_shrink();
 
   uint64_t get_window_interval() {
-    return window_interval;
+    return window_interval / 1000;
   }
 
   void set_previous_state(enum state last_action) {
