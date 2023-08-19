@@ -239,7 +239,7 @@ bool PSScavenge::invoke() {
   IsGCActiveMark mark;
 
   const bool scavenge_done = PSScavenge::invoke_no_policy();
-  const bool need_full_gc = !scavenge_done ||
+  bool need_full_gc = !scavenge_done ||
     policy->should_full_GC(heap->old_gen()->free_in_bytes());
   bool full_gc_done = false;
   bool need_resizing = false;
@@ -281,6 +281,14 @@ bool PSScavenge::invoke() {
         ParallelScavengeHeap::old_gen()->resize(10000);
         Universe::teraHeap()->unset_grow_h1();
         Universe::teraHeap()->get_resizing_policy()->reset_counters();
+
+        if (TeraHeapStatistics && need_full_gc) {
+          thlog_or_tty->stamp(true);
+          thlog_or_tty->print_cr("STATE = GROW_H1_NEED_FGC\n");
+          thlog_or_tty->flush();
+
+          need_full_gc = false;
+        }
         break;
 
       case TeraDynamicResizingPolicy::S_MOVE_BACK:

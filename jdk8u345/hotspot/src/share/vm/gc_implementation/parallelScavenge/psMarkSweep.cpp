@@ -201,6 +201,24 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     return true;
   }
 
+  bool eager_move_h2 = false;
+
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    eager_move_h2 = th->get_resizing_policy()->check_eager_move_h2();
+
+    if (eager_move_h2) {
+      if (TeraHeapStatistics) {
+        thlog_or_tty->stamp(true);
+        thlog_or_tty->print_cr("STATE = S_MOVE_H2_NEW\n");
+        thlog_or_tty->flush();
+      }
+
+      th->get_resizing_policy()->set_previous_state(TeraDynamicResizingPolicy::S_MOVE_H2);
+      Universe::teraHeap()->set_direct_promotion();
+    }
+  }
+
   ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
   assert(heap->kind() == CollectedHeap::ParallelScavengeHeap, "Sanity");
   GCCause::Cause gc_cause = heap->gc_cause();
@@ -548,7 +566,13 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
   _gc_tracer->report_gc_end(_gc_timer->gc_end(), _gc_timer->time_partitions());
 
   if (DynamicHeapResizing) {
-    Universe::teraHeap()->get_resizing_policy()->gc_end((_gc_timer->gc_end().milliseconds() - _gc_timer->gc_start().milliseconds()), os::elapsedTime());
+    TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+    tera_policy->gc_end((_gc_timer->gc_end().milliseconds() - _gc_timer->gc_start().milliseconds()), os::elapsedTime());
+
+    if (eager_move_h2) {
+      Universe::teraHeap()->unset_direct_promotion();
+      tera_policy->reset_counters();
+    }
   }
 
   return true;

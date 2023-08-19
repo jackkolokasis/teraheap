@@ -238,6 +238,8 @@ public:
   void set_previous_state(enum state last_action) {
     prev_action = last_action;
   }
+
+  bool check_eager_move_h2();
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP

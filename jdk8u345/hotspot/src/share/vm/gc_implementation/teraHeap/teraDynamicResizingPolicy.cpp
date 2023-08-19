@@ -7,7 +7,7 @@
 #define CYCLES_PER_SECOND 2.4e9; // CPU frequency of 2.4 GHz
 //#define WINDOW_INTERVAL ((30LL * 1000))
 #define TRANSFER_THRESHOLD 0.4f
-#define GC_FREQUENCY (25)
+#define GC_FREQUENCY (10)
 #define SMALL_INTERVAL ((5LL * 1000)) 
 #define REGULAR_INTERVAL ((30LL * 1000)) 
 #define HIGH_PRESSURE 0.75
@@ -42,10 +42,6 @@ bool TeraDynamicResizingPolicy::is_window_limit_exeed() {
   window_end_time = rdtsc();
   interval = ellapsed_time(window_start_time, window_end_time);
 
-  if (prev_action == S_SHRINK_H1 || prev_action == S_MOVE_H2)
-    return (interval >= window_interval) ? true : false;
-  
-  //return (interval >= window_interval || high_mem_pressure) ? true : false;
   return (interval >= window_interval) ? true : false;
 }
 
@@ -380,5 +376,14 @@ bool TeraDynamicResizingPolicy::should_grow_h1_after_shrink() {
   if (prev_action == S_SHRINK_H1) {
     return true;
   }
+  return false;
+}
+
+bool TeraDynamicResizingPolicy::check_eager_move_h2() {
+  if ((os::elapsedTime() -  last_full_gc_ms <= GC_FREQUENCY) && (interval < window_interval)) {
+    double h2_candidate_ratio = (double) h2_cand_size_in_bytes / Universe::heap()->capacity();
+    return (h2_candidate_ratio >= TRANSFER_THRESHOLD) ? true : false;
+  }
+
   return false;
 }
