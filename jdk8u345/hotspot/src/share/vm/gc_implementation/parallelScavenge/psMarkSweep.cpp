@@ -93,29 +93,32 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   GCCause::Cause gc_cause = heap->gc_cause();
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
+  bool avoid_gc = false;
 
   if (EnableTeraHeap && DynamicHeapResizing) {
     TeraHeap *th = Universe::teraHeap();
     TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
 
     switch (tera_policy->action()) {
+      case TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW:
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
+        th->set_grow_h1();
+        ParallelScavengeHeap::old_gen()->resize(10000);
+        th->unset_grow_h1();
+        tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
+        avoid_gc = true;
+        tera_policy->reset_counters();
+        break;
+
       case TeraDynamicResizingPolicy::S_MOVE_H2:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_MOVE_H2\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_H2);
         Universe::teraHeap()->set_direct_promotion();
 #ifdef LAZY_MOVE_H2
         tera_policy->reset_counters();
 #endif
         break;
       case TeraDynamicResizingPolicy::S_SHRINK_H1:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_SHRINK_H1\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_SHRINK_H1);
 
         th->set_shrink_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
@@ -124,11 +127,7 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
         break;
       
       case TeraDynamicResizingPolicy::S_GROW_H1:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_GROW_H1\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_GROW_H1);
         
         th->set_grow_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
@@ -137,29 +136,17 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
         break;
       
       case TeraDynamicResizingPolicy::S_MOVE_BACK:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_MOVE_BACK\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_BACK);
         tera_policy->reset_counters();
         break;
       
       case TeraDynamicResizingPolicy::S_IOSLACK:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_IOSLACK\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_IOSLACK);
         tera_policy->reset_counters();
         break;
 
       case TeraDynamicResizingPolicy::S_NO_ACTION:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_NO_ACTION\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_NO_ACTION);
         tera_policy->reset_counters();
         break;
 
@@ -174,6 +161,9 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
       return;
     }
   }
+
+  if (EnableTeraHeap && DynamicHeapResizing && avoid_gc)
+    return;
 
   if (ScavengeBeforeFullGC) {
     PSScavenge::invoke_no_policy();

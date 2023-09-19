@@ -30,6 +30,8 @@ TeraDynamicResizingPolicy::TeraDynamicResizingPolicy() {
   prev_full_gc_end = 0;
   last_full_gc_start = 0;
   gc_compaction_phase_ms = 0;
+
+  init_state_names();
 }
   
 // Calculate ellapsed time
@@ -338,6 +340,13 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::simple_action() {
   double avg_iowait_time = calc_avg_time(hist_iowait_time, HIST_SIZE);
   double avg_gc_time = calc_avg_time(hist_gc_time, GC_HIST_SIZE);
 
+#ifdef WAIT_AFTER_GROW
+  if (should_wait_after_grow(avg_iowait_time, avg_gc_time)) {
+    cur_action = S_WAIT_AFTER_GROW;
+    return S_WAIT_AFTER_GROW;
+  }
+#endif
+
   if (TeraHeapStatistics)
     debug_print(avg_iowait_time, avg_gc_time, interval, iowait_time_ms, gc_time);
 
@@ -489,7 +498,9 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
     return 0;
 
 #ifdef LAZY_MOVE_H2
-  bool is_no_action = (cur_action == S_NO_ACTION || cur_action == S_IOSLACK || cur_action == S_CONTINUE || cur_action == S_MOVE_H2);
+  bool is_no_action = (cur_action == S_NO_ACTION || cur_action == S_IOSLACK
+                       || cur_action == S_CONTINUE || cur_action == S_MOVE_H2
+                       || cur_action == S_WAIT_AFTER_GROW);
 #else
   bool is_no_action = (cur_action == S_NO_ACTION || cur_action == S_IOSLACK || cur_action == S_CONTINUE);
 #endif
@@ -636,4 +647,42 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::state_shrink_h1() {
 
   cur_action = S_SHRINK_H1;
   return S_SHRINK_H1;
+}
+
+#ifdef WAIT_AFTER_GROW
+// After each growing operation of H1 we wait to see the effect of
+// the action. If we reach a gc or the io cost is higher than gc
+// cost then we go to no action state. 
+bool TeraDynamicResizingPolicy::should_wait_after_grow(double io_time_ms,                                                                                                                
+                                                       double gc_time_ms) {
+
+  if (cur_action != S_GROW_H1 && cur_action != S_WAIT_AFTER_GROW)
+    return false;
+
+  bool should_wait = ((abs(io_time_ms - gc_time_ms) <= 100) || (gc_time_ms > io_time_ms));
+
+  return should_wait;
+}                 
+#endif
+
+// Print states (for debugging and logging purposes)
+void TeraDynamicResizingPolicy::print_state(enum state cur_state) {
+  if (!TeraHeapStatistics)
+    return;
+
+  thlog_or_tty->stamp(true);
+  thlog_or_tty->print_cr("STATE = %s\n", state_name[cur_state]);
+  thlog_or_tty->flush();
+}
+
+// Initialize the array of state names
+void TeraDynamicResizingPolicy::init_state_names() {
+  strncpy(state_name[0], "S_NO_ACTION",       12);
+  strncpy(state_name[1], "S_SHRINK_H1",       12);
+  strncpy(state_name[2], "S_GROW_H1",         10);
+  strncpy(state_name[3], "S_MOVE_BACK",       12);
+  strncpy(state_name[4], "S_CONTINUE",        11);
+  strncpy(state_name[5], "S_MOVE_H2",         10);
+  strncpy(state_name[6], "S_IOSLACK",         10);
+  strncpy(state_name[7], "S_WAIT_AFTER_GROW", 18);
 }

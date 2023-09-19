@@ -248,13 +248,21 @@ bool PSScavenge::invoke() {
     TeraHeap *th = Universe::teraHeap();
     TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
     switch (Universe::teraHeap()->get_resizing_policy()->action()) {
-      case TeraDynamicResizingPolicy::S_MOVE_H2:
+      case TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW:
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
+        tera_policy->reset_counters();
 
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_MOVE_H2\n");
-          thlog_or_tty->flush();
+        if (need_full_gc) {
+          th->set_grow_h1();
+          ParallelScavengeHeap::old_gen()->resize(10000);
+          th->unset_grow_h1();
+          need_full_gc = false;
+          tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
         }
+        break;
+
+      case TeraDynamicResizingPolicy::S_MOVE_H2:
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_H2);
 
         th->set_direct_promotion();
 #ifdef LAZY_MOVE_H2
@@ -265,11 +273,7 @@ bool PSScavenge::invoke() {
         break;
 
       case TeraDynamicResizingPolicy::S_SHRINK_H1:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_SHRINK_H1\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_SHRINK_H1);
 
         th->set_shrink_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
@@ -278,50 +282,31 @@ bool PSScavenge::invoke() {
         break;
 
       case TeraDynamicResizingPolicy::S_GROW_H1:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_GROW_H1\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_GROW_H1);
+
         th->set_grow_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
         th->unset_grow_h1();
         tera_policy->reset_counters();
 
-        if (TeraHeapStatistics && need_full_gc) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = GROW_H1_NEED_FGC\n");
-          thlog_or_tty->flush();
-
-          need_full_gc = false;
-        }
+        need_full_gc = false;
+        //if (need_full_gc) {
+        //  need_full_gc = false;
+        //}
         break;
 
       case TeraDynamicResizingPolicy::S_MOVE_BACK:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_MOVE_BACK\n");
-          thlog_or_tty->flush();
-        }
-        //assert(false, "Please implement this case");
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_BACK);
         tera_policy->reset_counters();
         break;
       
       case TeraDynamicResizingPolicy::S_IOSLACK:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_IOSLACK\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_IOSLACK);
         tera_policy->reset_counters();
         break;
 
       case TeraDynamicResizingPolicy::S_NO_ACTION:
-        if (TeraHeapStatistics) {
-          thlog_or_tty->stamp(true);
-          thlog_or_tty->print_cr("STATE = S_NO_ACTION\n");
-          thlog_or_tty->flush();
-        }
+        tera_policy->print_state(TeraDynamicResizingPolicy::S_NO_ACTION);
         tera_policy->reset_counters();
         break;
 

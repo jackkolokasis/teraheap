@@ -9,6 +9,8 @@
 
 #define HIST_SIZE 5
 #define GC_HIST_SIZE 1
+#define NUM_STATES 8
+#define STATE_NAME_LEN 20
 
 class TeraDynamicResizingPolicy : public CHeapObj<mtInternal> {
 public:
@@ -20,9 +22,13 @@ public:
     S_CONTINUE,                       //< Continue not finished interval
     S_MOVE_H2,                        //< Transfer objects to H2
     S_IOSLACK                         //< IO slack for page cache to grow
+#ifdef WAIT_AFTER_GROW
+    ,S_WAIT_AFTER_GROW                //< After grow wait to see the effect
+#endif
   };
 
 private:
+  char state_name[NUM_STATES][STATE_NAME_LEN]; //< Define state names
   uint64_t window_start_time;         //< Window start time
   unsigned long long iowait_start;    //< Start counting iowait time at
                                       // the start of the window
@@ -109,6 +115,16 @@ private:
 
   // Find the average of the array elements
   double calc_avg_time(double *arr, int size);
+
+#ifdef WAIT_AFTER_GROW
+  // After each growing operation of H1 we wait to see the effect of
+  // the action. If we reach a gc or the io cost is higher than gc
+  // cost then we go to no action state. 
+  bool should_wait_after_grow(double io_time_ms, double gc_time_ms);
+#endif
+
+  // Initialize the array of state names
+  void init_state_names();
 
 public:
   // Constructor
@@ -265,6 +281,9 @@ public:
 
   // Calculation of the GC cost prediction.
   double calculate_gc_cost(double gc_time_ms);
+
+  // Print states (for debugging and logging purposes)
+  void print_state(enum state cur_state);
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP
