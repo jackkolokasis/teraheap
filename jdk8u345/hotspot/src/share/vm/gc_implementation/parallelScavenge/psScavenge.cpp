@@ -245,6 +245,8 @@ bool PSScavenge::invoke() {
   bool need_resizing = false;
 
   if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
     switch (Universe::teraHeap()->get_resizing_policy()->action()) {
       case TeraDynamicResizingPolicy::S_MOVE_H2:
 
@@ -254,8 +256,12 @@ bool PSScavenge::invoke() {
           thlog_or_tty->flush();
         }
 
-        Universe::teraHeap()->set_direct_promotion();
-        need_resizing = true;
+        th->set_direct_promotion();
+#ifdef LAZY_MOVE_H2
+      tera_policy->reset_counters();
+#else 
+      need_resizing = true;
+#endif
         break;
 
       case TeraDynamicResizingPolicy::S_SHRINK_H1:
@@ -265,10 +271,10 @@ bool PSScavenge::invoke() {
           thlog_or_tty->flush();
         }
 
-        Universe::teraHeap()->set_shrink_h1();
+        th->set_shrink_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
-        Universe::teraHeap()->unset_shrink_h1();
-        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        th->unset_shrink_h1();
+        tera_policy->reset_counters();
         break;
 
       case TeraDynamicResizingPolicy::S_GROW_H1:
@@ -277,10 +283,10 @@ bool PSScavenge::invoke() {
           thlog_or_tty->print_cr("STATE = S_GROW_H1\n");
           thlog_or_tty->flush();
         }
-        Universe::teraHeap()->set_grow_h1();
+        th->set_grow_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
-        Universe::teraHeap()->unset_grow_h1();
-        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        th->unset_grow_h1();
+        tera_policy->reset_counters();
 
         if (TeraHeapStatistics && need_full_gc) {
           thlog_or_tty->stamp(true);
@@ -298,7 +304,16 @@ bool PSScavenge::invoke() {
           thlog_or_tty->flush();
         }
         //assert(false, "Please implement this case");
-        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        tera_policy->reset_counters();
+        break;
+      
+      case TeraDynamicResizingPolicy::S_IOSLACK:
+        if (TeraHeapStatistics) {
+          thlog_or_tty->stamp(true);
+          thlog_or_tty->print_cr("STATE = S_IOSLACK\n");
+          thlog_or_tty->flush();
+        }
+        tera_policy->reset_counters();
         break;
 
       case TeraDynamicResizingPolicy::S_NO_ACTION:
@@ -307,7 +322,7 @@ bool PSScavenge::invoke() {
           thlog_or_tty->print_cr("STATE = S_NO_ACTION\n");
           thlog_or_tty->flush();
         }
-        Universe::teraHeap()->get_resizing_policy()->reset_counters();
+        tera_policy->reset_counters();
         break;
 
       case TeraDynamicResizingPolicy::S_CONTINUE:
@@ -336,14 +351,20 @@ bool PSScavenge::invoke() {
 #ifdef TERA_MINOR_GC
   if (EnableTeraHeap) {
 	  Universe::teraHeap()->h2_clear_back_ref_stacks();
-    if (DynamicHeapResizing && need_resizing) {
-      Universe::teraHeap()->unset_shrink_h1();
-      Universe::teraHeap()->unset_grow_h1();
-      Universe::teraHeap()->unset_direct_promotion();
-      Universe::teraHeap()->get_resizing_policy()->reset_counters();
-    }
-
     if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+#ifdef LAZY_MOVE_H2
+      if (full_gc_done && tera_policy->get_cur_action() == TeraDynamicResizingPolicy::S_MOVE_H2) {
+        Universe::teraHeap()->unset_direct_promotion();
+        tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
+      }
+#else
+      if (DynamicHeapResizing && need_resizing) {
+        Universe::teraHeap()->unset_direct_promotion();
+        tera_policy->reset_counters();
+      }
+#endif
+
       Universe::teraHeap()->get_resizing_policy()->set_last_minor_gc(os::elapsedTime());
     }
   }

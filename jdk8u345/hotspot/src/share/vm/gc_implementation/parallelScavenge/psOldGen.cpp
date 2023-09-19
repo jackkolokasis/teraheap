@@ -355,33 +355,20 @@ void PSOldGen::resize(size_t desired_free_space) {
     // Overflowed the addition.
     new_size = gen_size_limit();
   }
-  static int i = 0;
-  i++;
 
-  if (EnableTeraHeap && DynamicHeapResizing && i >= 2) {
-    if (Universe::teraHeap()->need_to_grow_h1()) {
-      // new_size = used_in_bytes() + (1.5 * used_in_bytes());
-      //ParallelScavengeHeap* heap = (ParallelScavengeHeap*)Universe::heap();
-      //PSAdaptiveSizePolicy* policy = heap->size_policy();
-      //new_size = capacity_in_bytes() + policy->average_old_live_in_bytes();
-      new_size = capacity_in_bytes() + (0.5 * Universe::teraHeap()->get_resizing_policy()->get_buffer_cache_space());
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
 
-    } else if (Universe::teraHeap()->need_to_shink_h1()) {
-      size_t free_space = capacity_in_bytes() - used_in_bytes();
-      //new_size = used_in_bytes() + (0.3 * free_space);
-      //new_size = used_in_bytes() + Universe::teraHeap()->get_resizing_policy()->calculate_old_gen_free_bytes(free_space, used_in_bytes());
-      new_size = used_in_bytes() + (0.5 * free_space); 
-      Universe::teraHeap()->get_resizing_policy()->set_shrinked_bytes(capacity_in_bytes() - new_size);
-      Universe::teraHeap()->get_resizing_policy()->set_current_size_page_cache();
-      
-      if (TeraHeapStatistics) {
-        thlog_or_tty->print_cr("Shrink_by = %lu\n", capacity_in_bytes() - new_size);
-        thlog_or_tty->flush();
-      }
+    // Inside the interval we do not change the heap size
+    new_size = capacity_in_bytes();
 
-    } else {
-      //new_size = used_in_bytes() + desired_free_space;
-      new_size = capacity_in_bytes();
+    if (th->need_to_grow_h1()) {
+      new_size = tera_policy->grow_h1();
+    }
+
+    if (th->need_to_shink_h1()) {
+      new_size = tera_policy->shrink_h1();
     }
   } else {
     // Adjust according to our min and max

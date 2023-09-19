@@ -47,6 +47,9 @@ size_t                  MarkSweep::_preserved_count_max = 0;
 PreservedMark*          MarkSweep::_preserved_marks = NULL;
 ReferenceProcessor*     MarkSweep::_ref_processor   = NULL;
 STWGCTimer*             MarkSweep::_gc_timer        = NULL;
+#ifdef TERA_MAJOR_GC
+STWGCTimer*             MarkSweep::_gc_compact_phase_timer = NULL;
+#endif
 SerialOldTracer*        MarkSweep::_gc_tracer       = NULL;
 
 MarkSweep::FollowRootClosure  MarkSweep::follow_root_closure;
@@ -184,6 +187,9 @@ void MarkSweep::KeepAliveClosure::do_oop(narrowOop* p) { MarkSweep::KeepAliveClo
 void marksweep_init() {
   MarkSweep::_gc_timer = new (ResourceObj::C_HEAP, mtGC) STWGCTimer();
   MarkSweep::_gc_tracer = new (ResourceObj::C_HEAP, mtGC) SerialOldTracer();
+#ifdef TERA_MAJOR_GC
+  MarkSweep::_gc_compact_phase_timer = new (ResourceObj::C_HEAP, mtGC) STWGCTimer();
+#endif
 }
 
 #ifndef PRODUCT

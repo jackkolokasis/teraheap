@@ -374,7 +374,9 @@ public:
 
   void set_direct_promotion(size_t old_live, size_t max_old_gen_size);
 
-  bool is_direct_promote();
+  bool is_direct_promote() {
+    return direct_promotion;
+  }
 
 #if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
   void h2_incr_total_marked_obj_size(size_t size);
@@ -445,8 +447,6 @@ public:
   void unset_direct_promotion() {
     direct_promotion = false;
   }
-
-  
 };
 
 #endif

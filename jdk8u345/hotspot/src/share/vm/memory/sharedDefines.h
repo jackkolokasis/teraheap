@@ -145,4 +145,29 @@
                                     // policy is used with
                                     // HINT_HIGH_LOW_WATERMARK
 
+// State machine flags for DynaHeap
+#define BASIC_VERSION              // Simple version of the state machine 
+
+#define PER_MINOR_GC               //< Take decisions per minor GCs
+
+#define GROW_STEP (0.2)            //< 0.2 (progressive) 0.8 (aggressive)
+
+#define SHRINK_STEP (0.8)          //< 0.8 (progressive) 0.2 (aggressive)
+
+//#define FIX_IOSLACK                //< Fix ioslack calculation
+//
+//#define SHRINK_GC_GROW             //< Scenario where the last action
+//                                   // before a GC is a SHRINK_Η1, so
+//                                   // we avoid to GROW_H1
+//
+//#define HIGH_OCCUPANCY             //< Check for high occupancy
+//
+#define FLUSH_GC_HISTORY_AFTER_MOVEH2 //< After moving objects to H2
+                                      //we flush the GC history
+
+#define GC_DISTRIBUTION            //< Distribution of GC accross the intervals
+
+#define LAZY_MOVE_H2               //< Test to see if the lazy move h2
+                                   //will improve the performance
+
 #endif  // _SHARE_DEFINES_H_

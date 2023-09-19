@@ -1,4 +1,5 @@
 #include "memory/allocation.hpp"
+#include "memory/sharedDefines.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +7,8 @@
 #ifndef SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP
 #define SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP
 
-#define HIST_SIZE 1
+#define HIST_SIZE 5
+#define GC_HIST_SIZE 1
 
 class TeraDynamicResizingPolicy : public CHeapObj<mtInternal> {
 public:
@@ -17,6 +19,7 @@ public:
     S_MOVE_BACK,                      //< Move obects from H2 to H1 
     S_CONTINUE,                       //< Continue not finished interval
     S_MOVE_H2,                        //< Transfer objects to H2
+    S_IOSLACK                         //< IO slack for page cache to grow
   };
 
 private:
@@ -25,13 +28,9 @@ private:
                                       // the start of the window
   unsigned long long cpu_start;       //< Start counting iowait time at
                                       // the start of the window
-  //unsigned long mjr_faults_start;     // Major faults counter start
-  //unsigned long mjr_faults;           // Major faults counter start
 
   unsigned long long gc_iowait_start; //< IO wait time created during gc
   unsigned long long gc_cpu_start;    //< IO wait time created during gc
-  //unsigned long gc_mjr_faults_start;  //< GC major faults start   
-  //unsigned long gc_mjr_faults;        //< Total major faults in gc
   double gc_iowait_time_ms;           //< Total IO wait time generated
   uint64_t gc_dev_time;               //< Total time that the device
                                       // was active during GC
@@ -43,12 +42,15 @@ private:
                                       // interval of the window
   double interval;                    //< Interval of the window
   state prev_action;                  //< Previous action
+  state cur_action;                   //< Current action
 
   size_t h2_cand_size_in_bytes;       //< H2 candidate objects
                                       // size in bytes
 
-  double last_full_gc_ms;             //< Track when the last gc
-                                      // has been performed
+  double prev_full_gc_end;            //< Track when the previous full
+                                      // gc has been ended
+  double last_full_gc_start;          //< Track when the last gc
+
   double last_minor_gc;               //< Time happened the last minor
                                       // gc
 
@@ -56,22 +58,22 @@ private:
                                       // need to perform an action.
                                       // This flag is set by mutator
                                       // threads.
-  double hist_gc_time[HIST_SIZE];             // History of the gc time in
+  double hist_gc_time[GC_HIST_SIZE];  // History of the gc time in
                                       // previous intervals
-  double hist_iowait_time[HIST_SIZE];         // History of the iowait time in
+  double hist_iowait_time[HIST_SIZE]; // History of the iowait time in
                                       // previous intervals
 
   size_t shrinked_bytes;              // shrinked bytes
   
-  size_t prev_page_cache_size;         // current size of page cache
+  size_t prev_page_cache_size;        // Current size of page cache
                                       // before shrink operation
-  double last_shrink_action;          // last shrink operation
   
   uint64_t window_interval;           // window_interval;
   
-  bool high_mem_pressure;             // Indicate that after a full GC
-                                      // there is still high memory pressure
+  bool transfer_hint_enabled;         // Check if objects have been transfered to H2 using 
 
+  double gc_compaction_phase_ms;      // Time of the compaction phase
+                                      // that includes I/O 
 
   // Check if the window limit exceed time
   bool is_window_limit_exeed();
@@ -105,33 +107,12 @@ private:
     return ((uint64_t)hi << 32) | lo;
   }
 
-  //unsigned long get_mjr_faults(); 
-
   // Find the average of the array elements
-  double calc_avg_time(double *arr);
+  double calc_avg_time(double *arr, int size);
 
 public:
   // Constructor
-  TeraDynamicResizingPolicy() {
-    window_start_time = rdtsc();
-    read_cpu_stats(&iowait_start, &cpu_start);
-    //mjr_faults_start = get_mjr_faults(); 
-   // gc_mjr_faults = 0;
-    gc_iowait_time_ms = 0;
-    gc_time = 0;
-    dev_time_start = get_device_active_time("nvme1n1");
-    gc_dev_time = 0;
-    prev_action = S_CONTINUE;
-    last_full_gc_ms = 0;
-
-    for (int i = 0; i < HIST_SIZE; i++) {
-      hist_iowait_time[i] = 0;
-      hist_gc_time[i] = 0;
-    }
-    last_shrink_action = 0;
-    window_interval = 30000;
-    high_mem_pressure = false;
-  }
+  TeraDynamicResizingPolicy();
 
   // Destructor
   ~TeraDynamicResizingPolicy() {
@@ -141,16 +122,27 @@ public:
   void reset_counters();
 
   // Init the iowait timer at the begining of the major GC.
-  void gc_start();
+  void gc_start(double start_time);
   
   // Count the iowait time during gc and update the gc_iowait_time_ms
   // counter for the current window
   void gc_end(double gctime, double last_full_gc);
 
+  // Execute an action based on the state machine. This is a wrapper for
+  // simple_action() and optimized_action().
+  state action();
+
   // According to the usage of the old generation and the io wait time
   // we perform an action. This action triggers to grow H1 or shrink
   // H1.
-  state action();
+  // This action implements the optimized version of the state machine.
+  state optimized_action();
+  
+  // According to the usage of the old generation and the io wait time
+  // we perform an action. This action triggers to grow H1 or shrink
+  // H1. 
+  // This is the simple version of the state machine.
+  state simple_action();
 
   // Get the total time in milliseconds that the device is active.
   // This fucntion utilizes the /sys/block/<dev>/stat file to read the
@@ -168,11 +160,7 @@ public:
   // Decrease the size of H2 candidate objects that are in H1 and
   // should be moved to H2. We measure only H2 candidates objects that
   // are primitive arrays and leaf objects.
-  void decrease_h2_candidate_size(size_t size) {
-    h2_cand_size_in_bytes -= size * HeapWordSize;
-    if (h2_cand_size_in_bytes < 0)
-      h2_cand_size_in_bytes = 0;
-  }
+  void decrease_h2_candidate_size(size_t size);
 
   // At the start each major GC we should reset the counter of the
   // size of h2 candidate objects in H1.
@@ -203,43 +191,80 @@ public:
     return last_minor_gc;
   }
 
+  // VMThread enables DynaHeap to perform action. For cases that
+  // IO is high (the whole computation happens in H2) and low number
+  // of objects are created in the young generation.
   void action_enabled(void) {
     need_action = true; 
   }
 
+  // Reset the action enabled by VMThread.
   void action_disabled(void) {
     need_action = false; 
   }
 
+  // Check if the VMThread enable an action.
   bool is_action_enabled() {
     return need_action;
   }
   
-  // Calculate free bytes for old generation for promotion
-  size_t calculate_old_gen_free_bytes(size_t max_free_bytes, size_t used_bytes);
-
-  // Get the total size of the buffer and spage cache
-  size_t get_buffer_cache_space();
-
+  // Set the number of shrinked bytes when a SHRINK_H1 operation
+  // occured.
   void set_shrinked_bytes(size_t bytes) {
     shrinked_bytes = bytes;
   }
 
+  // Before as shrinking operation we save the size of the page cache.
   void set_current_size_page_cache() {
-    prev_page_cache_size = get_buffer_cache_space();
+    prev_page_cache_size = read_cgroup_mem_stats(true);
   }
 
-  bool should_grow_h1_after_shrink();
-
+  // Get the window interval time.
   uint64_t get_window_interval() {
+    // Transform milliseconds to seconds
     return window_interval / 1000;
+  }
+
+  enum state get_cur_action() {
+    return cur_action;
+  }
+  
+  void set_cur_action(enum state new_action) {
+    cur_action = new_action;
   }
 
   void set_previous_state(enum state last_action) {
     prev_action = last_action;
   }
 
-  bool check_eager_move_h2();
+  // Grow the capacity of H1.
+  size_t grow_h1();
+
+  // Shrink the capacity of H1 to increase the page cache size.
+  size_t shrink_h1();
+
+  // Save the history of the GC and iowait overheads. We maintain two
+  // ring buffers (one for GC and one for iowait) and update these
+  // buffers with the new values for GC cost and IO overhead.
+  void history(int index, double gc_time, double iowait_time_ms);
+
+  // Accumulate the time of the compaction phase of the major GC when
+  // it moves objects to H2. The compaction phase contains the I/O
+  // wait time for transfering objects to H2.
+  void compaction_phase_time(double time) {
+    gc_compaction_phase_ms += (transfer_hint_enabled) ? time : 0;
+  }
+
+  // Read the memory statistics for the cgroup
+  size_t read_cgroup_mem_stats(bool read_page_cache);
+
+  // Before we perform a shrink operation we check if there is an IO
+  // slack. If there is IO slack then we abort the extra shrinking
+  // operation.
+  state state_shrink_h1();
+
+  // Calculation of the GC cost prediction.
+  double calculate_gc_cost(double gc_time_ms);
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP

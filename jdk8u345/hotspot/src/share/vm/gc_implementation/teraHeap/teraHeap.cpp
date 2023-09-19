@@ -880,10 +880,6 @@ void TeraHeap::set_direct_promotion(size_t old_live, size_t max_old_gen_size) {
 	direct_promotion = ((float) old_live / (float) max_old_gen_size) >= 0.85 ? true : false;
 }
 
-bool TeraHeap::is_direct_promote() {
-	return direct_promotion;
-}
-
 #if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
 void TeraHeap::h2_incr_total_marked_obj_size(size_t sz) {
 	total_marked_obj_for_h2 += sz;

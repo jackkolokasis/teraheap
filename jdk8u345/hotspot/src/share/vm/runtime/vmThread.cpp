@@ -432,9 +432,9 @@ bool should_gc() {
   // interval between minor GCs is higher than windows interval then
   // perform a minor gc.
   TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
-  if (os::elapsedTime() - tera_policy->get_last_minor_gc() > tera_policy->get_window_interval()) {
-    fprintf(stderr, "should_scavenge = true\n");
-    Universe::teraHeap()->get_resizing_policy()->action_enabled();
+  double ellapsedTime = os::elapsedTime() - tera_policy->get_last_minor_gc();
+  if (ellapsedTime > tera_policy->get_window_interval() && !tera_policy->is_action_enabled() && !SafepointSynchronize::is_at_safepoint()) {
+    tera_policy->action_enabled();
     return true;
   }
 
@@ -494,9 +494,7 @@ void VMThread::loop() {
         }
 
         if (DynamicHeapResizing && should_gc()) {
-          ParallelScavengeHeap* heap = ParallelScavengeHeap::heap();
-          VM_ParallelGCSystemGC op(Universe::heap()->total_collections(), Universe::heap()->total_full_collections(), GCCause::_java_lang_system_gc);
-          execute(&op);
+          Universe::heap()->collect_as_vm_thread(GCCause::_heap_inspection);
         }
         _cur_vm_operation = _vm_queue->remove_next();
 

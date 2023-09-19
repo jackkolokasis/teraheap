@@ -120,6 +120,9 @@ class MarkSweep : AllStatic {
   static ReferenceProcessor*             _ref_processor;
 
   static STWGCTimer*                     _gc_timer;
+#ifdef TERA_MAJOR_GC
+  static STWGCTimer*                     _gc_compact_phase_timer;
+#endif
   static SerialOldTracer*                _gc_tracer;
 
   // Non public closures
@@ -145,6 +148,9 @@ class MarkSweep : AllStatic {
   static ReferenceProcessor* const ref_processor() { return _ref_processor; }
 
   static STWGCTimer* gc_timer() { return _gc_timer; }
+#ifdef TERA_MAJOR_GC
+  static STWGCTimer* gc_compact_timer() { return _gc_compact_phase_timer; }
+#endif
   static SerialOldTracer* gc_tracer() { return _gc_tracer; }
 
   // Call backs for marking
