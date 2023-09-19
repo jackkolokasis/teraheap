@@ -656,12 +656,20 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::state_shrink_h1() {
 bool TeraDynamicResizingPolicy::should_wait_after_grow(double io_time_ms,                                                                                                                
                                                        double gc_time_ms) {
 
-  if (cur_action != S_GROW_H1 && cur_action != S_WAIT_AFTER_GROW)
+  if (cur_action != S_WAIT_AFTER_GROW)
     return false;
 
-  bool should_wait = ((abs(io_time_ms - gc_time_ms) <= 100) || (gc_time_ms > io_time_ms));
+  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
+  size_t cur_size = old_gen->capacity_in_bytes();
+  size_t used_size = old_gen->used_in_bytes();
 
-  return should_wait;
+  // Occupancy of the old generation is higher than 85%
+  bool high_occupancy = (((double)(used_size) / cur_size) > 0.70);
+
+  if (high_occupancy)
+    return false;
+
+  return ((abs(io_time_ms - gc_time_ms) <= 100) || (gc_time_ms > io_time_ms));
 }                 
 #endif
 
@@ -685,4 +693,11 @@ void TeraDynamicResizingPolicy::init_state_names() {
   strncpy(state_name[5], "S_MOVE_H2",         10);
   strncpy(state_name[6], "S_IOSLACK",         10);
   strncpy(state_name[7], "S_WAIT_AFTER_GROW", 18);
+}
+  
+// Check if the old gen is at the highest size
+bool TeraDynamicResizingPolicy::is_old_gen_max_capacity() {
+  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
+  bool under_h1_max_limit = old_gen->capacity_in_bytes() < old_gen->max_gen_size();
+  return under_h1_max_limit;
 }

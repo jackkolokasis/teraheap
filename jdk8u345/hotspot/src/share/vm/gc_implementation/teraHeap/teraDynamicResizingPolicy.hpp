@@ -126,6 +126,9 @@ private:
   // Initialize the array of state names
   void init_state_names();
 
+  // Normalized amortized gc cost
+  double normalize_ratio(double originalValue);
+
 public:
   // Constructor
   TeraDynamicResizingPolicy();
@@ -284,6 +287,9 @@ public:
 
   // Print states (for debugging and logging purposes)
   void print_state(enum state cur_state);
+
+  // Check if the old gen is at the highest size
+  bool is_old_gen_max_capacity();
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP

@@ -252,13 +252,19 @@ bool PSScavenge::invoke() {
         tera_policy->print_state(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
         tera_policy->reset_counters();
 
-        if (need_full_gc) {
-          th->set_grow_h1();
-          ParallelScavengeHeap::old_gen()->resize(10000);
-          th->unset_grow_h1();
-          need_full_gc = false;
-          tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
-        }
+        //if (need_full_gc) {
+        //  if (tera_policy->is_old_gen_max_capacity()) {
+        //    tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
+        //  } else {
+        //    th->set_grow_h1();
+        //    ParallelScavengeHeap::old_gen()->resize(10000);
+        //    th->unset_grow_h1();
+        //    tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_GROW_H1);
+        //    tera_policy->calculate_gc_cost(0);
+        //    tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
+        //    need_full_gc = false;
+        //  }
+        //}
         break;
 
       case TeraDynamicResizingPolicy::S_MOVE_H2:
@@ -287,12 +293,12 @@ bool PSScavenge::invoke() {
         th->set_grow_h1();
         ParallelScavengeHeap::old_gen()->resize(10000);
         th->unset_grow_h1();
-        tera_policy->reset_counters();
-
+        tera_policy->calculate_gc_cost(0);
+        tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
+        // We grow the heap so, there is no need to perform the gc. We
+        // postpone the gc.
         need_full_gc = false;
-        //if (need_full_gc) {
-        //  need_full_gc = false;
-        //}
+        tera_policy->reset_counters();
         break;
 
       case TeraDynamicResizingPolicy::S_MOVE_BACK:
