@@ -265,7 +265,7 @@ public:
   // Save the history of the GC and iowait overheads. We maintain two
   // ring buffers (one for GC and one for iowait) and update these
   // buffers with the new values for GC cost and IO overhead.
-  void history(int index, double gc_time, double iowait_time_ms);
+  int history(double gc_time, double iowait_time_ms);
 
   // Accumulate the time of the compaction phase of the major GC when
   // it moves objects to H2. The compaction phase contains the I/O
@@ -290,6 +290,9 @@ public:
 
   // Check if the old gen is at the highest size
   bool is_old_gen_max_capacity();
+  
+  // Change GC cost
+  void shrink_after_move();
 };
 
 #endif // SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP

@@ -168,4 +168,6 @@
                                    // to perform continiously growing
                                    // operations.
 
+#define SHRINK_AFTER_MOVE          //< Shrink H1 after move objects to H2
+
 #endif  // _SHARE_DEFINES_H_

@@ -347,7 +347,11 @@ bool PSScavenge::invoke() {
 #ifdef LAZY_MOVE_H2
       if (full_gc_done && tera_policy->get_cur_action() == TeraDynamicResizingPolicy::S_MOVE_H2) {
         Universe::teraHeap()->unset_direct_promotion();
+#ifndef SHRINK_AFTER_MOVE
         tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
+#else
+        tera_policy->shrink_after_move();
+#endif
       }
 #else
       if (DynamicHeapResizing && need_resizing) {

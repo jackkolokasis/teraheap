@@ -191,7 +191,11 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 #ifdef LAZY_MOVE_H2
     TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
     if (tera_policy->get_cur_action() == TeraDynamicResizingPolicy::S_MOVE_H2) {
+#ifndef SHRINK_AFTER_MOVE
       tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
+#else
+      tera_policy->shrink_after_move();
+#endif
     }
 #endif
       Universe::teraHeap()->unset_direct_promotion();

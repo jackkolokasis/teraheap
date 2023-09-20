@@ -300,7 +300,6 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::simple_action() {
   double iowait_time_ms = 0;
   uint64_t device_active_time_ms = 0, dev_time_end = 0;
   unsigned long long iowait_end = 0, cpu_end = 0;
-  static int i = 0;
 
   // Check if we are inside the window
   if (!is_window_limit_exeed())
@@ -322,10 +321,9 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::simple_action() {
   if (iowait_time_ms < 0 || device_active_time_ms <= 0)
     iowait_time_ms = 0;
 
-  history(i, gc_time - gc_compaction_phase_ms, iowait_time_ms);
-  i++;
+  int samples = history(gc_time - gc_compaction_phase_ms, iowait_time_ms);
 
-  if (i < HIST_SIZE) {
+  if (samples < HIST_SIZE) {
     cur_action = S_NO_ACTION;
     return S_NO_ACTION;
   }
@@ -474,7 +472,8 @@ void TeraDynamicResizingPolicy::decrease_h2_candidate_size(size_t size) {
 // Save the history of the GC and iowait overheads. We maintain two
 // ring buffers (one for GC and one for iowait) and update these
 // buffers with the new values for GC cost and IO overhead.
-void TeraDynamicResizingPolicy::history(int index, double gc_time_ms, double iowait_time_ms) {
+int TeraDynamicResizingPolicy::history(double gc_time_ms, double iowait_time_ms) {
+  static int index = 0;
 #ifdef GC_DISTRIBUTION
   double gc_ratio = calculate_gc_cost(gc_time_ms);
   hist_gc_time[index % GC_HIST_SIZE] = gc_ratio * interval;
@@ -484,6 +483,8 @@ void TeraDynamicResizingPolicy::history(int index, double gc_time_ms, double iow
   hist_gc_time[index % GC_HIST_SIZE] = gc_time_ms;
   hist_iowait_time[index % HIST_SIZE] = iowait_time_ms;
 #endif
+  index++;
+  return index;
 }
 // Calculation of the GC cost prediction.
 double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
@@ -711,3 +712,41 @@ bool TeraDynamicResizingPolicy::is_old_gen_max_capacity() {
   bool under_h1_max_limit = old_gen->capacity_in_bytes() < old_gen->max_gen_size();
   return under_h1_max_limit;
 }
+  
+// Change GC cost
+void TeraDynamicResizingPolicy::shrink_after_move() {
+  double iowait_time_ms = 0;
+  uint64_t device_active_time_ms = 0, dev_time_end = 0;
+  unsigned long long iowait_end = 0, cpu_end = 0;
+
+  // We get the interval
+  is_window_limit_exeed();
+
+  // Calculate the user and iowait time during the window interval
+  read_cpu_stats(&iowait_end, &cpu_end);
+  calc_iowait_time(iowait_start, iowait_end, cpu_start, cpu_end,
+                   interval, &iowait_time_ms);
+
+  iowait_time_ms -= gc_iowait_time_ms;
+  dev_time_end = get_device_active_time("nvme1n1");
+  device_active_time_ms = (dev_time_end - dev_time_start) - gc_dev_time;
+
+  assert(gc_time <= interval, "GC time should be less than the window interval");
+  assert(iowait_time_ms <= interval, "GC time should be less than the window interval");
+  assert(device_active_time_ms <= interval, "GC time should be less than the window interval");
+
+  if (iowait_time_ms < 0 || device_active_time_ms <= 0)
+    iowait_time_ms = 0;
+
+  int samples = history(gc_time - gc_compaction_phase_ms, iowait_time_ms);
+
+  Universe::teraHeap()->set_shrink_h1();
+  ParallelScavengeHeap::old_gen()->resize(10000);
+  Universe::teraHeap()->unset_shrink_h1();
+  cur_action = S_SHRINK_H1;
+  history(0, 0);
+  cur_action = S_IOSLACK;
+  reset_counters();
+}
+
+
