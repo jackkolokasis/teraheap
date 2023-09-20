@@ -341,9 +341,10 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::simple_action() {
   double avg_gc_time = calc_avg_time(hist_gc_time, GC_HIST_SIZE);
 
 #ifdef WAIT_AFTER_GROW
-  if (should_wait_after_grow(avg_iowait_time, avg_gc_time)) {
-    cur_action = S_WAIT_AFTER_GROW;
-    return S_WAIT_AFTER_GROW;
+  state res = should_wait_after_grow(avg_iowait_time, avg_gc_time);
+  if (res != S_CONTINUE) {
+    cur_action = res;
+    return res;
   }
 #endif
 
@@ -653,11 +654,11 @@ TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::state_shrink_h1() {
 // After each growing operation of H1 we wait to see the effect of
 // the action. If we reach a gc or the io cost is higher than gc
 // cost then we go to no action state. 
-bool TeraDynamicResizingPolicy::should_wait_after_grow(double io_time_ms,                                                                                                                
+TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::should_wait_after_grow(double io_time_ms,                                                                                                                
                                                        double gc_time_ms) {
 
   if (cur_action != S_WAIT_AFTER_GROW)
-    return false;
+    return S_CONTINUE;
 
   PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
   size_t cur_size = old_gen->capacity_in_bytes();
@@ -666,10 +667,19 @@ bool TeraDynamicResizingPolicy::should_wait_after_grow(double io_time_ms,
   // Occupancy of the old generation is higher than 85%
   bool high_occupancy = (((double)(used_size) / cur_size) > 0.70);
 
-  if (high_occupancy)
-    return false;
+  if (high_occupancy) {
+    return S_NO_ACTION; // remember to change that for optimization in S_GROW_H1
+  }
 
-  return ((abs(io_time_ms - gc_time_ms) <= 100) || (gc_time_ms > io_time_ms));
+  if (abs(io_time_ms - gc_time_ms) <= 100) {
+    return S_NO_ACTION;
+  }
+
+  if (gc_time_ms > io_time_ms) {
+    return S_NO_ACTION; // remmber to change that for optimization in S_SHRINK_H1;
+  }
+
+  return S_NO_ACTION;
 }                 
 #endif
 

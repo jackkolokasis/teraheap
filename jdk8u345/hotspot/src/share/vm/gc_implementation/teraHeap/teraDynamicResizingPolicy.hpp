@@ -120,7 +120,7 @@ private:
   // After each growing operation of H1 we wait to see the effect of
   // the action. If we reach a gc or the io cost is higher than gc
   // cost then we go to no action state. 
-  bool should_wait_after_grow(double io_time_ms, double gc_time_ms);
+  enum state should_wait_after_grow(double io_time_ms, double gc_time_ms);
 #endif
 
   // Initialize the array of state names
