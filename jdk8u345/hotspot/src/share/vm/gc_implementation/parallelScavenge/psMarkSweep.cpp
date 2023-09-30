@@ -93,85 +93,21 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   GCCause::Cause gc_cause = heap->gc_cause();
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
-  bool avoid_gc = false;
 
   if (EnableTeraHeap && DynamicHeapResizing) {
     TeraHeap *th = Universe::teraHeap();
     TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
-
-    switch (tera_policy->action()) {
-      case TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
-        //if (tera_policy->is_old_gen_max_capacity()) {
-        //  tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
-        //} else {
-        //  th->set_grow_h1();
-        //  ParallelScavengeHeap::old_gen()->resize(10000);
-        //  th->unset_grow_h1();
-        //  tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_GROW_H1);
-        //  tera_policy->calculate_gc_cost(0);
-        //  tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
-        //  avoid_gc = true;
-        //}
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_MOVE_H2:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_H2);
-        Universe::teraHeap()->set_direct_promotion();
-#ifdef LAZY_MOVE_H2
-        tera_policy->reset_counters();
-#endif
-        break;
-      case TeraDynamicResizingPolicy::S_SHRINK_H1:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_SHRINK_H1);
-
-        th->set_shrink_h1();
-        ParallelScavengeHeap::old_gen()->resize(10000);
-        th->unset_shrink_h1();
-        tera_policy->reset_counters();
-        break;
-      
-      case TeraDynamicResizingPolicy::S_GROW_H1:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_GROW_H1);
-        
-        th->set_grow_h1();
-        ParallelScavengeHeap::old_gen()->resize(10000);
-        th->unset_grow_h1();
-        tera_policy->calculate_gc_cost(0);
-        tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
-        tera_policy->reset_counters();
-        break;
-      
-      case TeraDynamicResizingPolicy::S_MOVE_BACK:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_BACK);
-        tera_policy->reset_counters();
-        break;
-      
-      case TeraDynamicResizingPolicy::S_IOSLACK:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_IOSLACK);
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_NO_ACTION:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_NO_ACTION);
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_CONTINUE:
-        break;
-    }
-
+    bool need_full_gc = false;
+    bool need_resizing = false;
+    tera_policy->dram_repartition(&need_full_gc, &need_resizing);
     tera_policy->set_last_minor_gc(os::elapsedTime());
+
     if (tera_policy->is_action_enabled()) {
       tera_policy->action_disabled();
       Universe::teraHeap()->unset_direct_promotion();
       return;
     }
   }
-
-  if (EnableTeraHeap && DynamicHeapResizing && avoid_gc)
-    return;
 
   if (ScavengeBeforeFullGC) {
     PSScavenge::invoke_no_policy();
@@ -186,20 +122,13 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 
 #ifdef TERA_MAJOR_GC
   // If the major GC fails then we need to clear the backward stacks
-  Universe::teraHeap()->h2_clear_back_ref_stacks();
-  if (EnableTeraHeap && DynamicHeapResizing) {
-#ifdef LAZY_MOVE_H2
+  if (EnableTeraHeap)
+    Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+  if (DynamicHeapResizing) {
     TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
-    if (tera_policy->get_cur_action() == TeraDynamicResizingPolicy::S_MOVE_H2) {
-#ifndef SHRINK_AFTER_MOVE
-      tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
-#else
-      tera_policy->shrink_after_move();
-#endif
-    }
-#endif
-      Universe::teraHeap()->unset_direct_promotion();
-      tera_policy->set_last_minor_gc(os::elapsedTime());
+    tera_policy->epilog_move_h2(true, true);
+    tera_policy->set_last_minor_gc(os::elapsedTime());
   }
 #endif
 }

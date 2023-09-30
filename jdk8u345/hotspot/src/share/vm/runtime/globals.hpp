@@ -2510,6 +2510,15 @@ class CommandLineFlags {
   product(bool, DynamicHeapResizing, false,                                 \
           "Enable dynamic heap resizing for TeraHeap")                      \
                                                                             \
+  product(intx, TeraResizingPolicy, 0,                                      \
+          "0: Simple resizing policy; "                                     \
+          "1: Simple wait resizing policy; "                                \
+          "2: Simple aggressive grow after wait resizing policy; "          \
+          "3: Simple aggressive shrink after wait resizing policy;")        \
+								                                    	    \
+  product(uintx, TeraDRAMLimit, 0,                                          \
+          "Total size of DRAM budget (in bytes)")                           \
+                                                                            \
   product(bool, EnableTeraHeap, false,                                      \
           "Enable TeraHeap. Works only with ParallelScavenge Collector")    \
                                                                             \
@@ -2524,13 +2533,13 @@ class CommandLineFlags {
                                                                             \
   product(bool, H2ObjectPlacement, false,                                   \
           "Print the objects labels in H2 regions")                         \
-								                                    										    \
+								                                    	    \
   product(bool, H2LivenessAnalysis, false,                                  \
           "Liveness analysis per H2 region objects")                        \
-								                                    										    \
+								                                    	    \
   product(uintx, TeraHeapSize, 0,                                           \
           "Initial TeraHeap total size (in bytes)")                         \
-								                                    										    \
+								                                    	    \
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
 								                                    										    \

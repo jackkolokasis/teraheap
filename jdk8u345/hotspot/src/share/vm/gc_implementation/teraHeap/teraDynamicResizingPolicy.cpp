@@ -6,12 +6,157 @@
 
 #define BUFFER_SIZE 1024
 #define CYCLES_PER_SECOND 2.4e9; // CPU frequency of 2.4 GHz
-#define TRANSFER_THRESHOLD 0.4f
-#define GC_FREQUENCY (10)
-#define SMALL_INTERVAL ((2LL * 1000)) 
 #define REGULAR_INTERVAL ((10LL * 1000)) 
-#define HIGH_PRESSURE 0.75
-#define IOSLACK_THRESHOLD ((1*1024*1024*1024LU))
+
+// Initialize the policy of the state machine
+TeraStateMachine* TeraDynamicResizingPolicy::init_state_machine_policy() {
+  switch (TeraResizingPolicy) {
+    case 1:
+      return new TeraSimpleWaitStateMachine();
+    case 2:
+      return new TeraAggrGrowStateMachine();
+    case 3:
+      return new TeraAggrShrinkStateMachine();
+    case 4:
+      return new TeraOptWaitAfterShrinkStateMachine();
+    case 5:
+      return new TeraShrinkAfterGrowStateMachine();
+    case 6:
+      return new TeraOptWaitAfterGrowStateMachine();
+    case 7:
+      return new TeraFullOptimizedStateMachine(); 
+    default:
+      break;
+  }
+  
+  return new TeraSimpleStateMachine();
+}
+
+// We call this function after moving objects to H2 to reste the
+// state and the counters.
+// TODO: move this inside the policy
+void TeraDynamicResizingPolicy::epilog_move_h2(bool full_gc_done,
+                                               bool need_resizing) {
+  // By default we unsert the direct promotion
+  Universe::teraHeap()->unset_direct_promotion();
+  bool epilog = state_machine->epilog_move_h2(full_gc_done, need_resizing,
+                                              &cur_action, &cur_state);
+
+  if (!epilog) 
+    return;
+
+  reset_counters();
+  actions tmp_action = cur_action;
+  cur_action = SHRINK_H1;
+  calculate_gc_cost(0);
+  cur_action = tmp_action;
+}
+
+// We use this function to take decision in case of minor GC which
+// happens before a major gc.
+void TeraDynamicResizingPolicy::dram_repartition(bool *need_full_gc,
+                                                 bool *eager_move) {
+  double avg_gc_time_ms, avg_io_time_ms;
+  uint64_t device_active_time_ms = 0;
+  TeraHeap *th = Universe::teraHeap();
+
+  calculate_gc_io_costs(&avg_gc_time_ms, &avg_io_time_ms, &device_active_time_ms);
+
+  state_machine->fsm(&cur_state, &cur_action, avg_gc_time_ms, avg_io_time_ms,
+                     device_active_time_ms, h2_cand_size_in_bytes, eager_move);
+  print_state_action();
+
+  switch (cur_action) {
+    case SHRINK_H1:
+      action_shrink_h1();
+      break;
+    case GROW_H1:
+      action_grow_h1(need_full_gc);
+      break;
+    case MOVE_H2:
+      Universe::teraHeap()->set_direct_promotion();
+      break;
+    case MOVE_BACK:
+      action_move_back();
+      break;
+    case NO_ACTION:
+    case IOSLACK:
+    case WAIT_AFTER_GROW:
+    case CONTINUE:
+      break;
+  }
+  reset_counters();
+}
+
+// Print states (for debugging and logging purposes)
+void TeraDynamicResizingPolicy::print_state_action() {
+  if (!TeraHeapStatistics)
+    return;
+
+  thlog_or_tty->stamp(true);
+  thlog_or_tty->print_cr("STATE = %s\n", state_name[cur_state]);
+  thlog_or_tty->print_cr("ACTION = %s\n", action_name[cur_action]);
+  thlog_or_tty->flush();
+}
+
+// Initialize the array of state names
+void TeraDynamicResizingPolicy::init_state_actions_names() {
+  strncpy(action_name[0], "NO_ACTION",       10);
+  strncpy(action_name[1], "SHRINK_H1",       10);
+  strncpy(action_name[2], "GROW_H1",          8);
+  strncpy(action_name[3], "MOVE_BACK",       10);
+  strncpy(action_name[4], "CONTINUE",         9);
+  strncpy(action_name[5], "MOVE_H2",          8);
+  strncpy(action_name[6], "IOSLACK",          8);
+  strncpy(action_name[7], "WAIT_AFTER_GROW", 16);
+  
+  strncpy(state_name[0], "S_NO_ACTION",      12);
+  strncpy(state_name[1], "S_WAIT_SHRINK",    14);
+  strncpy(state_name[2], "S_WAIT_GROW",      12);
+  strncpy(state_name[3], "S_WAIT_MOVE",      12);
+}
+
+// Calculate the average of gc and io costs and return their values.
+// We use these values to determine the next actions.
+void TeraDynamicResizingPolicy::calculate_gc_io_costs(double *avg_gc_time_ms,
+                                                      double *avg_io_time_ms,
+                                                      uint64_t *device_active_time_ms) {
+  double iowait_time_ms = 0;
+  uint64_t dev_time_end = 0;
+  unsigned long long iowait_end = 0, cpu_end = 0;
+  *device_active_time_ms = 0; 
+
+  // Check if we are inside the window
+  if (!is_window_limit_exeed()) {
+    *avg_gc_time_ms = 0;
+    *avg_io_time_ms = 0;
+    return;
+  }
+
+  // Calculate the user and iowait time during the window interval
+  read_cpu_stats(&iowait_end, &cpu_end);
+  calc_iowait_time(iowait_start, iowait_end, cpu_start, cpu_end,
+                   interval, &iowait_time_ms);
+
+  iowait_time_ms -= gc_iowait_time_ms;
+  dev_time_end = get_device_active_time("nvme1n1");
+  *device_active_time_ms = (dev_time_end - dev_time_start) - gc_dev_time;
+
+  assert(gc_time <= interval, "GC time should be less than the window interval");
+  assert(iowait_time_ms <= interval, "GC time should be less than the window interval");
+  assert(*device_active_time_ms <= interval, "GC time should be less than the window interval");
+
+  if (iowait_time_ms < 0 || *device_active_time_ms <= 0)
+    iowait_time_ms = 0;
+
+  history(gc_time - gc_compaction_phase_ms, iowait_time_ms);
+
+  *avg_io_time_ms = calc_avg_time(hist_iowait_time, HIST_SIZE);
+  *avg_gc_time_ms = calc_avg_time(hist_gc_time, GC_HIST_SIZE);
+  
+  if (TeraHeapStatistics)
+    debug_print(*avg_io_time_ms, *avg_gc_time_ms, interval, iowait_time_ms, gc_time);
+}
 
 TeraDynamicResizingPolicy::TeraDynamicResizingPolicy() {
   window_start_time = rdtsc();
@@ -20,7 +165,8 @@ TeraDynamicResizingPolicy::TeraDynamicResizingPolicy() {
   gc_time = 0;
   dev_time_start = get_device_active_time("nvme1n1");
   gc_dev_time = 0;
-  prev_action = S_CONTINUE;
+  cur_action = NO_ACTION;
+  cur_state = S_NO_ACTION;
 
   memset(hist_gc_time, 0, GC_HIST_SIZE * sizeof(double));
   memset(hist_iowait_time, 0, HIST_SIZE * sizeof(double));
@@ -31,7 +177,8 @@ TeraDynamicResizingPolicy::TeraDynamicResizingPolicy() {
   last_full_gc_start = 0;
   gc_compaction_phase_ms = 0;
 
-  init_state_names();
+  init_state_actions_names();
+  state_machine = init_state_machine_policy();
 }
   
 // Calculate ellapsed time
@@ -66,16 +213,14 @@ bool TeraDynamicResizingPolicy::is_window_limit_exeed() {
   return true;
 #else
   return (interval >= window_interval) ? true : false;
-#endif
+#endif // PER_MINOR_GC
 }
 
 // Init the iowait timer at the begining of the major GC.
 void TeraDynamicResizingPolicy::gc_start(double start_time) {
   read_cpu_stats(&gc_iowait_start, &gc_cpu_start);
   gc_dev_start = get_device_active_time("nvme1n1");
-#ifdef GC_DISTRIBUTION
   last_full_gc_start = start_time;
-#endif
 }
 
 // Count the iowait time during gc and update the gc_iowait_time_ms
@@ -98,17 +243,6 @@ void TeraDynamicResizingPolicy::gc_end(double gc_duration, double last_full_gc) 
 
   prev_full_gc_end = last_gc_end;
   last_gc_end = last_full_gc;
-
-//#ifdef FLUSH_GC_HISTORY_AFTER_MOVEH2
-  //if (transfer_hint_enabled) {
-  //  reset_counters();
-  //  memset(hist_gc_time, 0, HIST_SIZE * sizeof(double));
-  //}
-  //if(transfer_hint_enabled) {
-  //  // substract compaction phase because it has I/O time to the device
-  //  gc_compaction_phase_ms;
-  //}
-//#endif
 }
 
 // This function opens iostat and read the io wait time in percentage
@@ -197,186 +331,33 @@ uint64_t TeraDynamicResizingPolicy::get_device_active_time(const char* device) {
   return 0;
 }
 
-// Execute an action based on the state machine. This is a wrapper for
-// simple_action() and optimized_action().
-TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::action() {
-#ifdef BASIC_VERSION
-  return simple_action();
-#else
-  return optimized_action();
-#endif
+void TeraDynamicResizingPolicy::action_grow_h1(bool *need_full_gc) {
+  TeraHeap *th = Universe::teraHeap();
+
+  th->set_grow_h1();
+  ParallelScavengeHeap::old_gen()->resize(10000);
+  th->unset_grow_h1();
+
+  // Recalculate the GC cost
+  calculate_gc_cost(0);
+  // We grow the heap so, there is no need to perform the gc. We
+  // postpone the gc.
+  *need_full_gc = false;
 }
 
-// According to the usage of the old generation and the io wait time
-// we perform an action. This action triggers to grow H1 or shrink
-// H1.
-TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::optimized_action() {
-  double iowait_time_ms = 0;
-  uint64_t device_active_time_ms = 0, dev_time_end = 0;
-  unsigned long long iowait_end = 0, cpu_end = 0;
-  static int i = 0;
+void TeraDynamicResizingPolicy::action_shrink_h1() {
+  TeraHeap *th = Universe::teraHeap();
 
-  // Check if we are inside the window
-  if (!is_window_limit_exeed())
-    return S_CONTINUE;
+  th->set_shrink_h1();
+  ParallelScavengeHeap::old_gen()->resize(10000);
+  th->unset_shrink_h1();
 
-  // Calculate the user and iowait time during the window interval
-  read_cpu_stats(&iowait_end, &cpu_end);
-  calc_iowait_time(iowait_start, iowait_end, cpu_start, cpu_end,
-                   interval, &iowait_time_ms);
-  //mjr_faults = (get_mjr_faults() - mjr_faults_start) - gc_mjr_faults;
-
-  iowait_time_ms -= gc_iowait_time_ms;
-  dev_time_end = get_device_active_time("nvme1n1");
-  device_active_time_ms = (dev_time_end - dev_time_start) - gc_dev_time;
-
-  assert(gc_time <= interval, "GC time should be less than the window interval");
-  assert(iowait_time_ms <= interval, "GC time should be less than the window interval");
-  assert(device_active_time_ms <= interval, "GC time should be less than the window interval");
-
-  if (iowait_time_ms < 0)
-    iowait_time_ms = 0;
-
-  hist_gc_time[i % HIST_SIZE] = gc_time;
-  hist_iowait_time[i % HIST_SIZE] = iowait_time_ms;
-  i++;
-
-  if (i < HIST_SIZE) {
-    prev_action = S_NO_ACTION;
-    return S_NO_ACTION;
-  }
-
-  double avg_iowait_time = calc_avg_time(hist_iowait_time, HIST_SIZE);
-  double avg_gc_time = calc_avg_time(hist_gc_time, GC_HIST_SIZE);
-  
-  if (TeraHeapStatistics)
-    debug_print(avg_iowait_time, avg_gc_time, interval, iowait_time_ms, gc_time);
-
-  if (avg_gc_time + avg_iowait_time < (0.1 * interval)) {
-    prev_action = S_NO_ACTION;
-    return S_NO_ACTION;
-  }
-
-  // We calculate the ratio of the h2 candidate objects in H1 
-  double h2_candidate_ratio = (double) h2_cand_size_in_bytes / Universe::heap()->capacity();
-
-  if (prev_action != S_SHRINK_H1 && avg_gc_time >= avg_iowait_time &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
-    prev_action = S_MOVE_H2;
-    return S_MOVE_H2;
-  }
-
-  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
-  
-  if (avg_gc_time >= avg_iowait_time && old_gen->capacity_in_bytes() < old_gen->max_gen_size()) {
-    prev_action = S_GROW_H1;
-    return S_GROW_H1;
-  }
-
-  if (avg_iowait_time > avg_gc_time && device_active_time_ms > 0 ) {
-    if (prev_action == S_SHRINK_H1) {
-      size_t diff = read_cgroup_mem_stats(true) - prev_page_cache_size;
-
-      if (shrinked_bytes > diff) {
-        if (TeraHeapStatistics) {
-          thlog_or_tty->print_cr("shrink_with_no_action diff=%lu\n", diff);
-          thlog_or_tty->flush();
-        }
-        return S_NO_ACTION;
-      }
-    }
-    prev_action = S_SHRINK_H1;
-    return S_SHRINK_H1;
-  }
-
-  prev_action = S_NO_ACTION;
-  return S_NO_ACTION;
+  // Recalculate the GC cost
+  calculate_gc_cost(0);
 }
 
-// According to the usage of the old generation and the io wait time
-// we perform an action. This action triggers to grow H1 or shrink
-// H1.
-// This is the simple version of the state machine. There is no optimizations.
-TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::simple_action() {
-  double iowait_time_ms = 0;
-  uint64_t device_active_time_ms = 0, dev_time_end = 0;
-  unsigned long long iowait_end = 0, cpu_end = 0;
-
-  // Check if we are inside the window
-  if (!is_window_limit_exeed())
-    return S_CONTINUE;
-
-  // Calculate the user and iowait time during the window interval
-  read_cpu_stats(&iowait_end, &cpu_end);
-  calc_iowait_time(iowait_start, iowait_end, cpu_start, cpu_end,
-                   interval, &iowait_time_ms);
-
-  iowait_time_ms -= gc_iowait_time_ms;
-  dev_time_end = get_device_active_time("nvme1n1");
-  device_active_time_ms = (dev_time_end - dev_time_start) - gc_dev_time;
-
-  assert(gc_time <= interval, "GC time should be less than the window interval");
-  assert(iowait_time_ms <= interval, "GC time should be less than the window interval");
-  assert(device_active_time_ms <= interval, "GC time should be less than the window interval");
-
-  if (iowait_time_ms < 0 || device_active_time_ms <= 0)
-    iowait_time_ms = 0;
-
-  int samples = history(gc_time - gc_compaction_phase_ms, iowait_time_ms);
-
-  if (samples < HIST_SIZE) {
-    cur_action = S_NO_ACTION;
-    return S_NO_ACTION;
-  }
-
-#ifdef LAZY_MOVE_H2
-  if (cur_action == S_MOVE_H2) {
-    cur_action = S_MOVE_H2;
-    return S_MOVE_H2;
-  }
-#endif
-
-  double avg_iowait_time = calc_avg_time(hist_iowait_time, HIST_SIZE);
-  double avg_gc_time = calc_avg_time(hist_gc_time, GC_HIST_SIZE);
-
-#ifdef WAIT_AFTER_GROW
-  state res = should_wait_after_grow(avg_iowait_time, avg_gc_time);
-  if (res != S_CONTINUE) {
-    cur_action = res;
-    return res;
-  }
-#endif
-
-  if (TeraHeapStatistics)
-    debug_print(avg_iowait_time, avg_gc_time, interval, iowait_time_ms, gc_time);
-
-  // If the difference between GC and iowait is up to 100 ms then  do
-  // not perform any operation
-  if (abs(avg_gc_time - avg_iowait_time) <= 100) {
-    cur_action = S_NO_ACTION;
-    return S_NO_ACTION;
-  }
-
-  // We calculate the ratio of the h2 candidate objects in H1 
-  double h2_candidate_ratio = (double) h2_cand_size_in_bytes / Universe::heap()->capacity();
-  if (avg_gc_time >= avg_iowait_time &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
-    cur_action = S_MOVE_H2;
-    return S_MOVE_H2;
-  }
-
-  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
-  bool under_h1_max_limit = old_gen->capacity_in_bytes() < old_gen->max_gen_size();
-
-  if (cur_action != S_MOVE_H2 && avg_gc_time >= avg_iowait_time && under_h1_max_limit) {
-    cur_action = S_GROW_H1;
-    return S_GROW_H1;
-  }
-
-  if (avg_iowait_time > avg_gc_time && device_active_time_ms > 0) {
-    return state_shrink_h1();
-  }
-
-  cur_action = S_NO_ACTION;
-  return S_NO_ACTION;
+void TeraDynamicResizingPolicy::action_move_back() {
+  return;
 }
 
 // Print counters for debugging purposes
@@ -407,7 +388,7 @@ size_t TeraDynamicResizingPolicy::grow_h1() {
   size_t new_size = 0;
   size_t cur_size = old_gen->capacity_in_bytes();
   size_t ideal_page_cache  = prev_page_cache_size + shrinked_bytes;
-  size_t cur_page_cache = read_cgroup_mem_stats(true);
+  size_t cur_page_cache = state_machine->read_cgroup_mem_stats(true);
 
   bool ioslack = (cur_page_cache < ideal_page_cache); 
   shrinked_bytes = 0;
@@ -423,11 +404,11 @@ size_t TeraDynamicResizingPolicy::grow_h1() {
     return cur_size + (ideal_page_cache - cur_page_cache); 
   }
 
-  new_size = cur_size + (GROW_STEP * read_cgroup_mem_stats(true));
+  new_size = cur_size + (GROW_STEP * state_machine->read_cgroup_mem_stats(true));
 
   if (TeraHeapStatistics) {
     thlog_or_tty->print_cr("[GROW_H1] Before = %lu | After = %lu | PageCache = %lu\n",
-                           cur_size, new_size, read_cgroup_mem_stats(true));
+                           cur_size, new_size, state_machine->read_cgroup_mem_stats(true));
     thlog_or_tty->flush();
   }
 
@@ -435,6 +416,7 @@ size_t TeraDynamicResizingPolicy::grow_h1() {
 }
 
 // Shrink the capacity of H1 to increase the page cache size.
+// This functions is called by the collector
 size_t TeraDynamicResizingPolicy::shrink_h1() {
   PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
   size_t cur_size = old_gen->capacity_in_bytes();
@@ -447,7 +429,7 @@ size_t TeraDynamicResizingPolicy::shrink_h1() {
 
   if (TeraHeapStatistics) {
     thlog_or_tty->print_cr("[SHRINK_H1] Before = %lu | After = %lu | PageCache = %lu\n",
-                           cur_size, new_size, read_cgroup_mem_stats(true));
+                           cur_size, new_size, state_machine->read_cgroup_mem_stats(true));
     thlog_or_tty->flush();
   }
 
@@ -466,26 +448,21 @@ void TeraDynamicResizingPolicy::decrease_h2_candidate_size(size_t size) {
   transfer_hint_enabled = true;
 #else
   transfer_hint_enabled = Universe::teraHeap()->is_direct_promote() ? false : true;
-#endif
+#endif // LAZY_MOVE_H2
 }
 
 // Save the history of the GC and iowait overheads. We maintain two
 // ring buffers (one for GC and one for iowait) and update these
 // buffers with the new values for GC cost and IO overhead.
-int TeraDynamicResizingPolicy::history(double gc_time_ms, double iowait_time_ms) {
+void TeraDynamicResizingPolicy::history(double gc_time_ms, double iowait_time_ms) {
   static int index = 0;
-#ifdef GC_DISTRIBUTION
   double gc_ratio = calculate_gc_cost(gc_time_ms);
+
   hist_gc_time[index % GC_HIST_SIZE] = gc_ratio * interval;
   hist_iowait_time[index % HIST_SIZE] = iowait_time_ms;
-
-#else
-  hist_gc_time[index % GC_HIST_SIZE] = gc_time_ms;
-  hist_iowait_time[index % HIST_SIZE] = iowait_time_ms;
-#endif
   index++;
-  return index;
 }
+
 // Calculation of the GC cost prediction.
 double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
   static double last_gc_time_ms  = 0;
@@ -499,13 +476,7 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
   if (gc_time_ms == 0 && gc_interval_ms == 0)
     return 0;
 
-#ifdef LAZY_MOVE_H2
-  bool is_no_action = (cur_action == S_NO_ACTION || cur_action == S_IOSLACK
-                       || cur_action == S_CONTINUE || cur_action == S_MOVE_H2
-                       || cur_action == S_WAIT_AFTER_GROW);
-#else
-  bool is_no_action = (cur_action == S_NO_ACTION || cur_action == S_IOSLACK || cur_action == S_CONTINUE);
-#endif
+  bool is_no_action = !(cur_action == SHRINK_H1 || cur_action == GROW_H1);
 
   if (gc_time_ms == 0 && is_no_action) {
     return gc_percentage_ratio;
@@ -517,19 +488,6 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
   double cur_free_bytes_ratio = (1 - cur_live_bytes_ratio);
   double cost = 0;
 
-#ifdef LAZY_MOVE_H2
-  if (gc_time_ms == 0 && (cur_action == S_SHRINK_H1 || cur_action == S_GROW_H1)) {
-    cost = last_gc_time_ms * (1 - cur_free_bytes_ratio);
-    gc_percentage_ratio = (cost * last_gc_free_bytes_ratio) / (cur_free_bytes_ratio * gc_interval_ms);
-
-    if (TeraHeapStatistics) {
-      thlog_or_tty->print_cr("gc_percentage = %lf\n", gc_percentage_ratio);
-    }
-
-    return gc_percentage_ratio;
-  }
-
-#else
   if (gc_time_ms == 0) {
     cost = last_gc_time_ms * (1 - cur_free_bytes_ratio);
     gc_percentage_ratio = (cost * last_gc_free_bytes_ratio) / (cur_free_bytes_ratio * gc_interval_ms);
@@ -540,7 +498,6 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
 
     return gc_percentage_ratio;
   }
-#endif
 
   // Calculate the cost of current GC
   last_gc_time_ms = gc_time_ms;
@@ -554,199 +511,3 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
 
   return gc_percentage_ratio;
 }
-
-// Calculation of the GC cost prediction.
-//double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
-//  static double last_gc_time_ms  = 0;
-//  static double last_gc_free_bytes_ratio = 1;
-//
-//  // Free bytes
-//  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
-//  double cur_live_bytes_ratio = (double) old_gen->used_in_bytes() / old_gen->capacity_in_bytes();
-//  double cur_free_bytes_ratio = (1 - cur_live_bytes_ratio);
-//
-//  // Interval between the previous and the current gc
-//  double gc_interval_ms = (last_full_gc_start - prev_full_gc_end) * 1000;
-//  double gc_percentage_ratio = 0;
-//  double cost = 0;
-//
-//  if (gc_time_ms == 0) {
-//    // Calculate the cost of current GC
-//    cost = last_gc_time_ms * (1 - cur_free_bytes_ratio);
-//    gc_percentage_ratio = (cost * last_gc_free_bytes_ratio) / (cur_free_bytes_ratio * gc_interval_ms);
-//
-//    if (TeraHeapStatistics) {
-//      thlog_or_tty->print_cr("gc_percentage = %lf\n", gc_percentage_ratio);
-//    }
-//
-//    return gc_percentage_ratio;
-//  }
-//
-//  last_gc_time_ms = gc_time_ms;
-//  last_gc_free_bytes_ratio = cur_free_bytes_ratio;
-//  cost = last_gc_time_ms * (1 - cur_free_bytes_ratio);
-//  gc_percentage_ratio = (cost * last_gc_free_bytes_ratio) / (cur_free_bytes_ratio * gc_interval_ms);
-//
-//  if (TeraHeapStatistics) {
-//    thlog_or_tty->print_cr("gc_percentage = %lf\n", gc_percentage_ratio);
-//  }
-//
-//  return gc_percentage_ratio;
-//}
-  
-// Read the memory statistics for the cgroup
-// TODO: Make the path dynamic (after the submission of the paper)
-size_t TeraDynamicResizingPolicy::read_cgroup_mem_stats(bool read_page_cache) {
-  // Define the path to the memory.stat file
-  const char* file_path = "/sys/fs/cgroup/memory/memlim/memory.stat";
-
-  // Open the file for reading
-  FILE* file = fopen(file_path, "r");
-
-  if (file == NULL) {
-    fprintf(stderr, "Failed to open memory.stat\n");
-    return 0;
-  }
-
-  char line[BUFFER_SIZE];
-  size_t res = 0;
-
-  // Read each line in the file
-  while (fgets(line, sizeof(line), file)) {
-    if (read_page_cache && strncmp(line, "cache", 5) == 0) {
-      // Extract the cache value
-      res = atoll(line + 6);
-      break;
-    }
-
-    if (strncmp(line, "rss", 3) == 0) {
-      // Extract the rss value
-      res = atoll(line + 4);
-      break;
-    }
-  }
-
-  // Close the file
-  fclose(file);
-  return res;
-}
-
-// Before we perform a shrink operation we check if there is an IO
-// slack. If there is IO slack then we abort the extra shrinking
-// operation.
-TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::state_shrink_h1() {
-  size_t cur_rss = 0;
-  size_t cur_cache = 0;
-
-  cur_rss = read_cgroup_mem_stats(false);
-  cur_cache = read_cgroup_mem_stats(true);
-  bool ioslack = ((cur_rss + cur_cache) < (59055800320 * 0.97));
-
-  if (ioslack) {
-    cur_action = S_IOSLACK;
-    return S_IOSLACK;
-  }
-
-  cur_action = S_SHRINK_H1;
-  return S_SHRINK_H1;
-}
-
-#ifdef WAIT_AFTER_GROW
-// After each growing operation of H1 we wait to see the effect of
-// the action. If we reach a gc or the io cost is higher than gc
-// cost then we go to no action state. 
-TeraDynamicResizingPolicy::state TeraDynamicResizingPolicy::should_wait_after_grow(double io_time_ms,                                                                                                                
-                                                       double gc_time_ms) {
-
-  if (cur_action != S_WAIT_AFTER_GROW)
-    return S_CONTINUE;
-
-  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
-  size_t cur_size = old_gen->capacity_in_bytes();
-  size_t used_size = old_gen->used_in_bytes();
-
-  // Occupancy of the old generation is higher than 85%
-  bool high_occupancy = (((double)(used_size) / cur_size) > 0.70);
-
-  if (high_occupancy) {
-    return S_NO_ACTION; // remember to change that for optimization in S_GROW_H1
-  }
-
-  if (abs(io_time_ms - gc_time_ms) <= 100) {
-    return S_NO_ACTION;
-  }
-
-  if (gc_time_ms > io_time_ms) {
-    return S_NO_ACTION; // remmber to change that for optimization in S_SHRINK_H1;
-  }
-
-  return S_NO_ACTION;
-}                 
-#endif
-
-// Print states (for debugging and logging purposes)
-void TeraDynamicResizingPolicy::print_state(enum state cur_state) {
-  if (!TeraHeapStatistics)
-    return;
-
-  thlog_or_tty->stamp(true);
-  thlog_or_tty->print_cr("STATE = %s\n", state_name[cur_state]);
-  thlog_or_tty->flush();
-}
-
-// Initialize the array of state names
-void TeraDynamicResizingPolicy::init_state_names() {
-  strncpy(state_name[0], "S_NO_ACTION",       12);
-  strncpy(state_name[1], "S_SHRINK_H1",       12);
-  strncpy(state_name[2], "S_GROW_H1",         10);
-  strncpy(state_name[3], "S_MOVE_BACK",       12);
-  strncpy(state_name[4], "S_CONTINUE",        11);
-  strncpy(state_name[5], "S_MOVE_H2",         10);
-  strncpy(state_name[6], "S_IOSLACK",         10);
-  strncpy(state_name[7], "S_WAIT_AFTER_GROW", 18);
-}
-  
-// Check if the old gen is at the highest size
-bool TeraDynamicResizingPolicy::is_old_gen_max_capacity() {
-  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
-  bool under_h1_max_limit = old_gen->capacity_in_bytes() < old_gen->max_gen_size();
-  return under_h1_max_limit;
-}
-  
-// Change GC cost
-void TeraDynamicResizingPolicy::shrink_after_move() {
-  double iowait_time_ms = 0;
-  uint64_t device_active_time_ms = 0, dev_time_end = 0;
-  unsigned long long iowait_end = 0, cpu_end = 0;
-
-  // We get the interval
-  is_window_limit_exeed();
-
-  // Calculate the user and iowait time during the window interval
-  read_cpu_stats(&iowait_end, &cpu_end);
-  calc_iowait_time(iowait_start, iowait_end, cpu_start, cpu_end,
-                   interval, &iowait_time_ms);
-
-  iowait_time_ms -= gc_iowait_time_ms;
-  dev_time_end = get_device_active_time("nvme1n1");
-  device_active_time_ms = (dev_time_end - dev_time_start) - gc_dev_time;
-
-  assert(gc_time <= interval, "GC time should be less than the window interval");
-  assert(iowait_time_ms <= interval, "GC time should be less than the window interval");
-  assert(device_active_time_ms <= interval, "GC time should be less than the window interval");
-
-  if (iowait_time_ms < 0 || device_active_time_ms <= 0)
-    iowait_time_ms = 0;
-
-  int samples = history(gc_time - gc_compaction_phase_ms, iowait_time_ms);
-
-  Universe::teraHeap()->set_shrink_h1();
-  ParallelScavengeHeap::old_gen()->resize(10000);
-  Universe::teraHeap()->unset_shrink_h1();
-  cur_action = S_SHRINK_H1;
-  history(0, 0);
-  cur_action = S_IOSLACK;
-  reset_counters();
-}
-
-

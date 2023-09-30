@@ -146,28 +146,14 @@
                                     // HINT_HIGH_LOW_WATERMARK
 
 // State machine flags for DynaHeap
-#define BASIC_VERSION              // Simple version of the state machine 
-
 #define PER_MINOR_GC               //< Take decisions per minor GCs
 
 #define GROW_STEP (0.2)            //< 0.2 (progressive) 0.8 (aggressive)
 
 #define SHRINK_STEP (0.8)          //< 0.8 (progressive) 0.2 (aggressive)
 
-#define FLUSH_GC_HISTORY_AFTER_MOVEH2 //< After moving objects to H2
-                                      //we flush the GC history
-
-#define GC_DISTRIBUTION            //< Distribution of GC accross the intervals
-
 #define LAZY_MOVE_H2               //< Wait the next GC for moving
                                    //objects to H2. Until next GC wait
                                    //and do not take new decissions.
-
-#define WAIT_AFTER_GROW            //< After growing H1 wait to see
-                                   // the effect. This feature avoids
-                                   // to perform continiously growing
-                                   // operations.
-
-#define SHRINK_AFTER_MOVE          //< Shrink H1 after move objects to H2
 
 #endif  // _SHARE_DEFINES_H_

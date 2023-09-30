@@ -247,78 +247,7 @@ bool PSScavenge::invoke() {
   if (EnableTeraHeap && DynamicHeapResizing) {
     TeraHeap *th = Universe::teraHeap();
     TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
-    switch (Universe::teraHeap()->get_resizing_policy()->action()) {
-      case TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
-        tera_policy->reset_counters();
-
-        //if (need_full_gc) {
-        //  if (tera_policy->is_old_gen_max_capacity()) {
-        //    tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
-        //  } else {
-        //    th->set_grow_h1();
-        //    ParallelScavengeHeap::old_gen()->resize(10000);
-        //    th->unset_grow_h1();
-        //    tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_GROW_H1);
-        //    tera_policy->calculate_gc_cost(0);
-        //    tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
-        //    need_full_gc = false;
-        //  }
-        //}
-        break;
-
-      case TeraDynamicResizingPolicy::S_MOVE_H2:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_H2);
-
-        th->set_direct_promotion();
-#ifdef LAZY_MOVE_H2
-      tera_policy->reset_counters();
-#else 
-      need_resizing = true;
-#endif
-        break;
-
-      case TeraDynamicResizingPolicy::S_SHRINK_H1:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_SHRINK_H1);
-
-        th->set_shrink_h1();
-        ParallelScavengeHeap::old_gen()->resize(10000);
-        th->unset_shrink_h1();
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_GROW_H1:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_GROW_H1);
-
-        th->set_grow_h1();
-        ParallelScavengeHeap::old_gen()->resize(10000);
-        th->unset_grow_h1();
-        tera_policy->calculate_gc_cost(0);
-        tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_WAIT_AFTER_GROW);
-        // We grow the heap so, there is no need to perform the gc. We
-        // postpone the gc.
-        need_full_gc = false;
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_MOVE_BACK:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_MOVE_BACK);
-        tera_policy->reset_counters();
-        break;
-      
-      case TeraDynamicResizingPolicy::S_IOSLACK:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_IOSLACK);
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_NO_ACTION:
-        tera_policy->print_state(TeraDynamicResizingPolicy::S_NO_ACTION);
-        tera_policy->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_CONTINUE:
-        break;
-    }
+    tera_policy->dram_repartition(&need_full_gc, &need_resizing);
   }
 
   if (UsePerfData) {
@@ -342,25 +271,11 @@ bool PSScavenge::invoke() {
 #ifdef TERA_MINOR_GC
   if (EnableTeraHeap) {
 	  Universe::teraHeap()->h2_clear_back_ref_stacks();
+
     if (DynamicHeapResizing) {
       TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
-#ifdef LAZY_MOVE_H2
-      if (full_gc_done && tera_policy->get_cur_action() == TeraDynamicResizingPolicy::S_MOVE_H2) {
-        Universe::teraHeap()->unset_direct_promotion();
-#ifndef SHRINK_AFTER_MOVE
-        tera_policy->set_cur_action(TeraDynamicResizingPolicy::S_NO_ACTION);
-#else
-        tera_policy->shrink_after_move();
-#endif
-      }
-#else
-      if (DynamicHeapResizing && need_resizing) {
-        Universe::teraHeap()->unset_direct_promotion();
-        tera_policy->reset_counters();
-      }
-#endif
-
-      Universe::teraHeap()->get_resizing_policy()->set_last_minor_gc(os::elapsedTime());
+      tera_policy->epilog_move_h2(full_gc_done, need_resizing);
+      tera_policy->set_last_minor_gc(os::elapsedTime());
     }
   }
 #endif // TERA_MINOR_GC
