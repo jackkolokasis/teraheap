@@ -315,32 +315,24 @@ void PSOldGen::resize(size_t desired_free_space) {
   static int i = 0;
   i++;
 
-  if (EnableTeraHeap && DynamicHeapResizing && i >= 2) {
-    double used_ratio = (double) used_in_bytes() / capacity_in_bytes(); 
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
 
-    if (Universe::teraHeap()->need_to_grow_h1()) {
-      new_size = max_gen_size();
-    }
-    else if (Universe::teraHeap()->need_to_shink_h1()) {
-      size_t diff = capacity_in_bytes() - used_in_bytes();
-      new_size = used_in_bytes() + (diff - (size_t) (diff * 0.7));
-    } 
-    else if (used_ratio >= 0.75) {
-      new_size = used_in_bytes() + (size_t)(used_in_bytes() * 0.4);
+    // Inside the interval we do not change the heap size
+    new_size = capacity_in_bytes();
 
-    } else {
-      new_size = capacity_in_bytes();
+    if (th->need_to_grow_h1()) {
+      new_size = tera_policy->grow_h1();
     }
-    //fprintf(stderr, "--------------------------------\n");
-    //fprintf(stderr, "capacity in bytes = %lu\n", capacity_in_bytes());
-    //fprintf(stderr, "used_in_bytes = %lu\n", used_in_bytes());
-    //fprintf(stderr, "max_gen_size = %lu\n", max_gen_size());
-    //fprintf(stderr, "min_gen_size = %lu\n", min_gen_size());
-    //fprintf(stderr, "--------------------------------\n");
+
+    if (th->need_to_shink_h1()) {
+      new_size = tera_policy->shrink_h1();
+    }
+  } else {
+    // Adjust according to our min and max
+    new_size = clamp(new_size, min_gen_size(), max_gen_size());
   }
-  
-  // Adjust according to our min and max
-  new_size = clamp(new_size, min_gen_size(), max_gen_size());
 
   assert(max_gen_size() >= reserved().byte_size(), "max new size problem?");
   new_size = align_up(new_size, alignment);

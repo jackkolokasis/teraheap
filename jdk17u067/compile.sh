@@ -11,6 +11,11 @@
 # Compile JVM
 #
 ###################################################
+	
+PROJECT_DIR="$(pwd)/.."
+CC=gcc-8
+CXX=g++-8
+
 
 function usage()
 {
@@ -33,10 +38,11 @@ function usage()
 function release() 
 {
   make dist-clean
+  CC=$CC CXX=$CXX \
   bash ./configure \
     --with-jobs="$(nproc)" \
-    --with-extra-cflags="-O3 -I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include" \
-    --with-extra-cxxflags="-O3 -I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include" \
+    --with-extra-cflags="-O3 -I${PROJECT_DIR}/allocator/include -I${PROJECT_DIR}/tera_malloc/include" \
+    --with-extra-cxxflags="-O3 -I${PROJECT_DIR}/allocator/include -I${PROJECT_DIR}/tera_malloc/include" \
     --with-target-bits=64
   
   intercept-build make
@@ -49,16 +55,15 @@ function release()
 # Compile with debug symbols and assertions
 function debug_symbols_on() 
 {
-	export LD_LIBRARY_PATH=/home/kolokasis/github/teraheap/allocator/lib:$LD_LIBRARY_PATH
-
   make dist-clean
+  CC=$CC CXX=$CXX \
   bash ./configure \
     --with-debug-level=fastdebug \
     --with-native-debug-symbols=internal \
     --with-target-bits=64 \
     --with-jobs="$(nproc)" \
-    --with-extra-cflags="-I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include" \
-    --with-extra-cxxflags="-I/home/kolokasis/github/teraheap/allocator/include -I/home/kolokasis/github/teraheap/allocator/include"
+    --with-extra-cflags="-I${PROJECT_DIR}/allocator/include -I${PROJECT_DIR}/tera_malloc/include" \
+    --with-extra-cxxflags="-I${PROJECT_DIR}/allocator/include -I${PROJECT_DIR}/tera_malloc/include"
 
   intercept-build make
   cd ../ 
@@ -75,9 +80,7 @@ function clean_make()
 
 export_env_vars()
 {
-	local PROJECT_DIR="$(pwd)/.."
-
-	export JAVA_HOME="/usr/lib/jvm/java17"
+	export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
 
 	### TeraHeap Allocator
 	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib:$LIBRARY_PATH

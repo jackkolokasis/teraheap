@@ -3,6 +3,7 @@
 
 #include "memory/allocation.hpp"
 #include "oops/oopsHierarchy.hpp"
+#include "gc/shared/gc_globals.hpp"
 
 #define LOW_THRESHOLD_WEIGHT 0.5f
 #define HIGH_THRESHOLD 0.85
@@ -22,6 +23,7 @@ public:
   virtual long get_promote_tag() = 0;
 
   virtual void set_direct_promotion(size_t old_live, size_t max_old_gen_size) = 0;
+  virtual void unset_direct_promotion() = 0;
   virtual void set_low_promotion_threshold() = 0;
   virtual void h2_incr_total_marked_obj_size(size_t sz) = 0;
   virtual void h2_reset_total_marked_obj_size() = 0;
@@ -46,13 +48,14 @@ public:
 
 class DefaultPolicy : public TransferPolicy {
 public:
-  DefaultPolicy() { transfer_on = false; }
+  DefaultPolicy() { transfer_on = true; }
   void set_non_promote_tag(long val) override {}
   void set_promote_tag(long val) override {}
   long get_non_promote_tag() override { return 0; }
   long get_promote_tag() override { return 0; }
 
   void set_direct_promotion(size_t old_live, size_t max_old_gen_size) override {}
+  void unset_direct_promotion() override {};
   void set_low_promotion_threshold() override {}
   void h2_incr_total_marked_obj_size(size_t sz) override {}
   void h2_reset_total_marked_obj_size() override {}
@@ -63,13 +66,14 @@ public:
 
 class SparkPrimitivePolicy : public TransferPolicy {
 public:
-  SparkPrimitivePolicy() { transfer_on = false; }
+  SparkPrimitivePolicy() { transfer_on = true; }
   void set_non_promote_tag(long val) override {}
   void set_promote_tag(long val) override {}
   long get_non_promote_tag() override { return 0; }
   long get_promote_tag() override { return 0; }
 
   void set_direct_promotion(size_t old_live, size_t max_old_gen_size) override {}
+  void unset_direct_promotion() override {};
   void set_low_promotion_threshold() override {}
   void h2_incr_total_marked_obj_size(size_t sz) override {}
   void h2_reset_total_marked_obj_size() override {}
@@ -99,9 +103,13 @@ public:
   long get_promote_tag() override             { return promote_tag;     }
 
   void set_direct_promotion(size_t old_live, size_t max_old_gen_size) override {
-    direct_promotion = 
+    direct_promotion = (DynamicHeapResizing) ? true :
       ((float) old_live / (float) max_old_gen_size) >= HIGH_THRESHOLD ? true : false;
   }
+  
+  void unset_direct_promotion() override {
+    direct_promotion = false;
+  };
 
   void set_low_promotion_threshold() override {
     h2_low_promotion_threshold = 

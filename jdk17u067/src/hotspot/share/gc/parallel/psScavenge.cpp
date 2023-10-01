@@ -242,49 +242,16 @@ bool PSScavenge::invoke() {
   IsGCActiveMark mark;
 
   const bool scavenge_done = PSScavenge::invoke_no_policy();
-  const bool need_full_gc = !scavenge_done ||
+  bool need_full_gc = !scavenge_done ||
     policy->should_full_GC(heap->old_gen()->free_in_bytes());
   bool full_gc_done = false;
   bool need_resizing = false;
 
-#ifdef DYNAMIC_HEAP_RESIZING_TEST
   if (EnableTeraHeap && DynamicHeapResizing) {
-    switch (Universe::teraHeap()->get_resizing_policy()->action()) {
-      case TeraDynamicResizingPolicy::S_MOVE_H2:
-      //fprintf(stderr, "STATE = S_MOVE_H2\n");
-        Universe::teraHeap()->get_policy()->set_move_h2();
-        need_resizing = true;
-        break;
-
-      case TeraDynamicResizingPolicy::S_SHRINK_H1:
-        //fprintf(stderr, "STATE = S_SHRINK_H1\n");
-        Universe::teraHeap()->set_shrink_h1();
-        need_resizing = true;
-        break;
-
-      case TeraDynamicResizingPolicy::S_GROW_H1:
-        //fprintf(stderr, "STATE = S_GROW_H1\n");
-        Universe::teraHeap()->set_grow_h1();
-        need_resizing = true;
-        break;
-
-      case TeraDynamicResizingPolicy::S_MOVE_BACK:
-        //assert(false, "Please implement this case");
-        //fprintf(stderr, "STATE = S_MOVE_BACK\n");
-        Universe::teraHeap()->get_resizing_policy()->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_NO_ACTION:
-        //fprintf(stderr, "STATE = S_NO_ACTION\n");
-        Universe::teraHeap()->get_resizing_policy()->reset_counters();
-        break;
-
-      case TeraDynamicResizingPolicy::S_CONTINUE:
-        //fprintf(stderr, "STATE = S_CONTINUE\n");
-        break;
-    }
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
+    tera_policy->dram_repartition(&need_full_gc, &need_resizing);
   }
-#endif
 
   if (UsePerfData) {
     PSGCAdaptivePolicyCounters* const counters = heap->gc_policy_counters();
@@ -300,18 +267,16 @@ bool PSScavenge::invoke() {
     full_gc_done = PSParallelCompact::invoke_no_policy(clear_all_softrefs);
   }
 
-#ifdef DYNAMIC_HEAP_RESIZING_TEST
-  if (EnableTeraHeap && DynamicHeapResizing && need_resizing) {
-    Universe::teraHeap()->unset_shrink_h1();
-    Universe::teraHeap()->unset_grow_h1();
-    Universe::teraHeap()->get_policy()->unset_move_h2();
-    Universe::teraHeap()->get_resizing_policy()->reset_counters();
-  }
-#endif
-
 #ifdef TERA_MINOR_GC
-  if (EnableTeraHeap)
+  if (EnableTeraHeap) {
 	  Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+    if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+      tera_policy->epilog_move_h2(full_gc_done, need_resizing);
+      tera_policy->set_last_minor_gc(os::elapsedTime());
+    }
+  }
 #endif //TERA_MINOR_GC
 
   return full_gc_done;

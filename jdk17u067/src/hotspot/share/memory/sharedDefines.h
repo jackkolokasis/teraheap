@@ -141,4 +141,15 @@
 
 #define DYNAMIC_HEAP_RESIZING_TEST     // Dynamic heap resizing
 
+// State machine flags for DynaHeap
+#define PER_MINOR_GC               //< Take decisions per minor GCs
+
+#define GROW_STEP (0.2)            //< 0.2 (progressive) 0.8 (aggressive)
+
+#define SHRINK_STEP (0.8)          //< 0.8 (progressive) 0.2 (aggressive)
+
+#define LAZY_MOVE_H2               //< Wait the next GC for moving
+                                   //objects to H2. Until next GC wait
+                                   //and do not take new decissions.
+
 #endif  // SHARE_MEMORY_SHAREDDEFINES_H

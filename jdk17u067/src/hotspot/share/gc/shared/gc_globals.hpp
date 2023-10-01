@@ -721,7 +721,16 @@
           "are: DefaultPolicy, SparkPrimitivePolicy")                       \
                                                                             \
   product(bool, DynamicHeapResizing, false,                                 \
-          "Enable dynamic heap resizing for TeraHeap")
+          "Enable dynamic heap resizing for TeraHeap")                      \
+                                                                            \
+  product(intx, TeraResizingPolicy, 0,                                      \
+          "0: Simple resizing policy; "                                     \
+          "1: Simple wait resizing policy; "                                \
+          "2: Simple aggressive grow after wait resizing policy; "          \
+          "3: Simple aggressive shrink after wait resizing policy;")        \
+								                                    	                      \
+  product(uintx, TeraDRAMLimit, 0,                                          \
+          "Total size of DRAM budget (in bytes)")
 
 
 // end of GC_FLAGS

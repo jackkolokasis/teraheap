@@ -122,13 +122,14 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 
 #ifdef TERA_MAJOR_GC
   // If the major GC fails then we need to clear the backward stacks
-  if (EnableTeraHeap)
+  if (EnableTeraHeap) {
     Universe::teraHeap()->h2_clear_back_ref_stacks();
 
-  if (DynamicHeapResizing) {
-    TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
-    tera_policy->epilog_move_h2(true, true);
-    tera_policy->set_last_minor_gc(os::elapsedTime());
+    if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+      tera_policy->epilog_move_h2(true, true);
+      tera_policy->set_last_minor_gc(os::elapsedTime());
+    }
   }
 #endif
 }

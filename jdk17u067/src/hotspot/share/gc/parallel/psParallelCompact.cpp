@@ -1035,6 +1035,7 @@ void ParallelCompactData::verify_clear()
 #endif  // #ifdef ASSERT
 
 STWGCTimer          PSParallelCompact::_gc_timer;
+STWGCTimer          PSParallelCompact::_gc_compact_phase_timer;
 ParallelOldTracer   PSParallelCompact::_gc_tracer;
 elapsedTimer        PSParallelCompact::_accumulated_time;
 unsigned int        PSParallelCompact::_total_invocations = 0;
@@ -1987,6 +1988,21 @@ void PSParallelCompact::invoke(bool maximum_heap_compaction) {
 
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
+  
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
+    bool need_full_gc = false;
+    bool need_resizing = false;
+    tera_policy->dram_repartition(&need_full_gc, &need_resizing);
+    tera_policy->set_last_minor_gc(os::elapsedTime());
+
+    if (tera_policy->is_action_enabled()) {
+      tera_policy->action_disabled();
+      Universe::teraHeap()->get_policy()->unset_direct_promotion();
+      return;
+    }
+  }
 
   if (ScavengeBeforeFullGC) {
     PSScavenge::invoke_no_policy();
@@ -1997,6 +2013,19 @@ void PSParallelCompact::invoke(bool maximum_heap_compaction) {
 
   PSParallelCompact::invoke_no_policy(clear_all_soft_refs ||
                                       maximum_heap_compaction);
+
+#ifdef TERA_MAJOR_GC
+  // If the major GC fails then we need to clear the backward stacks
+  if (EnableTeraHeap) {
+    Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+    if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+      tera_policy->epilog_move_h2(true, true);
+      tera_policy->set_last_minor_gc(os::elapsedTime());
+    }
+  }
+#endif
 }
 
 // This method contains no policy. You should probably
@@ -2013,11 +2042,10 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 
   GCIdMark gc_id_mark;
 
-#ifdef DYNAMIC_HEAP_RESIZING_TEST
   if (DynamicHeapResizing) {
-    TeraDynamicResizingPolicy::gc_start();
+    Universe::teraHeap()->get_resizing_policy()->gc_start(os::elapsedTime());
+    Universe::teraHeap()->get_resizing_policy()->reset_h2_candidate_size();
   }
-#endif // DYNAMIC_HEAP_RESIZING_TEST 
 
   _gc_timer.register_gc_start();
   _gc_tracer.report_gc_start(heap->gc_cause(), _gc_timer.gc_start());
@@ -2117,8 +2145,12 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
 #ifdef TERA_MAJOR_GC
     // Adjust the references of H2 candidate objects and 
     if (EnableTeraHeap) {
-      if (Universe::teraHeap()->get_policy()->is_tranfer_on())
+      if (DynamicHeapResizing)
+        _gc_compact_phase_timer.register_gc_start();
+
+      if (Universe::teraHeap()->get_policy()->is_tranfer_on()) {
         compact_h2_candidate_objects();
+      }
       adjust_backward_references();
     }
 #endif
@@ -2140,6 +2172,11 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
     if (EnableTeraHeap) {
       // Wait to complete all the transfers to H2 and then continue
       Universe::teraHeap()->h2_complete_transfers();
+
+      if (DynamicHeapResizing) {
+        _gc_compact_phase_timer.register_gc_end();
+        Universe::teraHeap()->get_resizing_policy()->compaction_phase_time(_gc_compact_phase_timer.gc_end().milliseconds() - _gc_compact_phase_timer.gc_start().milliseconds());
+      }
 
       if (Universe::teraHeap()->get_policy()->is_tranfer_on()) {
         Universe::teraHeap()->destroy_tera_dram_allocator();
@@ -2240,7 +2277,7 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
     }
 
 #ifdef TERA_MAJOR_GC
-    if (EnableTeraHeap) {
+    if (EnableTeraHeap && !DynamicHeapResizing) {
       size_t old_live = old_gen->used_in_bytes();
       size_t max_old_gen_size = old_gen->max_gen_size(); 
       Universe::teraHeap()->get_policy()->set_direct_promotion(old_live, max_old_gen_size);
@@ -2305,11 +2342,10 @@ bool PSParallelCompact::invoke_no_policy(bool maximum_heap_compaction) {
   _gc_tracer.report_dense_prefix(dense_prefix(old_space_id));
   _gc_tracer.report_gc_end(_gc_timer.gc_end(), _gc_timer.time_partitions());
 
-#ifdef DYNAMIC_HEAP_RESIZING_TEST
   if (DynamicHeapResizing) {
-    TeraDynamicResizingPolicy::gc_end(_gc_timer.gc_end().milliseconds() - _gc_timer.gc_start().milliseconds());
+    TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+    tera_policy->gc_end((_gc_timer.gc_end().milliseconds() - _gc_timer.gc_start().milliseconds()), os::elapsedTime());
   }
-#endif // DYNAMIC_HEAP_RESIZING_TEST 
 
   return true;
 }

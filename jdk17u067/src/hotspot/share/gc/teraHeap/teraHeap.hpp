@@ -68,15 +68,12 @@ private:
 
   TransferPolicy *tera_policy;      //< Transfer policy for H2
 
-#ifdef DYNAMIC_HEAP_RESIZING_TEST
   bool shrink_h1 = false;           //< This flag indicate that H1
                                     // should be shrinked
   bool grow_h1 = false;             //< This flag indicate that H1
                                     // should be grown
   
   TeraDynamicResizingPolicy* dynamic_resizing_policy; 
-
-#endif
 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
@@ -333,7 +330,8 @@ public:
   // Destroy the reserved dram space
   void destroy_tera_dram_allocator();
 
-#ifdef DYNAMIC_HEAP_RESIZING_TEST
+  // TODO: The following 6 functions should move to
+  // DynamicResizingPolicy class
   // The state machine uses this function to set if the GC should
   // shrink H1 as a result to free the physical pages. Then the OS
   // will reclaim the physical pahges and will use them as part of the
@@ -355,7 +353,6 @@ public:
   TeraDynamicResizingPolicy* get_resizing_policy() {
     return dynamic_resizing_policy;
   }
-#endif
 };
 
 #endif

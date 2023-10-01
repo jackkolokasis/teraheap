@@ -1049,6 +1049,7 @@ class PSParallelCompact : AllStatic {
 
  private:
   static STWGCTimer           _gc_timer;
+  static STWGCTimer           _gc_compact_phase_timer;
   static ParallelOldTracer    _gc_tracer;
   static elapsedTimer         _accumulated_time;
   static unsigned int         _total_invocations;

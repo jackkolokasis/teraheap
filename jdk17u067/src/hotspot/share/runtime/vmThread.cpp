@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "compiler/compileBroker.hpp"
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/teraHeap/teraHeap.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "jfr/support/jfrThreadId.hpp"
 #include "logging/log.hpp"
@@ -278,6 +279,24 @@ void VMThread::evaluate_operation(VM_Operation* op) {
 
 }
 
+// On evey GC we are going to call
+bool should_gc() {
+  if (!UseParallelGC || !DynamicHeapResizing)
+    return false;
+
+  // State machine executed at the end of each minor gc. If the
+  // interval between minor GCs is higher than windows interval then
+  // perform a minor gc.
+  TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+  double ellapsedTime = os::elapsedTime() - tera_policy->get_last_minor_gc();
+  if (ellapsedTime > tera_policy->get_window_interval() && !tera_policy->is_action_enabled() && !SafepointSynchronize::is_at_safepoint()) {
+    tera_policy->action_enabled();
+    return true;
+  }
+
+  return false;
+}
+
 class HandshakeALotClosure : public HandshakeClosure {
  public:
   HandshakeALotClosure() : HandshakeClosure("HandshakeALot") {}
@@ -454,6 +473,11 @@ void VMThread::wait_for_operation() {
     assert(_cur_vm_operation  == NULL, "Must be");
 
     setup_periodic_safepoint_if_needed();
+        
+    if (DynamicHeapResizing && should_gc()) {
+      Universe::heap()->collect_as_vm_thread(GCCause::_heap_inspection);
+    }
+
     if (_next_vm_operation != NULL) {
       return;
     }

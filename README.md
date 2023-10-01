@@ -19,6 +19,8 @@ pip3 install scan-build --user
 pip3 install compdb --user
 ```
 
+The JVM can be compiled only with gcc <= 8.5 and g++ <= 8.5
+
 ### Build
 1. Build allocator.
 ```sh
@@ -40,7 +42,8 @@ specific environment variables
 
 3. Set your gcc/g++ path/alias 
 ```sh
-cd jdk8u345 
+cd ./jdk8u345 # for building java8
+cd ./jdk17u067 # for building java17
 ```
 and set CC and CXX variables inside compile.sh to your gcc path/alias
 
