@@ -137,7 +137,7 @@ private:
   
   // Calculate the average of gc and io costs and return their values.
   // We use these values to determine the next actions.
-  void calculate_gc_io_costs(double *avg_gc_time_ms, double *avg_io_time_ms,
+  bool calculate_gc_io_costs(double *avg_gc_time_ms, double *avg_io_time_ms,
                              uint64_t *device_active_time_ms);
   
   // Print counters for debugging purposes

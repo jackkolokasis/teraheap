@@ -25,7 +25,10 @@ TeraStateMachine* TeraDynamicResizingPolicy::init_state_machine_policy() {
       return new TeraOptWaitAfterGrowStateMachine();
     case 7:
       return new TeraFullOptimizedStateMachine(); 
-    default:
+    case 8:
+      return new TeraDirectGrowShrinkStateMachine(); 
+    case 9:
+      return new TeraFullDirectGrowShrinkStateMachine(); 
       break;
   }
   
@@ -60,7 +63,7 @@ void TeraDynamicResizingPolicy::dram_repartition(bool *need_full_gc,
   uint64_t device_active_time_ms = 0;
   TeraHeap *th = Universe::teraHeap();
 
-  calculate_gc_io_costs(&avg_gc_time_ms, &avg_io_time_ms, &device_active_time_ms);
+  bool should_decide = calculate_gc_io_costs(&avg_gc_time_ms, &avg_io_time_ms, &device_active_time_ms);
 
   state_machine->fsm(&cur_state, &cur_action, avg_gc_time_ms, avg_io_time_ms,
                      device_active_time_ms, h2_cand_size_in_bytes, eager_move);
@@ -85,7 +88,9 @@ void TeraDynamicResizingPolicy::dram_repartition(bool *need_full_gc,
     case CONTINUE:
       break;
   }
-  reset_counters();
+  
+  if (should_decide)
+    reset_counters();
 }
 
 // Print states (for debugging and logging purposes)
@@ -118,7 +123,7 @@ void TeraDynamicResizingPolicy::init_state_actions_names() {
 
 // Calculate the average of gc and io costs and return their values.
 // We use these values to determine the next actions.
-void TeraDynamicResizingPolicy::calculate_gc_io_costs(double *avg_gc_time_ms,
+bool TeraDynamicResizingPolicy::calculate_gc_io_costs(double *avg_gc_time_ms,
                                                       double *avg_io_time_ms,
                                                       uint64_t *device_active_time_ms) {
   double iowait_time_ms = 0;
@@ -130,7 +135,7 @@ void TeraDynamicResizingPolicy::calculate_gc_io_costs(double *avg_gc_time_ms,
   if (!is_window_limit_exeed()) {
     *avg_gc_time_ms = 0;
     *avg_io_time_ms = 0;
-    return;
+    return false;
   }
 
   // Calculate the user and iowait time during the window interval
@@ -151,11 +156,14 @@ void TeraDynamicResizingPolicy::calculate_gc_io_costs(double *avg_gc_time_ms,
 
   history(gc_time - gc_compaction_phase_ms, iowait_time_ms);
 
-  *avg_io_time_ms = calc_avg_time(hist_iowait_time, HIST_SIZE);
+  *avg_io_time_ms = need_action ? iowait_time_ms : calc_avg_time(hist_iowait_time, HIST_SIZE);
   *avg_gc_time_ms = calc_avg_time(hist_gc_time, GC_HIST_SIZE);
   
-  if (TeraHeapStatistics)
+  if (TeraHeapStatistics) {
+    thlog_or_tty->print_cr("Device active time = %lu\n", *device_active_time_ms);
     debug_print(*avg_io_time_ms, *avg_gc_time_ms, interval, iowait_time_ms, gc_time);
+  }
+  return true;
 }
 
 TeraDynamicResizingPolicy::TeraDynamicResizingPolicy() {
@@ -485,15 +493,18 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
   // Free bytes
   PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
   double cur_live_bytes_ratio = (double) old_gen->used_in_bytes() / old_gen->capacity_in_bytes();
-  double cur_free_bytes_ratio = (1 - cur_live_bytes_ratio);
+  double cur_free_bytes_ratio = (1.0 - cur_live_bytes_ratio);
   double cost = 0;
 
   if (gc_time_ms == 0) {
-    cost = last_gc_time_ms * (1 - cur_free_bytes_ratio);
+    cost = last_gc_time_ms * (1.0 - last_gc_free_bytes_ratio);
     gc_percentage_ratio = (cost * last_gc_free_bytes_ratio) / (cur_free_bytes_ratio * gc_interval_ms);
 
     if (TeraHeapStatistics) {
       thlog_or_tty->print_cr("gc_percentage = %lf\n", gc_percentage_ratio);
+      thlog_or_tty->print_cr("last_gc_time_ms = %f\n", last_gc_time_ms);
+      thlog_or_tty->print_cr("1.0 - cur_free = %f\n", (1.0 - cur_free_bytes_ratio));
+      thlog_or_tty->print_cr("gc_interval_ms = %f", gc_interval_ms);
     }
 
     return gc_percentage_ratio;

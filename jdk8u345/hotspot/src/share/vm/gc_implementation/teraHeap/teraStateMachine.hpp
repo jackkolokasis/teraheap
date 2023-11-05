@@ -172,4 +172,36 @@ public:
                              size_t h2_cand_size_in_bytes);
 };
 
+class TeraDirectGrowShrinkStateMachine : public TeraSimpleWaitStateMachine {
+public:
+  TeraDirectGrowShrinkStateMachine() {
+    thlog_or_tty->print_cr("Resizing Policy = TeraDirectGrowShrinkStateMachine\n");
+    thlog_or_tty->flush();
+  }
+  
+  void state_wait_after_shrink(states *cur_state, actions *cur_action,
+                             double gc_time_ms, double io_time_ms,
+                             size_t h2_cand_size_in_bytes);
+
+  void state_wait_after_grow(states *cur_state, actions *cur_action,
+                             double gc_time_ms, double io_time_ms,
+                             size_t h2_cand_size_in_bytes);
+};
+
+class TeraFullDirectGrowShrinkStateMachine : public TeraSimpleWaitStateMachine {
+public:
+  TeraFullDirectGrowShrinkStateMachine() {
+    thlog_or_tty->print_cr("Resizing Policy = TeraFullDirectGrowShrinkStateMachine\n");
+    thlog_or_tty->flush();
+  }
+  
+  void state_wait_after_shrink(states *cur_state, actions *cur_action,
+                             double gc_time_ms, double io_time_ms,
+                             size_t h2_cand_size_in_bytes);
+
+  void state_wait_after_grow(states *cur_state, actions *cur_action,
+                             double gc_time_ms, double io_time_ms,
+                             size_t h2_cand_size_in_bytes);
+};
+
 #endif // SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERASTATEMACHINE_HPP

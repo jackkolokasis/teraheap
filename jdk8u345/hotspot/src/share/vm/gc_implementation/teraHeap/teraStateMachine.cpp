@@ -409,17 +409,19 @@ void TeraFullOptimizedStateMachine::state_wait_after_shrink(states *cur_state, a
     return;
   }
   
+  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
+  bool under_h1_max_limit = old_gen->capacity_in_bytes() < old_gen->max_gen_size();
+  if (gc_time_ms >= io_time_ms && under_h1_max_limit) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action = GROW_H1;
+    return;
+  }
+  
   // We calculate the ratio of the h2 candidate objects in H1 
   double h2_candidate_ratio = (double) h2_cand_size_in_bytes / Universe::heap()->capacity();
   if (gc_time_ms >= io_time_ms &&  h2_candidate_ratio >= TRANSFER_THRESHOLD) {
     *cur_state = S_WAIT_MOVE;
     *cur_action = MOVE_H2;
-    return;
-  }
-  
-  if (gc_time_ms > io_time_ms) {
-    *cur_state = S_WAIT_GROW;
-    *cur_action = GROW_H1;
     return;
   }
   
@@ -477,6 +479,138 @@ void TeraFullOptimizedStateMachine::state_wait_after_grow(states *cur_state, act
   if (gc_time_ms > io_time_ms && high_occupancy && under_h1_max_limit) {
     *cur_state = S_WAIT_GROW;
     *cur_action = GROW_H1;
+    return;
+  }
+
+  if (gc_time_ms > io_time_ms && !high_occupancy && under_h1_max_limit) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action = WAIT_AFTER_GROW;
+    return;
+  }
+
+  *cur_state = S_NO_ACTION;
+  *cur_action = NO_ACTION; // remember to change that for optimization in S_GROW_H1
+}
+  
+void TeraDirectGrowShrinkStateMachine::state_wait_after_shrink(states *cur_state, actions *cur_action,
+                                                               double gc_time_ms, double io_time_ms,
+                                                               size_t h2_cand_size_in_bytes) {
+  if (abs(io_time_ms - gc_time_ms) <= EPSILON) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = IOSLACK;
+    return;
+  }
+  
+  size_t cur_rss = read_cgroup_mem_stats(false);
+  size_t cur_cache = read_cgroup_mem_stats(true);
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  if (io_time_ms > gc_time_ms && !ioslack) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = SHRINK_H1;
+    return;
+  }
+  
+  if (io_time_ms > gc_time_ms && ioslack) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = IOSLACK;
+    return;
+  }
+  
+  *cur_state = S_NO_ACTION;
+  *cur_action = NO_ACTION;
+}
+
+void TeraDirectGrowShrinkStateMachine::state_wait_after_grow(states *cur_state, actions *cur_action,
+                                                             double gc_time_ms, double io_time_ms,
+                                                             size_t h2_cand_size_in_bytes) {
+  if (abs(io_time_ms - gc_time_ms) <= EPSILON) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action =  WAIT_AFTER_GROW;
+    return;
+  }
+
+  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
+  size_t cur_size = old_gen->capacity_in_bytes();
+  size_t used_size = old_gen->used_in_bytes();
+  // Occupancy of the old generation is higher than 70%
+  bool high_occupancy = (((double)(used_size) / cur_size) > 0.70);
+  bool under_h1_max_limit = cur_size < old_gen->max_gen_size();
+
+  if (gc_time_ms > io_time_ms && high_occupancy && under_h1_max_limit) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action = GROW_H1; // remember to change that for optimization in S_GROW_H1
+    return;
+  }
+
+  if (gc_time_ms > io_time_ms && !high_occupancy && under_h1_max_limit) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action = WAIT_AFTER_GROW;
+    return;
+  }
+
+  *cur_state = S_NO_ACTION;
+  *cur_action = NO_ACTION; // remember to change that for optimization in S_GROW_H1
+}
+
+void TeraFullDirectGrowShrinkStateMachine::state_wait_after_shrink(states *cur_state, actions *cur_action,
+                                                               double gc_time_ms, double io_time_ms,
+                                                               size_t h2_cand_size_in_bytes) {
+  if (abs(io_time_ms - gc_time_ms) <= EPSILON) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = IOSLACK;
+    return;
+  }
+
+  if (gc_time_ms > io_time_ms) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action = GROW_H1; // remember to change that for optimization in S_GROW_H1
+    return;
+  }
+  
+  size_t cur_rss = read_cgroup_mem_stats(false);
+  size_t cur_cache = read_cgroup_mem_stats(true);
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  if (io_time_ms > gc_time_ms && !ioslack) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = SHRINK_H1;
+    return;
+  }
+  
+  if (io_time_ms > gc_time_ms && ioslack) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = IOSLACK;
+    return;
+  }
+  
+  *cur_state = S_NO_ACTION;
+  *cur_action = NO_ACTION;
+}
+
+void TeraFullDirectGrowShrinkStateMachine::state_wait_after_grow(states *cur_state, actions *cur_action,
+                                                             double gc_time_ms, double io_time_ms,
+                                                             size_t h2_cand_size_in_bytes) {
+  if (abs(io_time_ms - gc_time_ms) <= EPSILON) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action =  WAIT_AFTER_GROW;
+    return;
+  }
+  
+  if (io_time_ms > gc_time_ms) {
+    *cur_state = S_WAIT_SHRINK;
+    *cur_action = IOSLACK;
+    return;
+  }
+
+  PSOldGen *old_gen = ParallelScavengeHeap::old_gen();
+  size_t cur_size = old_gen->capacity_in_bytes();
+  size_t used_size = old_gen->used_in_bytes();
+  // Occupancy of the old generation is higher than 70%
+  bool high_occupancy = (((double)(used_size) / cur_size) > 0.70);
+  bool under_h1_max_limit = cur_size < old_gen->max_gen_size();
+
+  if (gc_time_ms > io_time_ms && high_occupancy && under_h1_max_limit) {
+    *cur_state = S_WAIT_GROW;
+    *cur_action = GROW_H1; // remember to change that for optimization in S_GROW_H1
     return;
   }
 
