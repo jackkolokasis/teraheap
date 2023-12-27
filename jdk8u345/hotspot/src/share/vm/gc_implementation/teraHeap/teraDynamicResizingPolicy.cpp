@@ -513,7 +513,7 @@ double TeraDynamicResizingPolicy::calculate_gc_cost(double gc_time_ms) {
   // Calculate the cost of current GC
   last_gc_time_ms = gc_time_ms;
   last_gc_free_bytes_ratio = cur_free_bytes_ratio;
-  cost = last_gc_time_ms * (1 - cur_free_bytes_ratio);
+  cost = last_gc_time_ms * (1.0 - cur_free_bytes_ratio);
   gc_percentage_ratio = (cost * last_gc_free_bytes_ratio) / (cur_free_bytes_ratio * gc_interval_ms);
 
   if (TeraHeapStatistics) {

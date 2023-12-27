@@ -2,6 +2,7 @@
 #define SHARE_GC_TERAHEAP_TERADYNAMICRESIZINGPOLICY_HPP
 
 #include "gc/teraHeap/teraEnum.h"
+#include "gc/teraHeap/teraCPUUsage.hpp"
 #include "gc/teraHeap/teraStateMachine.hpp"
 #include "memory/allocation.hpp"
 #include "memory/sharedDefines.h"
@@ -19,13 +20,7 @@ private:
   char state_name[NUM_STATES][NAME_LEN]; //< Define state names
   char action_name[NUM_ACTIONS][NAME_LEN]; //< Define state names
   uint64_t window_start_time;         //< Window start time
-  unsigned long long iowait_start;    //< Start counting iowait time at
-                                      // the start of the window
-  unsigned long long cpu_start;       //< Start counting iowait time at
-                                      // the start of the window
 
-  unsigned long long gc_iowait_start; //< IO wait time created during gc
-  unsigned long long gc_cpu_start;    //< IO wait time created during gc
   double gc_iowait_time_ms;           //< Total IO wait time generated
   uint64_t gc_dev_time;               //< Total time that the device
                                       // was active during GC
@@ -73,29 +68,14 @@ private:
   double gc_compaction_phase_ms;      //< Time of the compaction phase
                                       // that includes I/O 
   TeraStateMachine *state_machine;    //< FSM
+  TeraCPUUsage *cpu_usage;             // Cpu utilization for
+                                      // estimating iowait
 
   // Check if the window limit exceed time
   bool is_window_limit_exeed();
 
   // Calculate ellapsed time
   double ellapsed_time(uint64_t start_time, uint64_t end_time);
-
-  // This function opens iostat and read the io wait time at the
-  // current time.
-  void read_cpu_stats(unsigned long long* cpu_iowait,
-                      unsigned long long* total_cpu);
-  
-  // Calculate iowait time based on the following formula
-  //
-  //                (cpu_iowait_after - cpu_iowait_before) 
-  //  iowait_time = -------------------------------------- * duration 
-  //                 (total_cpu_after - total_cpu_before)
-  //
-  void calc_iowait_time(unsigned long long cpu_iowait_before,
-                               unsigned long long cpu_iowait_after,
-                               unsigned long long total_cpu_before,
-                               unsigned long long total_cpu_after,
-                               double duration, double* iowait_time);
 
   // Count timer. We avoid to use os::elapsed_time() because internally
   // uses the clock_get_time which adds extra overhead. This function
@@ -119,6 +99,9 @@ private:
 
   // Intitilize the policy of the state machine.
   TeraStateMachine* init_state_machine_policy();
+  
+  // Intitilize the cpu usage statistics
+  TeraCPUUsage* init_cpu_usage_stats();
   
   // Calculation of the GC cost prediction.
   double calculate_gc_cost(double gc_time_ms);

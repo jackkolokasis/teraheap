@@ -41,6 +41,44 @@ void TeraStateMachine::state_no_action(states *cur_state, actions *cur_action,
   *cur_action = NO_ACTION;
 }
 
+// Read the process anonymous memory
+size_t TeraStateMachine::read_process_anon_memory() {
+    // Open /proc/pid/stat file
+    char path[BUFFER_SIZE];
+    snprintf(path, sizeof(path), "/proc/%d/stat", getpid());
+    FILE *fp = fopen(path, "r");
+
+    if (fp == NULL) {
+        perror("Error opening /proc/pid/stat");
+        exit(EXIT_FAILURE);
+    }
+
+    // Read the contents of /proc/pid/stat into a buffer
+    char buffer[BUFFER_SIZE];
+    if (fgets(buffer, sizeof(buffer), fp) == NULL) {
+        perror("Error reading /proc/pid/stat");
+        exit(EXIT_FAILURE);
+    }
+
+    // Close the file
+    fclose(fp);
+
+    // Tokenize the buffer to extract RSS
+    char *token = strtok(buffer, " ");
+    for (int i = 1; i < 24; ++i) {
+        token = strtok(NULL, " ");
+        if (token == NULL) {
+            fprintf(stderr, "Error tokenizing /proc/pid/stat\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Convert the token to a long int
+    size_t rss = atol(token) * os::vm_page_size();
+
+    return rss;
+}
+
 // Read the memory statistics for the cgroup
 size_t TeraStateMachine::read_cgroup_mem_stats(bool read_page_cache) {
   // Define the path to the memory.stat file
@@ -162,7 +200,7 @@ void TeraSimpleWaitStateMachine::state_wait_after_shrink(states *cur_state, acti
 
   size_t cur_rss = read_cgroup_mem_stats(false);
   size_t cur_cache = read_cgroup_mem_stats(true);
-  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.9));
 
   if (io_time_ms > gc_time_ms && ioslack) {
     *cur_state = S_WAIT_SHRINK;
@@ -230,7 +268,7 @@ void TeraAggrShrinkStateMachine::state_wait_after_shrink(states *cur_state, acti
   
   size_t cur_rss = read_cgroup_mem_stats(false);
   size_t cur_cache = read_cgroup_mem_stats(true);
-  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.9));
   if (io_time_ms > gc_time_ms && !ioslack) {
     *cur_state = S_WAIT_SHRINK;
     *cur_action = SHRINK_H1;
@@ -259,7 +297,7 @@ void TeraGrowAfterShrinkStateMachine::state_wait_after_shrink(states *cur_state,
   
   size_t cur_rss = read_cgroup_mem_stats(false);
   size_t cur_cache = read_cgroup_mem_stats(true);
-  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.9));
   if (io_time_ms > gc_time_ms && !ioslack) {
     *cur_state = S_WAIT_SHRINK;
     *cur_action = SHRINK_H1;
@@ -299,7 +337,7 @@ void TeraOptWaitAfterShrinkStateMachine::state_wait_after_shrink(states *cur_sta
   
   size_t cur_rss = read_cgroup_mem_stats(false);
   size_t cur_cache = read_cgroup_mem_stats(true);
-  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.9));
   if (io_time_ms > gc_time_ms && !ioslack) {
     *cur_state = S_WAIT_SHRINK;
     *cur_action = SHRINK_H1;
@@ -423,9 +461,10 @@ void TeraFullOptimizedStateMachine::state_wait_after_shrink(states *cur_state, a
     return;
   }
   
-  size_t cur_rss = read_cgroup_mem_stats(false);
+  //size_t cur_rss = read_cgroup_mem_stats(false);
+  size_t cur_rss = read_process_anon_memory();
   size_t cur_cache = read_cgroup_mem_stats(true);
-  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.97));
+  bool ioslack = ((cur_rss + cur_cache) < (TeraDRAMLimit * 0.9));
   if (io_time_ms > gc_time_ms && !ioslack) {
     *cur_state = S_WAIT_SHRINK;
     *cur_action = SHRINK_H1;

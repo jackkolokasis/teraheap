@@ -39,8 +39,9 @@ extern "C" {
 	extern int num_reqs;					//< Number of asynchronous write requests
 
 	// Initialize allocator with start address 'heap_end + 1'. The end of the
-	// heap.
-	void       init(uint64_t alignment);
+  // heap. The path indicates the path to create the file for H2 and
+  // its size.
+	void       init(uint64_t alignment, const char* path, uint64_t size);
 	
 	// Return the start address of the memory allocation pool
 	char*      start_addr_mem_pool(void);

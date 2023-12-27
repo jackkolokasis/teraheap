@@ -723,11 +723,21 @@
   product(bool, DynamicHeapResizing, false,                                 \
           "Enable dynamic heap resizing for TeraHeap")                      \
                                                                             \
+  product(uintx, H2FileSize, 0,                                             \
+         "H2 file size (bytes e.g 20gb=21474836480)")                       \
+                                                                            \
+  product(ccstr, AllocateH2At, NULL,                                        \
+          "Path to the directory where the H2 Heap temporary file will be created") \
+                                                                            \
   product(intx, TeraResizingPolicy, 0,                                      \
           "0: Simple resizing policy; "                                     \
           "1: Simple wait resizing policy; "                                \
           "2: Simple aggressive grow after wait resizing policy; "          \
           "3: Simple aggressive shrink after wait resizing policy;")        \
+                                                                            \
+  product(intx, TeraCPUStatsPolicy, 0,                                      \
+          "0: Policy with /proc/stat; "                                     \
+          "1: Policy with getrusage; ")                                     \
 								                                    	                      \
   product(uintx, TeraDRAMLimit, 0,                                          \
           "Total size of DRAM budget (in bytes)")

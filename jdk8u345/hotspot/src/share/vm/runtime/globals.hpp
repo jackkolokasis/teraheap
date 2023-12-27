@@ -2510,6 +2510,12 @@ class CommandLineFlags {
   product(bool, DynamicHeapResizing, false,                                 \
           "Enable dynamic heap resizing for TeraHeap")                      \
                                                                             \
+  product(uintx, H2FileSize, 0,                                             \
+          "Size of H2 heap (bytes e.g 20gb=21474836480)")                   \
+                                                                            \
+  product(ccstr, AllocateH2At, NULL,                                        \
+            "Path to the directory where the H2 Heap temporary file will be created") \
+                                                                            \
   product(intx, TeraResizingPolicy, 0,                                      \
           "0: Simple resizing policy; "                                     \
           "1: Simple wait resizing policy; "                                \

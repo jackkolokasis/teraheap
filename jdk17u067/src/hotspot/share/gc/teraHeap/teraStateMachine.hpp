@@ -33,6 +33,9 @@ public:
   
   // Read the memory statistics for the cgroup
   size_t read_cgroup_mem_stats(bool read_page_cache);
+
+  // Read the process anonymous memory
+  size_t read_process_anon_memory();
 };
 
 class TeraSimpleStateMachine : public TeraStateMachine {

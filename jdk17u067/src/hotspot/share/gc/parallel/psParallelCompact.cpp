@@ -2707,7 +2707,6 @@ void PSParallelCompact::adjust_backward_references() {
 
   while (obj != NULL) {
     Universe::teraHeap()->enable_groups(NULL, (HeapWord*) obj);
-    fprintf(stderr, "Adjust backward ref: %p | %s\n", obj, (*obj)->klass()->internal_name());
     adjust_pointer(obj, cm);
     Universe::teraHeap()->disable_groups();
     obj = Universe::teraHeap()->h2_adjust_next_back_reference();

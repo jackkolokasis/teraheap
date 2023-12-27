@@ -21,7 +21,12 @@ long int TeraHeap::cur_obj_part_id;
 TeraHeap::TeraHeap() {
 
   uint64_t align = CardTable::th_ct_max_alignment_constraint();
-  init(align);
+
+  if (AllocateH2At == NULL || H2FileSize == 0) {
+    ShouldNotReachHere();
+  }
+
+  init(align, AllocateH2At, H2FileSize);
 
   _start_addr = start_addr_mem_pool();
   _stop_addr = stop_addr_mem_pool();
