@@ -3,3 +3,5 @@
 *.class
 tags
 openjdk/build/
+jdk17u067/compile_commands.json
+jdk17u067/.cache/

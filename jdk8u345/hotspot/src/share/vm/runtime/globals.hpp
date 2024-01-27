@@ -2507,6 +2507,27 @@ class CommandLineFlags {
           "The percentage of the used heap that the instances of a class "  \
           "must occupy for the class to generate a trace event")            \
                                                                             \
+  product(bool, DynamicHeapResizing, false,                                 \
+          "Enable dynamic heap resizing for TeraHeap")                      \
+                                                                            \
+  product(bool, TraceH2DirtyPages, false,                                   \
+          "Trace H2 dirty pages in the page cache")                         \
+                                                                            \
+  product(uintx, H2FileSize, 0,                                             \
+          "Size of H2 heap (bytes e.g 20gb=21474836480)")                   \
+                                                                            \
+  product(ccstr, AllocateH2At, NULL,                                        \
+            "Path to the directory where the H2 Heap temporary file will be created") \
+                                                                            \
+  product(intx, TeraResizingPolicy, 0,                                      \
+          "0: Simple resizing policy; "                                     \
+          "1: Simple wait resizing policy; "                                \
+          "2: Simple aggressive grow after wait resizing policy; "          \
+          "3: Simple aggressive shrink after wait resizing policy;")        \
+								                                    	    \
+  product(uintx, TeraDRAMLimit, 0,                                          \
+          "Total size of DRAM budget (in bytes)")                           \
+                                                                            \
   product(bool, EnableTeraHeap, false,                                      \
           "Enable TeraHeap. Works only with ParallelScavenge Collector")    \
                                                                             \
@@ -2521,13 +2542,13 @@ class CommandLineFlags {
                                                                             \
   product(bool, H2ObjectPlacement, false,                                   \
           "Print the objects labels in H2 regions")                         \
-								                                    										    \
+								                                    	    \
   product(bool, H2LivenessAnalysis, false,                                  \
           "Liveness analysis per H2 region objects")                        \
-								                                    										    \
+								                                    	    \
   product(uintx, TeraHeapSize, 0,                                           \
           "Initial TeraHeap total size (in bytes)")                         \
-								                                    										    \
+								                                    	    \
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
 								                                    										    \

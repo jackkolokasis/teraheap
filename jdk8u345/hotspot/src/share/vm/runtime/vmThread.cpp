@@ -40,6 +40,7 @@
 #include "utilities/dtrace.hpp"
 #include "utilities/events.hpp"
 #include "utilities/xmlstream.hpp"
+#include "gc_implementation/parallelScavenge/vmPSOperations.hpp"
 
 #ifndef USDT2
 HS_DTRACE_PROBE_DECL3(hotspot, vmops__request, char *, uintptr_t, int);
@@ -422,6 +423,23 @@ void VMThread::evaluate_operation(VM_Operation* op) {
   }
 }
 
+// On evey GC we are going to call
+bool should_gc() {
+  if (!UseParallelGC || !DynamicHeapResizing)
+    return false;
+
+  // State machine executed at the end of each minor gc. If the
+  // interval between minor GCs is higher than windows interval then
+  // perform a minor gc.
+  TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+  double ellapsedTime = os::elapsedTime() - tera_policy->get_last_minor_gc();
+  if (ellapsedTime > tera_policy->get_window_interval() && !tera_policy->is_action_enabled() && !SafepointSynchronize::is_at_safepoint()) {
+    tera_policy->action_enabled();
+    return true;
+  }
+
+  return false;
+}
 
 void VMThread::loop() {
   assert(_cur_vm_operation == NULL, "no current one should be executing");
@@ -473,6 +491,10 @@ void VMThread::loop() {
             if (GCALotAtAllSafepoints) InterfaceSupport::check_gc_alot();
           #endif
           SafepointSynchronize::end();
+        }
+
+        if (DynamicHeapResizing && should_gc()) {
+          Universe::heap()->collect_as_vm_thread(GCCause::_heap_inspection);
         }
         _cur_vm_operation = _vm_queue->remove_next();
 

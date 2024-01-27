@@ -239,9 +239,21 @@ bool PSScavenge::invoke() {
   IsGCActiveMark mark;
 
   const bool scavenge_done = PSScavenge::invoke_no_policy();
-  const bool need_full_gc = !scavenge_done ||
+  bool need_full_gc = !scavenge_done ||
     policy->should_full_GC(heap->old_gen()->free_in_bytes());
   bool full_gc_done = false;
+  bool need_resizing = false;
+
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+
+    // Print the dirty pages in H2
+    if (TraceH2DirtyPages)
+      th->trace_dirty_h2_pages();
+
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
+    tera_policy->dram_repartition(&need_full_gc, &need_resizing);
+  }
 
   if (UsePerfData) {
     PSGCAdaptivePolicyCounters* const counters = heap->gc_policy_counters();
@@ -249,7 +261,7 @@ bool PSScavenge::invoke() {
     counters->update_full_follows_scavenge(ffs_val);
   }
 
-  if (need_full_gc) {
+  if (need_full_gc || need_resizing) {
     GCCauseSetter gccs(heap, GCCause::_adaptive_size_policy);
     CollectorPolicy* cp = heap->collector_policy();
     const bool clear_all_softrefs = cp->should_clear_all_soft_refs();
@@ -262,8 +274,15 @@ bool PSScavenge::invoke() {
   }
 
 #ifdef TERA_MINOR_GC
-  if (EnableTeraHeap)
+  if (EnableTeraHeap) {
 	  Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+    if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+      tera_policy->epilog_move_h2(full_gc_done, need_resizing);
+      tera_policy->set_last_minor_gc(os::elapsedTime());
+    }
+  }
 #endif // TERA_MINOR_GC
 
   return full_gc_done;

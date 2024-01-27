@@ -47,6 +47,9 @@ size_t                  MarkSweep::_preserved_count_max = 0;
 PreservedMark*          MarkSweep::_preserved_marks = NULL;
 ReferenceProcessor*     MarkSweep::_ref_processor   = NULL;
 STWGCTimer*             MarkSweep::_gc_timer        = NULL;
+#ifdef TERA_MAJOR_GC
+STWGCTimer*             MarkSweep::_gc_compact_phase_timer = NULL;
+#endif
 SerialOldTracer*        MarkSweep::_gc_tracer       = NULL;
 
 MarkSweep::FollowRootClosure  MarkSweep::follow_root_closure;
@@ -70,7 +73,29 @@ void MarkSweep::follow_stack() {
     while (!_marking_stack.is_empty()) {
       oop obj = _marking_stack.pop();
       assert (obj->is_gc_marked(), "p must be marked");
+
+#ifdef P_PRIMITIVE
+      if (EnableTeraHeap) {
+        Universe::teraHeap()->reset_obj_ref_field_flag();
+      }
+#endif
+
+#ifndef P_PRIMITIVE
+    if (EnableTeraHeap && DynamicHeapResizing && obj->is_marked_move_h2()) {
+      Universe::teraHeap()->get_resizing_policy()->increase_h2_candidate_size(obj->size());
+    }
+
+    if (EnableTeraHeap && !DynamicHeapResizing && obj->is_marked_move_h2()) {
+      Universe::teraHeap()->h2_incr_total_marked_obj_size(obj->size());
+    }
+#endif
       obj->follow_contents();
+
+#ifdef P_PRIMITIVE
+      if (EnableTeraHeap) {
+        Universe::teraHeap()->set_obj_primitive_state(obj);
+      }
+#endif
     }
     // Process ObjArrays one at a time to avoid marking stack bloat.
     if (!_objarray_stack.is_empty()) {
@@ -162,6 +187,9 @@ void MarkSweep::KeepAliveClosure::do_oop(narrowOop* p) { MarkSweep::KeepAliveClo
 void marksweep_init() {
   MarkSweep::_gc_timer = new (ResourceObj::C_HEAP, mtGC) STWGCTimer();
   MarkSweep::_gc_tracer = new (ResourceObj::C_HEAP, mtGC) SerialOldTracer();
+#ifdef TERA_MAJOR_GC
+  MarkSweep::_gc_compact_phase_timer = new (ResourceObj::C_HEAP, mtGC) STWGCTimer();
+#endif
 }
 
 #ifndef PRODUCT

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-START=4
+START=8
 END=31
 
 # Print error/usage script message

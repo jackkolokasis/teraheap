@@ -68,7 +68,7 @@ public class MultiHashMap {
 			num += entry.getKey().hashCode();
 			ArrayList<Integer> arr = entry.getValue();
 
-			gc();
+			//gc();
 			for (int i = 0; i < 5000; i++)
 			{
 				num += arr.get(i).hashCode();

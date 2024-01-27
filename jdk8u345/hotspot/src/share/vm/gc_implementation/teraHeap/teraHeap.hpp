@@ -2,6 +2,8 @@
 #define SHARE_VM_GC_IMPLEMENTATION_TERAHEAP_TERAHEAP_HPP
 
 #include "gc_implementation/parallelScavenge/objectStartArray.hpp"
+#include "gc_implementation/teraHeap/teraDynamicResizingPolicy.hpp"
+#include "gc_implementation/teraHeap/teraTraceDirtyPages.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
 #include "memory/sharedDefines.h"
 #include "oops/oop.hpp"
@@ -49,7 +51,7 @@ private:
   static uint64_t back_ptrs_per_mgc; //< Total number of back ptrs per MGC
 
   static uint64_t
-      obj_distr_size[3]; //< Object size distribution between B, KB, MB
+  obj_distr_size[3];                //< Object size distribution between B, KB, MB
 
   static long int cur_obj_group_id; //<We save the current object
                                     // group id for tera-marked
@@ -69,6 +71,13 @@ private:
                                     // object that will be moved
                                     // to H2 if it has back ptrs
                                     // to H1
+  bool shrink_h1;                   //< This flag indicate that H1
+                                    // should be shrinked
+  bool grow_h1;                     //< This flag indicate that H1
+                                    // should be grown
+  
+  TeraDynamicResizingPolicy* dynamic_resizing_policy; 
+  TeraTraceDirtyPages* trace_dirty_pages;
 
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
   size_t total_marked_obj_for_h2;   // Total marked objects to be moved in H2
@@ -85,13 +94,28 @@ private:
   bool direct_promotion;            // Indicate to move tagged objects
                                     // to H2 without waiting any hint
                                     // from the framework
- 
+
+#ifdef OBJ_STATS
+  size_t primitive_arrays_size;     //< Total size of promitive arrays
+  size_t primitive_obj_size;        //< Total size of objects with ONLY primitive type fields
+  size_t non_primitive_obj_size;    //< Total size of objects with non primitive type fields
+
+  size_t num_primitive_arrays;      //< Total number of promitive arrays instances
+  size_t num_primitive_obj;         //< Total number of objects with ONLY primitive type fields
+  size_t num_non_primitive_obj;     //< Total size of objects with non primitive type fields
+
+  size_t h2_primitive_array_size;   //< Total size of H2 objects that are primitive arrays 
+  size_t num_h2_primitive_array;    //< Total number of H2 objects that are primitive arrays
+#endif
+  bool traced_obj_has_ref_field;    //< Indicate that the object we
+                                    // scan in the marking phase of the
+                                    // major gc has references to other objects 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
   // references (H2 to H1)
   std::map<oop *, std::tr1::tuple<int, int, int> > histogram;
   oop *back_ref_obj;
-#endif
+#endif // BACK_REF_STAT
 
 #ifdef FWD_REF_STAT
   // This histogram keeps internally statistics for the forward references
@@ -228,7 +252,7 @@ public:
   // We need to make an fsync when we use fastmap
   void h2_fsync();
 
-#if PR_BUFFER
+#ifdef PR_BUFFER
   // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
   // used to know where the object will move to H2. We use promotion buffer to
   // reduce the number of system calls for small sized objects.
@@ -337,11 +361,24 @@ public:
   // Get promote label value
   long get_promote_tag();
 
-  bool h2_promotion_policy(oop obj, bool is_direct = false);
+  // This function determines which of the H2 candidate objects found
+  // during marking phase we are going to move to H2. According to the
+  // policy that we enabled in the sharedDefines.h file we do the
+  // appropriate action. This function is used only in the
+  // precompaction phase.
+  bool h2_transfer_policy(oop obj);
+  
+  // Promotion policy for H2 candidate objects. This function is used
+  // during the marking phase of the major GC. According to the policy
+  // that we enabled in the sharedDefines.h file we do the appropriate
+  // action.
+  bool h2_promotion_policy(oop obj);
 
   void set_direct_promotion(size_t old_live, size_t max_old_gen_size);
 
-  bool is_direct_promote();
+  bool is_direct_promote() {
+    return direct_promotion;
+  }
 
 #if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
   void h2_incr_total_marked_obj_size(size_t size);
@@ -351,13 +388,71 @@ public:
   bool check_low_promotion_threshold(size_t sz);
 
   void set_low_promotion_threshold();
-#endif
+#endif // NOHINT_HIGH_LOW_WATERMARK || HINT_HIGH_LOW_WATERMARK
 
   // Check if the object with `addr` span multiple regions
   int h2_continuous_regions(HeapWord *addr);
 
   // Check where the object starts
   bool h2_object_starts_in_region(HeapWord *obj);
+
+  // Reset object ref field flag
+  void reset_obj_ref_field_flag() { traced_obj_has_ref_field = false;}
+  
+  // Enable the flag if the object has reference fields
+  void set_obj_ref_field_flag() { traced_obj_has_ref_field = true; }
+
+  // We set the object type based on the 'traced_obj_has_ref_field
+  // flag value. We divide objects into three categories
+  // - primitive arrays
+  // - leaf objects which are the objects with only primitive type fields
+  // - non-primitive objets which are the objects with reference fields
+  void set_obj_primitive_state(oop obj);
+
+#ifdef OBJ_STATS
+  // Update counter for objects. We divide objects into three categories
+  // - primitive arrays
+  // - leaf objects which are the objects with only primitive type fields
+  // - non-primitive objets which are the objects with reference fields
+  void update_obj_stats(int type, size_t size);
+
+  // Update counter for object H2 objects 
+  void update_stats_h2_primitive_arrays(size_t size);
+#endif // OBJ_STATS
+
+  // The state machine uses this function to set if the GC should
+  // shrink H1 as a result to free the physical pages. Then the OS
+  // will reclaim the physical pahges and will use them as part of the
+  // buffer cache.
+  void set_shrink_h1() { shrink_h1 = true; }
+  // Reinitalize the shrink_h1 flag
+  void unset_shrink_h1() { shrink_h1 = false; }
+  // Check if the state machine identifies that we need to shrink H1.
+  bool  need_to_shink_h1() { return shrink_h1; }
+  
+  // The state machine uses this function to set if the GC should
+  // grow H1.
+  void set_grow_h1() { grow_h1 = true; }
+  // Reinitalize the grow_h1 flag to the default value
+  void unset_grow_h1() { grow_h1 = false; }
+  // Check if the state machine identifies that we need to grow H1.
+  bool  need_to_grow_h1() { return grow_h1; }
+
+  TeraDynamicResizingPolicy* get_resizing_policy() {
+    return dynamic_resizing_policy;
+  }
+
+  void set_direct_promotion() {
+    direct_promotion = true;
+  }
+
+  void unset_direct_promotion() {
+    direct_promotion = false;
+  }
+
+  void trace_dirty_h2_pages(void) {
+    trace_dirty_pages->find_dirty_pages();
+  }
 };
 
 #endif

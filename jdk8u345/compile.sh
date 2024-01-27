@@ -12,24 +12,6 @@
 #
 ###################################################
 
-# Define some variables for pretty printing
-ESC='\033[' 
-
-# Attributes
-NORMAL=0
-BOLD=1
-
-# Foreground colors
-RED_FG=31
-GREEN_FG=32
-YELLOW_FG=33
-
-# Presets
-BRED=${ESC}${BOLD}';'${RED_FG}'m'
-BGREEN=${ESC}${BOLD}';'${GREEN_FG}'m'
-BYELLOW=${ESC}${BOLD}';'${YELLOW_FG}'m'
-RESET=${ESC}${NORMAL}'m'
-
 CC=gcc-7.2.0
 CXX=g++-7.2.0
 
@@ -138,12 +120,10 @@ do
       debug_symbols_on
       ;;
     c)
-      echo "Clean and make"
       export_env_vars
       clean_make
       ;;
     m)
-      echo "Make"
       export_env_vars
       make
       ;;

@@ -64,11 +64,20 @@ public class Array_List {
 
 		for (int i = 0; i < num_elements; i++)
 			arl.add(new String("Hello World for the first time " + i));
+		
+    ArrayList<String> arl2 = new ArrayList<String>();
+		for (int i = 0; i < num_elements; i++)
+			arl2.add(new String("Hello World " + i));
 
+		_UNSAFE.h2TagAndMoveRoot(arl2, 0, 0);
+
+		calcHashCode(arl, num_elements);
+		calcHashCode(arl2, num_elements);
 		gc();
+
 		calcHashCode(arl, num_elements);
 
-        gc();
+    gc();
 		calcHashCode(arl, num_elements);
 
 		gc();
@@ -80,7 +89,12 @@ public class Array_List {
 			arl.add(new String("Hello World its me giannos " + i));
 
 		gc();
+
 		calcHashCode(arl, num_elements);
+
+    gc();
+
+    calcHashCode(arl2, num_elements);
 
 		mem_info("Memory After");
 	}

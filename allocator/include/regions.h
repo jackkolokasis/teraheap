@@ -19,28 +19,29 @@ extern "C" {
 #define INT_PTR unsigned int
 #endif
 
-	struct _mem_pool{
-		char *mmap_start;					//< Memory mapped allocation start addresss
-		char* start_address;				//< Aligned start address of TeraCache
-		char* cur_alloc_ptr;				//< Current allocation pointer of TeraCache
-		char* stop_address;					//< Last address of TeraCache
+struct _mem_pool{
+  char *mmap_start;					//< Memory mapped allocation start addresss
+  char* start_address;			//< Aligned start address of TeraCache
+  char* cur_alloc_ptr;			//< Current allocation pointer of TeraCache
+  char* stop_address;				//< Last address of TeraCache
 
-		uint64_t size;						//< Current allocated bytes in TeraCache
-	};
+  uint64_t size;						//< Current allocated bytes in TeraCache
+};
     
-    struct region_list{
-        char *start;
-        char *end;
-        struct region_list *next;
-    };
+struct region_list{
+  char *start;
+  char *end;
+  struct region_list *next;
+};
 
 	extern struct _mem_pool tc_mem_pool;	//< Allocator pool
 	extern int fd;							//< File descriptor for the opended file
 	extern int num_reqs;					//< Number of asynchronous write requests
 
 	// Initialize allocator with start address 'heap_end + 1'. The end of the
-	// heap.
-	void       init(uint64_t alignment);
+  // heap. The path indicates the path to create the file for H2 and
+  // its size.
+	void       init(uint64_t alignment, const char* path, uint64_t size);
 	
 	// Return the start address of the memory allocation pool
 	char*      start_addr_mem_pool(void);
@@ -96,6 +97,10 @@ extern "C" {
 	// This function if for the FastMap hybrid version. Give advise to kernel to
 	// serve all the pagefault using huge pages.
 	void	   r_enable_huge_flts(void);
+	
+  // This function is to get the start address of the mmaped space
+  // for H2
+	unsigned long	 r_get_mmaped_start(void);
 	
 #ifdef __cplusplus
 }

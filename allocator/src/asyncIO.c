@@ -28,9 +28,9 @@ void req_init() {
 // Return the 'index' of the available slot in the array, or return '-1' if all
 // the slots are active and allocated.
 static int find_slot() {
-	int i;
+	static int i = 0;
 
-	for (i = 0; i < MAX_REQS; i++) {
+	for (; i < MAX_REQS; i++) {
 		if (request[i].state == 0)
 			return i;
 
@@ -64,6 +64,7 @@ static int find_slot() {
 		}
 	}
 
+  i = 0;
 	return -1;
 }
 

@@ -94,6 +94,26 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
   PSAdaptiveSizePolicy* policy = heap->size_policy();
   IsGCActiveMark mark;
 
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
+    bool need_full_gc = false;
+    bool need_resizing = false;
+
+    // Print the dirty pages in H2
+    if (TraceH2DirtyPages)
+      th->trace_dirty_h2_pages();
+
+    tera_policy->dram_repartition(&need_full_gc, &need_resizing);
+    tera_policy->set_last_minor_gc(os::elapsedTime());
+
+    if (tera_policy->is_action_enabled()) {
+      tera_policy->action_disabled();
+      Universe::teraHeap()->unset_direct_promotion();
+      return;
+    }
+  }
+
   if (ScavengeBeforeFullGC) {
     PSScavenge::invoke_no_policy();
   }
@@ -107,7 +127,15 @@ void PSMarkSweep::invoke(bool maximum_heap_compaction) {
 
 #ifdef TERA_MAJOR_GC
   // If the major GC fails then we need to clear the backward stacks
-  Universe::teraHeap()->h2_clear_back_ref_stacks();
+  if (EnableTeraHeap) {
+    Universe::teraHeap()->h2_clear_back_ref_stacks();
+
+    if (DynamicHeapResizing) {
+      TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+      tera_policy->epilog_move_h2(true, true);
+      tera_policy->set_last_minor_gc(os::elapsedTime());
+    }
+  }
 #endif
 }
 
@@ -182,6 +210,11 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     TraceMemoryManagerStats tms(true /* Full GC */,gc_cause);
 
     if (TraceGen1Time) accumulated_time()->start();
+  
+    if (DynamicHeapResizing) {
+      Universe::teraHeap()->get_resizing_policy()->gc_start(os::elapsedTime());
+      Universe::teraHeap()->get_resizing_policy()->reset_h2_candidate_size();
+    }
 
     // Let the size policy know we're starting
     size_policy->major_collection_begin();
@@ -388,7 +421,7 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
     }
 
 #ifdef TERA_MAJOR_GC
-    if (EnableTeraHeap) {
+    if (EnableTeraHeap && !DynamicHeapResizing) {
       size_t old_live = old_gen->used_in_bytes();
       size_t max_old_gen_size = old_gen->max_gen_size(); 
       Universe::teraHeap()->set_direct_promotion(old_live, max_old_gen_size);
@@ -461,6 +494,11 @@ bool PSMarkSweep::invoke_no_policy(bool clear_all_softrefs) {
   _gc_timer->register_gc_end();
 
   _gc_tracer->report_gc_end(_gc_timer->gc_end(), _gc_timer->time_partitions());
+
+  if (DynamicHeapResizing) {
+    TeraDynamicResizingPolicy *tera_policy = Universe::teraHeap()->get_resizing_policy();
+    tera_policy->gc_end((_gc_timer->gc_end().milliseconds() - _gc_timer->gc_start().milliseconds()), os::elapsedTime());
+  }
 
   return true;
 }
@@ -823,8 +861,11 @@ void PSMarkSweep::mark_sweep_phase4() {
 	struct timeval start_time;
 	struct timeval end_time;
 
-	if (EnableTeraHeap && TeraHeapStatistics) 
-		gettimeofday(&start_time, NULL);
+  if (EnableTeraHeap && TeraHeapStatistics)
+    gettimeofday(&start_time, NULL);
+
+  if (EnableTeraHeap && DynamicHeapResizing)
+    _gc_compact_phase_timer->register_gc_start();
 #endif // TERA_MAJOR_GC
 
   EventMark m("4 compact heap");
@@ -861,6 +902,12 @@ void PSMarkSweep::mark_sweep_phase4() {
                              (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
                              (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
       thlog_or_tty->flush();
+    }
+
+    if (DynamicHeapResizing) {
+      _gc_compact_phase_timer->register_gc_end();
+      Universe::teraHeap()->get_resizing_policy()->compaction_phase_time(
+          _gc_compact_phase_timer->gc_end().milliseconds() - _gc_compact_phase_timer->gc_start().milliseconds());
     }
 
     // Give advise to kernel to prefetch pages for TeraCache sequentially

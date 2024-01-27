@@ -32,7 +32,7 @@ long int TeraHeap::cur_obj_part_id;
 TeraHeap::TeraHeap() {
 
   uint64_t align = CardTableModRefBS::th_ct_max_alignment_constraint();
-  init(align);
+  init(align, AllocateH2At, H2FileSize);
 
   _start_addr = start_addr_mem_pool();
   _stop_addr = stop_addr_mem_pool();
@@ -66,6 +66,28 @@ TeraHeap::TeraHeap() {
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
 	total_marked_obj_for_h2 = 0;
 #endif
+
+#ifdef OBJ_STATS
+  primitive_arrays_size = 0;
+  primitive_obj_size = 0;
+  non_primitive_obj_size = 0;
+
+  num_primitive_arrays = 0;
+  num_primitive_obj = 0;
+  num_non_primitive_obj = 0;
+
+  traced_obj_has_ref_field = false;
+  
+  num_h2_primitive_array = 0;
+  h2_primitive_array_size = 0;
+#endif
+  shrink_h1 = false;
+  grow_h1 = false;
+  dynamic_resizing_policy = new TeraDynamicResizingPolicy();
+
+  if (TraceH2DirtyPages)
+    trace_dirty_pages = new TeraTraceDirtyPages(r_get_mmaped_start(),
+                                                (unsigned long)_stop_addr);
 }
 
 // Return H2 start address
@@ -459,9 +481,32 @@ void TeraHeap::h2_print_stats() {
 
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
-	thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
-			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
+  thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
+                         obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
+   thlog_or_tty->flush();
+
+#ifdef OBJ_STATS
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_ARRAYS = %lu\n", num_primitive_arrays);
+	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_ARRAYS_SIZE = %lu\n", primitive_arrays_size);
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_OBJ = %lu\n", num_primitive_obj);
+	thlog_or_tty->print_cr("[STATISTICS] | PRIMITIVE_OBJ_SIZE = %lu\n", primitive_obj_size);
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_NON_PRIMITIVE_OBJ = %lu\n", num_non_primitive_obj);
+	thlog_or_tty->print_cr("[STATISTICS] | NON_PRIMITIVE_OBJ_SIZE = %lu\n", non_primitive_obj_size);
+	thlog_or_tty->print_cr("[STATISTICS] | NUM_H2_PRIMITIVE_ARRAYS = %lu\n", num_h2_primitive_array);
+	thlog_or_tty->print_cr("[STATISTICS] | H2_PRIMITIVE_ARRAYS_SIZE = %lu\n", h2_primitive_array_size);
+  
+  // Reinitializwe counters
+  primitive_arrays_size = 0;
+  primitive_obj_size = 0;
+  non_primitive_obj_size = 0;
+  num_primitive_arrays = 0;
+  num_primitive_obj = 0;
+  num_non_primitive_obj = 0;
+  num_h2_primitive_array = 0;
+  h2_primitive_array_size = 0;
   thlog_or_tty->flush();
+#endif
+
 #ifdef FWD_REF_STAT
 	h2_print_fwd_ref_stat();
 #endif
@@ -570,7 +615,7 @@ void TeraHeap::disable_groups(void){
 	obj_h2_addr = NULL;
 }
 
-#if PR_BUFFER
+#ifdef PR_BUFFER
 
 // Add an object 'obj' with size 'size' to the promotion buffer. 'New_adr' is
 // used to know where the object will move to H2. We use promotion buffer to
@@ -662,8 +707,7 @@ char* TeraHeap::h2_add_object(oop obj, size_t size) {
 		}
 
 		assert(count <=2, "Array out of range");
-
-		++obj_distr_size[count];
+    ++obj_distr_size[count];
 	}
 
   pos = allocate(size, (uint64_t)obj->get_obj_group_id(), (uint64_t)obj->get_obj_part_id());
@@ -750,7 +794,46 @@ long TeraHeap::get_promote_tag() {
   return promote_tag;
 }
 
-bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
+// Promotion policy for H2 candidate objects. This function is used
+// during the marking phase of the major GC. According to the policy
+// that we enabled in the sharedDefines.h file we do the appropriate
+// action
+bool TeraHeap::h2_promotion_policy(oop obj) {
+#ifdef P_NO_TRANSFER
+  return false;
+
+#elif defined(SPARK_POLICY)
+  return obj->is_marked_move_h2();
+
+#elif defined(HINT_HIGH_LOW_WATERMARK)
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
+  //if (direct_promotion)
+  //  return obj->is_marked_move_h2();
+
+  //return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+  return obj->is_marked_move_h2();
+
+#elif defined(NOHINT_HIGH_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
+  if (direct_promotion)
+    return obj->is_marked_move_h2();
+
+  return false;
+
+#else
+  return obj->is_marked_move_h2();
+
+#endif
+}
+
+// This function determines which of the H2 candidate objects found
+// during marking phase we are going to move to H2. According to the
+// policy that we enabled in the sharedDefines.h file we do the
+// appropriate action. This function is used only in the
+// precompaction phase.
+bool TeraHeap::h2_transfer_policy(oop obj) {
 #ifdef P_NO_TRANSFER
 	return false;
 
@@ -758,64 +841,73 @@ bool TeraHeap::h2_promotion_policy(oop obj, bool is_direct) {
 	return obj->is_marked_move_h2();
 
 #elif defined(HINT_HIGH_LOW_WATERMARK)
-  if (is_direct) {
-    if (!obj->is_marked_move_h2())
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
+  if (direct_promotion) {
+    if (!obj->is_marked_move_h2()) {
       return false;
+    }
+
+#ifdef P_PRIMITIVE
+    if (!obj->is_primitive())
+      return false;
+#endif
 
     return check_low_promotion_threshold(obj->size());
   }
-	
-  if (direct_promotion)
-    return obj->is_marked_move_h2();
 
-	return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+#ifdef P_PRIMITIVE
+  return (obj->is_marked_move_h2() && obj->is_primitive() && obj->get_obj_group_id() <=  promote_tag);
+#else
+  return (obj->is_marked_move_h2() && obj->get_obj_group_id() <=  promote_tag);
+#endif
 
 #elif defined(NOHINT_HIGH_WATERMARK)
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
 	if (direct_promotion)
 		return obj->is_marked_move_h2();
 
 	return false;
 
 #elif defined(NOHINT_HIGH_LOW_WATERMARK)
-	if (is_direct)
-		return check_low_promotion_threshold(obj->size());
-	
+  // We detect high memory presure in H1 heap and we are going to find
+  // the transitive closure for all marked objects
 	if (direct_promotion)
-		return obj->is_marked_move_h2();
+		return check_low_promotion_threshold(obj->size());
 
 	return false;
+
 #else
 	return obj->is_marked_move_h2();
 #endif
 }
-		
+
 void TeraHeap::set_direct_promotion(size_t old_live, size_t max_old_gen_size) {
 	direct_promotion = ((float) old_live / (float) max_old_gen_size) >= 0.85 ? true : false;
-}
-
-bool TeraHeap::is_direct_promote() {
-	return direct_promotion;
 }
 
 #if defined(NOHINT_HIGH_LOW_WATERMARK) || defined(HINT_HIGH_LOW_WATERMARK)
 void TeraHeap::h2_incr_total_marked_obj_size(size_t sz) {
 	total_marked_obj_for_h2 += sz;
 }
-		
+
 void TeraHeap::h2_reset_total_marked_obj_size() {
 	total_marked_obj_for_h2 = 0;
 }
-		
+
 bool TeraHeap::check_low_promotion_threshold(size_t sz) {
-	if (h2_low_promotion_threshold == 0 || sz > h2_low_promotion_threshold)
+	if (h2_low_promotion_threshold == 0 || (sz * HeapWordSize) > h2_low_promotion_threshold)
 		return false;
 
-	h2_low_promotion_threshold -= sz;
+	h2_low_promotion_threshold -= (sz * HeapWordSize);
 	return true;
 }
 
 void TeraHeap::set_low_promotion_threshold() {
-  h2_low_promotion_threshold = total_marked_obj_for_h2 * 0.5;
+  h2_low_promotion_threshold = DynamicHeapResizing ? 
+    dynamic_resizing_policy->get_h2_candidate_size() * 0.5 :
+    total_marked_obj_for_h2 * 0.5;
 }
 #endif
 
@@ -826,3 +918,71 @@ int TeraHeap::h2_continuous_regions(HeapWord *addr){
 bool TeraHeap::h2_object_starts_in_region(HeapWord *obj) {
   return object_starts_from_region((char *)obj);
 }
+
+void TeraHeap::set_obj_primitive_state(oop obj) {
+  // Object is a non-primitive object. Its fields are references. Thus
+  // the object has references to other objects in the heap.
+  if (traced_obj_has_ref_field) {
+#ifdef OBJ_STATS
+    update_obj_stats(0, obj->size());
+#endif
+    obj->set_non_primitive();
+    return;
+  }
+
+  // Track the size of H2 candidate objects in H1. Based on this size
+  // we determine when to move objects to H2.
+  if (DynamicHeapResizing && obj->is_marked_move_h2()) {
+    dynamic_resizing_policy->increase_h2_candidate_size(obj->size());
+  }
+
+  // Object is a prrimitive array
+  if (obj->is_typeArray()) {
+#ifdef OBJ_STATS
+    update_obj_stats(1, obj->size());
+#endif
+    obj->set_primitive(true);
+    return;
+  }
+  
+  // Object is a leaf object
+#ifdef OBJ_STATS
+    update_obj_stats(2, obj->size());
+#endif
+  obj->set_primitive(false);
+}
+
+#ifdef OBJ_STATS
+
+// Update counter for objects. We divide objects into three categories
+// - primitive arrays
+// - leaf objects which are the objects with only primitive type fields
+// - non-primitive objets which are the objects with reference fields
+void TeraHeap::update_obj_stats(int type, size_t size) {
+  if (!TeraHeapStatistics)
+    return;
+
+  switch (type) {
+    case 0: // Non-primitive objects
+      non_primitive_obj_size += size;
+      num_non_primitive_obj++;
+    break;
+
+    case 1: // Primitive array obects
+      primitive_arrays_size += size;
+      num_primitive_arrays++;
+    break;
+
+    case 2: // Leaf objects
+      primitive_obj_size += size;
+      num_primitive_obj++;
+    break;
+  }
+}
+
+// Update counter for object H2 objects 
+void TeraHeap::update_stats_h2_primitive_arrays(size_t size) {
+  num_h2_primitive_array++;
+  h2_primitive_array_size += size;
+}
+#endif

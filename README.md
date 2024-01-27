@@ -34,6 +34,8 @@ JAVA_HOME variable to point to the installation directory of openjdk8 as follows
 export JAVA_HOME="/path/to/openjdk8"
 ```
 
+The JVM can be compiled only with gcc <= 8.5 and g++ <= 8.5
+
 ### Build
 1. Build allocator.
 ```sh
@@ -44,13 +46,23 @@ cd -
 Read the README.md file in allocator directory to export the specific
 environment variables
 
-2. Set your gcc/g++ path/alias 
+2. Build tera_malloc.
 ```sh
-cd jdk8u345 
+cd tera_malloc
+./build.sh
+cd -
+```
+Read the README.md file in tera_malloc directory to export the
+specific environment variables
+
+3. Set your gcc/g++ path/alias 
+```sh
+cd ./jdk8u345 # for building java8
+cd ./jdk17u067 # for building java17
 ```
 and set CC and CXX variables inside compile.sh to your gcc path/alias
 
-3. Build JVM (release mode)
+4. Build JVM (release mode)
 ```sh
 ./compile.sh -r
 cd -

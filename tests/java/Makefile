@@ -11,16 +11,16 @@
 #
 ####################################################
 
-JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../jdk8u345/
-JAVAC=$(JAVA_REPO)/build/linux-x86_64-normal-server-release/jdk/bin/javac
-GDB=gdb
+JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../jdk17u067
+JAVAC=$(JAVA_REPO)/build/linux-x86_64-server-fastdebug/jdk/bin/javac
+PROJECT_DIR := $(shell pwd)/../..
 
 TARGET=Array.class Array_List.class Array_List_Int.class List_Large.class \
 	   MultiList.class Simple_Lambda.class Extend_Lambda.class \
 	   Test_Reflection.class Test_Reference.class HashMap.class Rehashing.class \
 	   Clone.class Groupping.class MultiHashMap.class Test_WeakHashMap.class \
-	   ClassInstance.class
-	
+	   ClassInstance.class PrimitiveObjects.class
+
 all: $(TARGET)
 
 Array.class: Array.java
@@ -69,6 +69,9 @@ Test_WeakHashMap.class: Test_WeakHashMap.java
 	$(JAVAC) $<
 
 ClassInstance.class: ClassInstance.java
+	$(JAVAC) $<
+
+PrimitiveObjects.class: PrimitiveObjects.java
 	$(JAVAC) $<
 
 clean:

@@ -355,8 +355,25 @@ void PSOldGen::resize(size_t desired_free_space) {
     // Overflowed the addition.
     new_size = gen_size_limit();
   }
-  // Adjust according to our min and max
-  new_size = MAX2(MIN2(new_size, gen_size_limit()), min_gen_size());
+
+  if (EnableTeraHeap && DynamicHeapResizing) {
+    TeraHeap *th = Universe::teraHeap();
+    TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
+
+    // Inside the interval we do not change the heap size
+    new_size = capacity_in_bytes();
+
+    if (th->need_to_grow_h1()) {
+      new_size = tera_policy->grow_h1();
+    }
+
+    if (th->need_to_shink_h1()) {
+      new_size = tera_policy->shrink_h1();
+    }
+  } else {
+    // Adjust according to our min and max
+    new_size = MAX2(MIN2(new_size, gen_size_limit()), min_gen_size());
+  }
 
   assert(gen_size_limit() >= reserved().byte_size(), "max new size problem?");
   new_size = align_size_up(new_size, alignment);

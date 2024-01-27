@@ -10,14 +10,19 @@
 #include <aio.h>
 
 #include "../include/regions.h"
-#include "../include/sharedDefines.h"
 #include "../include/asyncIO.h"
 #include "../include/segments.h"
+#include "../include/sharedDefines.h"
 
 #define HEAPWORD (8)                       // In the JVM the heap is aligned to 8 words
 #define HEADER_SIZE (32)                   // Header size of the Dummy object	
 #define align_size_up_(size, alignment) (((size) + ((alignment) - 1)) & ~((alignment) - 1))
 
+char dev[150] = {'\0'};
+uint64_t dev_size = 0;
+uint64_t region_array_size = 0;
+uint64_t max_rdd_id = 0;
+uint64_t group_array_size = 0;
 struct _mem_pool tc_mem_pool;
 int fd;
 
@@ -29,8 +34,38 @@ void* align_ptr_up(void* ptr, size_t alignment) {
 	return (void*)align_size_up((intptr_t)ptr, (intptr_t)alignment);
 }
 
+void create_file(const char* path, uint64_t size) {
+  assertf(size >= 1024*1024*1024LU, "Size should be grater than 1GB");
+  size_t max_len = strnlen(path, 150);
+
+  strncpy(dev, path, max_len + 1);
+
+  if (dev[max_len + 1] != '\0') {
+    perror("[Error] - Strncpy failed");
+    exit(EXIT_FAILURE);
+  }
+
+	strcat(dev,".XXXXXX");
+
+  dev_size = size;
+  region_array_size = dev_size / REGION_SIZE;
+  assertf(region_array_size >= MAX_PARTITIONS,
+          "Device size should be larger, because region_array_size is "
+          "calculated to be smaller than MAX_PARTITIONS!");
+  max_rdd_id = region_array_size / MAX_PARTITIONS;
+  group_array_size = region_array_size / 2; // deprecated
+  
+  fd = mkstemp(dev);
+  unlink(dev);
+  assertf(fd >= 1, "tempfile error.");
+  int status = posix_fallocate(fd, 0, dev_size);
+  if (status != 0) {
+    fprintf(stderr, "Fallocate error\n");
+  }
+}
+
 // Initialize allocator
-void init(uint64_t align) {
+void init(uint64_t align, const char* path, uint64_t size) {
     fd = -1;
 
 #if ANONYMOUS
@@ -38,9 +73,9 @@ void init(uint64_t align) {
     fd = open(DEV, O_RDWR);
 	tc_mem_pool.mmap_start = mmap(0, V_SPACE, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0);
 #else
-    fd = open(DEV, O_RDWR);
-	// Memory-mapped a file over a storage device
-	tc_mem_pool.mmap_start = mmap(0, DEV_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  create_file(path, size);
+  // Memory-mapped a file over a storage device
+  tc_mem_pool.mmap_start = mmap(0, dev_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 #endif
 
 	assertf(tc_mem_pool.mmap_start != MAP_FAILED, "Mapping Failed");
@@ -55,10 +90,10 @@ void init(uint64_t align) {
     printf("Start address:%p\n",tc_mem_pool.start_address);
     printf("Stop address:%p\n",tc_mem_pool.stop_address);
 #else
-	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + DEV_SIZE;
+	tc_mem_pool.stop_address = tc_mem_pool.mmap_start + dev_size;
 #endif
-    init_regions();
-	req_init();
+  init_regions();
+  req_init();
 }
 
 
@@ -80,7 +115,7 @@ size_t mem_pool_size() {
 #if ANONYMOUS
     return V_SPACE;
 #else
-	return DEV_SIZE;
+	return dev_size;
 #endif
 }
 
@@ -133,20 +168,20 @@ int r_is_empty() {
 // Close allocator and unmap pages
 void r_shutdown(void) {
 	printf("CALL HERE");
-	munmap(tc_mem_pool.mmap_start, DEV_SIZE);
+	munmap(tc_mem_pool.mmap_start, dev_size);
 }
 
 // Give advise to kernel to expect page references in sequential order.  (Hence,
 // pages in the given range can be aggressively read ahead, and may be freed
 // soon after they are accessed.)
 void r_enable_seq() {
-	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_SEQUENTIAL);
+	madvise(tc_mem_pool.mmap_start, dev_size, MADV_SEQUENTIAL);
 }
 
 // Give advise to kernel to expect page references in random order (Hence, read
 // ahead may be less useful than normally.)
 void r_enable_rand() {
-	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_NORMAL);
+	madvise(tc_mem_pool.mmap_start, dev_size, MADV_NORMAL);
 }
 
 // Explicit write 'data' with 'size' in certain 'offset' using system call
@@ -194,11 +229,17 @@ void r_fsync() {
 // This function if for the FastMap hybrid version. Give advise to kernel to
 // serve all the pagefault using regular pages.
 void r_enable_regular_flts(void) {
-	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_NOHUGEPAGE);
+	madvise(tc_mem_pool.mmap_start, dev_size, MADV_NOHUGEPAGE);
 }
 
 // This function if for the FastMap hybrid version. Give advise to kernel to
 // serve all the pagefault using huge pages.
 void r_enable_huge_flts(void) {
-	madvise(tc_mem_pool.mmap_start, DEV_SIZE, MADV_HUGEPAGE);
+	madvise(tc_mem_pool.mmap_start, dev_size, MADV_HUGEPAGE);
+}
+  
+// This function is to get the start address of the mmaped space
+// for H2
+unsigned long r_get_mmaped_start(void) {
+  return (unsigned long) tc_mem_pool.mmap_start;
 }

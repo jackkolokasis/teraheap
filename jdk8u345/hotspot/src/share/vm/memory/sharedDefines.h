@@ -83,6 +83,9 @@
                                   // will be flushed to the device because the
                                   // memory of fast map is different from
                                   // buffer cache. 
+//#define OBJ_STATS                 //< Take object statistics about
+                                  //primitive types and non primitive
+                                  //types
 
 /**********************************
  * Statistics
@@ -97,7 +100,7 @@
 #define TERA_TO_OLD		    328	    //< Pointer from TeraCache to Old Gen. Move
                                   // this object to TeraCache
 
-#define IN_TERA_CACHE     2147483561	//< This object is located in TeraCache
+#define IN_TERA_HEAP     2147483561	//< This object is located in TeraCache
 
 #define INIT_TF				    2035	  //< Initial object state
 
@@ -106,6 +109,16 @@
 #define LIVE_TERA_OBJ     202     //< Object marked as live during GC Analysis
 
 #define VISITED_TERA_OBJ  203     //< Object visited during GC Analysis
+
+#define PRIMITIVE_ARRAY   529     //< Object is primitive array
+
+#define LEAF_OBJECT       535     //< Leaf object (with only primitive fields)
+
+#define NON_PRIMITIVE     419     //< Non primitive object
+
+#define STATIC_FIELD      938     //< Static field
+
+#define WEAK_REF_FIELD    553     //< Weak/Sorft/Phantom reference field
 
 /**********************************
  * Policies for TeraCache
@@ -125,6 +138,22 @@
 
 //#define NOHINT_HIGH_LOW_WATERMARK //< No promotion hint with high and low watermark
 
-#define HINT_HIGH_LOW_WATERMARK   //< Promotion hint with high and low watermark
+#define HINT_HIGH_LOW_WATERMARK     //< Promotion hint with high and low watermark
+
+#define P_PRIMITIVE                 //< Move only primitive arrays and
+                                    // primitive objects to H2. This
+                                    // policy is used with
+                                    // HINT_HIGH_LOW_WATERMARK
+
+// State machine flags for DynaHeap
+#define PER_MINOR_GC               //< Take decisions per minor GCs
+
+#define GROW_STEP (0.2)            //< 0.2 (progressive) 0.8 (aggressive)
+
+#define SHRINK_STEP (0.8)          //< 0.8 (progressive) 0.2 (aggressive)
+
+#define LAZY_MOVE_H2               //< Wait the next GC for moving
+                                   //objects to H2. Until next GC wait
+                                   //and do not take new decissions.
 
 #endif  // _SHARE_DEFINES_H_

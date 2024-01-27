@@ -104,9 +104,10 @@ template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 				uint64_t groupId = Universe::teraHeap()->h2_get_region_groupId((void *) p);
 				uint64_t partId = Universe::teraHeap()->h2_get_region_partId((void *) p);
 				obj->mark_move_h2(groupId, partId);
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
-        Universe::teraHeap()->h2_incr_total_marked_obj_size(obj->size());
-#endif
+//#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+        // Universe::teraHeap()->h2_incr_total_marked_obj_size(obj->size());
+        //Universe::teraHeap()->get_resizing_policy()->increase_h2_candidate_size(obj->size());
+//#endif
 			}
 
 			_marking_stack.push(obj);
@@ -116,6 +117,11 @@ template <class T> inline void MarkSweep::tera_back_ref_mark_and_push(T* p) {
 
 template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
+
+#ifdef P_PRIMITIVE
+    if (EnableTeraHeap)
+      Universe::teraHeap()->set_obj_ref_field_flag();
+#endif
 
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
@@ -155,9 +161,10 @@ template <class T> inline void MarkSweep::tera_mark_and_push(T* p) {
     if (!(obj->is_marked_move_h2() || obj->is_instanceMirror() || obj->is_instanceRef() || obj->is_instanceClassLoader())) {
       obj->mark_move_h2(Universe::teraHeap()->get_cur_obj_group_id(),
                           Universe::teraHeap()->get_cur_obj_part_id());
-#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
-      Universe::teraHeap()->h2_incr_total_marked_obj_size(obj->size());
-#endif
+//#if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
+//      //Universe::teraHeap()->h2_incr_total_marked_obj_size(obj->size());
+//      //Universe::teraHeap()->get_resizing_policy()->increase_h2_candidate_size(obj->size());
+//#endif
     }
 
     if (!obj->mark()->is_marked()) {
@@ -188,6 +195,10 @@ template <class T> inline void MarkSweep::h2_liveness_analysis(T* p) {
 
 template <class T> inline void MarkSweep::mark_and_push(T* p) {
   T heap_oop = oopDesc::load_heap_oop(p);
+#ifdef P_PRIMITIVE
+    if (EnableTeraHeap)
+      Universe::teraHeap()->set_obj_ref_field_flag();
+#endif
   if (!oopDesc::is_null(heap_oop)) {
     oop obj = oopDesc::decode_heap_oop_not_null(heap_oop);
 
