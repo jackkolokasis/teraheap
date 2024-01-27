@@ -18,6 +18,21 @@ sudo yum install python3-pip
 pip3 install scan-build --user
 pip3 install compdb --user
 ```
+OpeJDK1.8 can be compiled with OpenJDK1.8. So, you need first to download
+OpenJDK1.8.
+```sh
+# For Ubuntu
+sudo apt-get install openjdk-8-jdk
+
+# For Centos
+sudo yum install java-1.8.0-openjdk
+```
+Edit the compile.sh script in jdk8u345/ directory by changing the
+JAVA_HOME variable to point to the installation directory of openjdk8 as follows:
+
+```sh
+export JAVA_HOME="/path/to/openjdk8"
+```
 
 The JVM can be compiled only with gcc <= 8.5 and g++ <= 8.5
 
@@ -66,3 +81,19 @@ To run benchmarks please clone the repository
 [tera_applications](https://github.com/jackkolokasis/tera_applications)
 and read the README.md files in each application directory. There are
 instructions about how to compile and run the different applications.
+
+## Acknowledgements
+We thank the anonymous reviewers for their insightful comments and
+their help in preparing the final version of the paper. We
+thankfully acknowledge the support of the European Commission under
+the Horizon 2020 Framework Programme for Research and Innovation
+through the projects EVOLVE (grant agreement No 825061). This
+research is also partly supported by project EUPEX, which has
+received funding from the European High-Performance Computing Joint
+Undertaking (JU) under grant agreement No 101033975. The JU receives
+support from the European Union's Horizon 2020 re-search and
+innovation programme and France, Germany, Italy, Greece, United
+Kingdom, Czech Republic, Croatia. Iacovos G. Kolokasis is also
+supported by the Meta Research PhD Fellowship and the State
+Scholarship Foundation of Cyprus.  
+

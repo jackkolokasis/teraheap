@@ -694,6 +694,7 @@ void PSMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
       thlog_or_tty->print_cr("[STATISTICS] | PHASE1 = %llu\n",
                              (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
                              (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+      thlog_or_tty->flush();
 
       if (TeraHeapAllocatorStatistics)
         Universe::teraHeap()->print_h2_active_regions();
@@ -779,7 +780,8 @@ void PSMarkSweep::mark_sweep_phase2() {
     thlog_or_tty->print_cr("[STATISTICS] | PHASE2 = %llu\n",
                            (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
                            (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
-	}
+	  thlog_or_tty->flush();
+  }
 #endif // TERA_MAJOR_GC
 }
 
@@ -848,6 +850,7 @@ void PSMarkSweep::mark_sweep_phase3() {
     thlog_or_tty->print_cr("[STATISTICS] | PHASE3 = %llu\n",
                            (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
                            (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+    thlog_or_tty->flush();
   }
 #endif // TERA_MAJOR_GC
 }
@@ -898,7 +901,7 @@ void PSMarkSweep::mark_sweep_phase4() {
       thlog_or_tty->print_cr("[STATISTICS] | PHASE4 = %llu\n",
                              (unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
                              (unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
-
+      thlog_or_tty->flush();
     }
 
     if (DynamicHeapResizing) {
