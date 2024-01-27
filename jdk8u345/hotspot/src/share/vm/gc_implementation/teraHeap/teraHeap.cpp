@@ -179,7 +179,7 @@ void TeraHeap::print_minor_gc_statistics() {
 	thlog_or_tty->print_cr("[STATISTICS] | TC_CT_TIME = %lu\n", max_tc_ct_trav_time);
 	thlog_or_tty->print_cr("[STATISTICS] | HEAP_CT_TIME = %lu\n", max_heap_ct_trav_time);
 	thlog_or_tty->print_cr("[STATISTICS] | BACK_PTRS_PER_MGC = %lu\n", back_ptrs_per_mgc);
-
+  thlog_or_tty->flush();
 #ifdef BACK_REF_STAT
 	h2_print_back_ref_stats();
 #endif
@@ -483,6 +483,7 @@ void TeraHeap::h2_print_stats() {
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
   thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
                          obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
+   thlog_or_tty->flush();
 
 #ifdef OBJ_STATS
 	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_ARRAYS = %lu\n", num_primitive_arrays);
@@ -509,7 +510,6 @@ void TeraHeap::h2_print_stats() {
 #ifdef FWD_REF_STAT
 	h2_print_fwd_ref_stat();
 #endif
-
 }
 
 #ifdef FWD_REF_STAT
@@ -562,10 +562,12 @@ void TeraHeap::h2_mark_back_references()
 	
 	gettimeofday(&end_time, NULL);
 
-	if (TeraHeapStatistics)
+	if (TeraHeapStatistics){
 		thlog_or_tty->print_cr("[STATISTICS] | TC_MARK = %llu\n", 
 				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
 				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+    thlog_or_tty->flush();
+  }
 }
 
 // Prints all active regions
@@ -589,10 +591,12 @@ void TeraHeap::h2_adjust_back_references() {
 	
 	gettimeofday(&end_time, NULL);
 
-	if (TeraHeapStatistics)
+	if (TeraHeapStatistics){
 		thlog_or_tty->print_cr("[STATISTICS] | TC_ADJUST %llu\n",
 				(unsigned long long)((end_time.tv_sec - start_time.tv_sec) * 1000) + // convert to ms
 				(unsigned long long)((end_time.tv_usec - start_time.tv_usec) / 1000)); // convert to ms
+    thlog_or_tty->flush();
+  }
 }
 
 // Enables groupping with region of obj

@@ -31,6 +31,21 @@ function usage()
 
     exit 1
 }
+
+# Compile without debug symbols for ASPLOS'23 Artifact Evaluation
+function artifact_evaluation() 
+{
+  make dist-clean
+  CC=$CC CXX=$CXX \
+  bash ./configure \
+    --with-jobs=32 \
+    --disable-debug-symbols \
+    --with-extra-cflags='-O3' \
+    --with-extra-cxxflags='-O3' \
+    --with-target-bits=64 \
+    --with-extra-ldflags=-lregions
+  make
+}
   
 # Compile without debug symbols
 function release() 
@@ -89,9 +104,13 @@ export_env_vars()
 	export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/allocator/include/:$CPLUS_INCLUDE_PATH
 }
 
-while getopts ":drcmh" opt
+while getopts ":adrcmh" opt
 do
   case "${opt}" in
+    a)
+      export_env_vars
+      artifact_evaluation
+      ;;
     r)
       export_env_vars
       release
