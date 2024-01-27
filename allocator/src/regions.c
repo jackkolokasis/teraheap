@@ -237,3 +237,9 @@ void r_enable_regular_flts(void) {
 void r_enable_huge_flts(void) {
 	madvise(tc_mem_pool.mmap_start, dev_size, MADV_HUGEPAGE);
 }
+  
+// This function is to get the start address of the mmaped space
+// for H2
+unsigned long r_get_mmaped_start(void) {
+  return (unsigned long) tc_mem_pool.mmap_start;
+}

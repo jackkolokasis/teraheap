@@ -249,6 +249,11 @@ bool PSScavenge::invoke() {
 
   if (EnableTeraHeap && DynamicHeapResizing) {
     TeraHeap *th = Universe::teraHeap();
+    
+    // Print the dirty pages in H2
+    if (TraceH2DirtyPages)
+      th->trace_dirty_h2_pages();
+
     TeraDynamicResizingPolicy *tera_policy = th->get_resizing_policy();
     tera_policy->dram_repartition(&need_full_gc, &need_resizing);
   }

@@ -48,6 +48,10 @@ TeraHeap::TeraHeap() {
 
   if (DynamicHeapResizing)
     dynamic_resizing_policy = new TeraDynamicResizingPolicy();
+  
+  if (TraceH2DirtyPages)
+    trace_dirty_pages = new TeraTraceDirtyPages(r_get_mmaped_start(),
+                                                (unsigned long)_stop_addr);
 }
 
 TeraHeap::~TeraHeap() {

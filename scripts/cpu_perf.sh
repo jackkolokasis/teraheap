@@ -9,6 +9,7 @@ usage() {
     echo "Options:"
     echo "      -p Performance"
     echo "      -s Power save"
+    echo "      -c Conservative"
     echo "      -v View"
     echo "      -h  Show usage"
     echo
@@ -26,8 +27,13 @@ set_powersave() {
   echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 }
 
+# Set cpu to conservative mode
+set_conservative() {
+  echo conservative | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+}
+
 # Check for the input arguments
-while getopts ":psvh" opt
+while getopts ":pscvh" opt
 do
   case "${opt}" in
     p)
@@ -36,6 +42,10 @@ do
       ;;
     s)
       set_powersave
+      exit
+      ;;
+    c)
+      set_conservative
       exit
       ;;
     v)

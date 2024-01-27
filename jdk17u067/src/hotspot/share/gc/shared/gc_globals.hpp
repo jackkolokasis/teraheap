@@ -705,23 +705,26 @@
                                                                             \
   product(bool, H2ObjectPlacement, false,                                   \
           "Print the objects labels in H2 regions")                         \
-								                                    										    \
+								                       					    \
   product(bool, H2LivenessAnalysis, false,                                  \
           "Liveness analysis per H2 region objects")                        \
-								                                    										    \
+								                       					    \
   product(uintx, TeraHeapSize, 0,                                           \
           "Initial TeraHeap total size (in bytes)")                         \
-								                                    										    \
+								                       					    \
   product(uintx, TeraStripeSize, 512,                                       \
           "Size of TeraHeap stripe size (e.g 128)")                         \
           range(0, max_juint)                                               \
-								                                    										    \
+								                      					    \
   product(ccstr, TeraHeapPolicy, "DefaultPolicy",                           \
           "TeraHeapPolicy for moving objects to H2. The possible values "   \
           "are: DefaultPolicy, SparkPrimitivePolicy")                       \
                                                                             \
   product(bool, DynamicHeapResizing, false,                                 \
           "Enable dynamic heap resizing for TeraHeap")                      \
+                                                                            \
+  product(bool, TraceH2DirtyPages, false,                                   \
+          "Trace H2 dirty pages in the page cache")                         \
                                                                             \
   product(uintx, H2FileSize, 0,                                             \
          "H2 file size (bytes e.g 20gb=21474836480)")                       \
@@ -738,7 +741,7 @@
   product(intx, TeraCPUStatsPolicy, 0,                                      \
           "0: Policy with /proc/stat; "                                     \
           "1: Policy with getrusage; ")                                     \
-								                                    	                      \
+								                                            \
   product(uintx, TeraDRAMLimit, 0,                                          \
           "Total size of DRAM budget (in bytes)")
 

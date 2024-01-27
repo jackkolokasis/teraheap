@@ -3,6 +3,7 @@
 
 #include "gc_implementation/parallelScavenge/objectStartArray.hpp"
 #include "gc_implementation/teraHeap/teraDynamicResizingPolicy.hpp"
+#include "gc_implementation/teraHeap/teraTraceDirtyPages.hpp"
 #include "gc_interface/collectedHeap.inline.hpp"
 #include "memory/sharedDefines.h"
 #include "oops/oop.hpp"
@@ -50,7 +51,7 @@ private:
   static uint64_t back_ptrs_per_mgc; //< Total number of back ptrs per MGC
 
   static uint64_t
-      obj_distr_size[3]; //< Object size distribution between B, KB, MB
+  obj_distr_size[3];                //< Object size distribution between B, KB, MB
 
   static long int cur_obj_group_id; //<We save the current object
                                     // group id for tera-marked
@@ -76,6 +77,7 @@ private:
                                     // should be grown
   
   TeraDynamicResizingPolicy* dynamic_resizing_policy; 
+  TeraTraceDirtyPages* trace_dirty_pages;
 
 #if defined(HINT_HIGH_LOW_WATERMARK) || defined(NOHINT_HIGH_LOW_WATERMARK)
   size_t total_marked_obj_for_h2;   // Total marked objects to be moved in H2
@@ -446,6 +448,10 @@ public:
 
   void unset_direct_promotion() {
     direct_promotion = false;
+  }
+
+  void trace_dirty_h2_pages(void) {
+    trace_dirty_pages->find_dirty_pages();
   }
 };
 

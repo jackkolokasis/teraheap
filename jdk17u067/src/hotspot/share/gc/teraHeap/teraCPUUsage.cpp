@@ -95,7 +95,7 @@ void TeraMultiExecutorCPUUsage::calculate_iowait_time(double duration,
   //thlog_or_tty->print_cr("system_time_ms = %lf\n", system_time_ms);
   //thlog_or_tty->flush();
   
-  *iowait_time = duration - ((user_time_ms + system_time_ms) / 5);
+  *iowait_time = duration - ((user_time_ms + system_time_ms) / 8);
 }
 
 

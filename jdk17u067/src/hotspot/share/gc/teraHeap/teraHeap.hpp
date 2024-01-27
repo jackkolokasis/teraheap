@@ -5,6 +5,7 @@
 #include "gc/shared/collectedHeap.inline.hpp"
 #include "gc/teraHeap/teraDynamicResizingPolicy.hpp"
 #include "gc/teraHeap/teraTimers.hpp"
+#include "gc/teraHeap/teraTraceDirtyPages.hpp"
 #include "gc/teraHeap/teraTransferPolicy.hpp"
 #include "gc/teraHeap/teraStatistics.hpp"
 #include "utilities/stack.inline.hpp"
@@ -74,6 +75,7 @@ private:
                                     // should be grown
   
   TeraDynamicResizingPolicy* dynamic_resizing_policy; 
+  TeraTraceDirtyPages* trace_dirty_pages;
 
 #ifdef BACK_REF_STAT
   // This histogram keeps internally statistics for the backward
@@ -352,6 +354,10 @@ public:
 
   TeraDynamicResizingPolicy* get_resizing_policy() {
     return dynamic_resizing_policy;
+  }
+  
+  void trace_dirty_h2_pages(void) {
+    trace_dirty_pages->find_dirty_pages();
   }
 };
 

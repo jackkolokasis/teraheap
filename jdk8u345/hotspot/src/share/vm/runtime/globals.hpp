@@ -2510,6 +2510,9 @@ class CommandLineFlags {
   product(bool, DynamicHeapResizing, false,                                 \
           "Enable dynamic heap resizing for TeraHeap")                      \
                                                                             \
+  product(bool, TraceH2DirtyPages, false,                                   \
+          "Trace H2 dirty pages in the page cache")                         \
+                                                                            \
   product(uintx, H2FileSize, 0,                                             \
           "Size of H2 heap (bytes e.g 20gb=21474836480)")                   \
                                                                             \

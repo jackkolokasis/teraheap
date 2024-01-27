@@ -84,6 +84,10 @@ TeraHeap::TeraHeap() {
   shrink_h1 = false;
   grow_h1 = false;
   dynamic_resizing_policy = new TeraDynamicResizingPolicy();
+
+  if (TraceH2DirtyPages)
+    trace_dirty_pages = new TeraTraceDirtyPages(r_get_mmaped_start(),
+                                                (unsigned long)_stop_addr);
 }
 
 // Return H2 start address
@@ -477,8 +481,8 @@ void TeraHeap::h2_print_stats() {
 
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS  = %lu\n", total_objects);
 	thlog_or_tty->print_cr("[STATISTICS] | TOTAL_OBJECTS_SIZE = %lu\n", total_objects_size);
-	thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
-			obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
+  thlog_or_tty->print_cr("[STATISTICS] | DISTRIBUTION | B = %lu | KB = %lu | MB = %lu\n",
+                         obj_distr_size[0], obj_distr_size[1], obj_distr_size[2]);
 
 #ifdef OBJ_STATS
 	thlog_or_tty->print_cr("[STATISTICS] | NUM_PRIMITIVE_ARRAYS = %lu\n", num_primitive_arrays);
@@ -699,8 +703,7 @@ char* TeraHeap::h2_add_object(oop obj, size_t size) {
 		}
 
 		assert(count <=2, "Array out of range");
-
-		++obj_distr_size[count];
+    ++obj_distr_size[count];
 	}
 
   pos = allocate(size, (uint64_t)obj->get_obj_group_id(), (uint64_t)obj->get_obj_part_id());
