@@ -130,7 +130,7 @@ ASFLAGS += $(EXTRA_ASFLAGS)
 # the same could be done by separate execstack command
 LFLAGS += -Xlinker -z -Xlinker noexecstack
 
-LIBS += -lm -ldl -lpthread
+LIBS += -lm -ldl -lpthread -lregions
 
 # By default, link the *.o into the library, not the executable.
 LINK_INTO$(LINK_INTO) = LIBJVM

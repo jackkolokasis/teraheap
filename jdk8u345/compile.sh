@@ -92,9 +92,9 @@ function clean_make()
 
 export_env_vars()
 {
-	local PROJECT_DIR="$(pwd)/../"
+	local PROJECT_DIR="$(pwd)/.."
 
-	export JAVA_HOME="/usr/lib/jvm/java-1.8.0-openjdk"
+	export JAVA_HOME="/usr/lib/jvm/java-1.8.0-openjdk-amd64"
 
 	### TeraHeap Allocator
 	export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LIBRARY_PATH
