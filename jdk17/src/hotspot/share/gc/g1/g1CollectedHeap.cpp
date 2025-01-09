@@ -1164,7 +1164,7 @@ bool G1CollectedHeap::do_full_collection(bool explicit_gc,
 
 #ifdef TERA_DEBUG
   {
-    std::cout << "--- Begin FULL GC ---" << "\n";
+    stdprint << "--- Begin FULL GC ---" << "\n";
   }
 #endif // DEBUG
 #ifdef TERA_DBG_VERIFY_H2
@@ -1194,7 +1194,7 @@ bool G1CollectedHeap::do_full_collection(bool explicit_gc,
 #endif // TERA_DBG_VERIFY_H2
 #ifdef TERA_DEBUG
   {
-    std::cout << "--- End FULL GC ---" << "\n";
+    stdprint << "--- End FULL GC ---" << "\n";
   }
 #endif // DEBUG
 

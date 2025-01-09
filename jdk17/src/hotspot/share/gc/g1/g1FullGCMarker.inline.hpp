@@ -85,7 +85,7 @@ template <class T> inline void G1FullGCMarker::mark_and_push(T* p) {
     if (EnableTeraHeap && Universe::teraHeap()->is_obj_in_h2(obj)) {
 
 #ifdef TERA_DBG_PHASES
-      std::cout << "### Phase 1 fencing reference to obj " << obj << "\n";
+      stdprint << "### Phase 1 fencing reference to obj " << obj << "\n";
 #endif // TERA_DBG_PHASES
 
       Universe::teraHeap()->mark_used_region(cast_from_oop<HeapWord *>(obj));
@@ -99,7 +99,7 @@ template <class T> inline void G1FullGCMarker::mark_and_push(T* p) {
       }
 #ifdef TERA_DBG_PHASES
       if (Universe::teraHeap()->is_metadata(obj))
-        std::cout << "### Phase 1 skipping metadata " << obj << " (" << obj->klass()->internal_name() << ")" << "\n";
+        stdprint << "### Phase 1 skipping metadata " << obj << " (" << obj->klass()->internal_name() << ")" << "\n";
 #endif // TERA_DBG_PHASES
     }
 

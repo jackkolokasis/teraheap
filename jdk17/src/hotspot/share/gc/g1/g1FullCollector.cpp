@@ -197,7 +197,7 @@ void G1FullCollector::prepare_collection() {
 void G1FullCollector::collect() {
 #ifdef TERA_DEBUG
   {
-    std::cout << "Begin Collection" << "\n";
+    stdprint << "Begin Collection" << "\n";
   }
 #endif // DEBUG
 
@@ -215,7 +215,7 @@ void G1FullCollector::collect() {
 
 #ifdef TERA_DEBUG
   {
-    std::cout << "End Collection" << "\n";
+    stdprint << "End Collection" << "\n";
   }
 #endif // DEBUG
 }
@@ -223,7 +223,7 @@ void G1FullCollector::collect() {
 void G1FullCollector::complete_collection() {
 #ifdef TERA_DEBUG
   {
-    std::cout << "Completing Collection" << "\n";
+    stdprint << "Completing Collection" << "\n";
   }
 #endif // DEBUG
   // Restore all marks.
@@ -249,7 +249,7 @@ void G1FullCollector::complete_collection() {
   _heap->print_heap_after_full_collection(scope()->heap_transition());
 #ifdef TERA_DEBUG
   {
-    std::cout << "Completed Collection" << "\n";
+    stdprint << "Completed Collection" << "\n";
   }
 #endif // DEBUG
 }
@@ -289,7 +289,7 @@ public:
 void G1FullCollector::phase1_mark_live_objects() {
 #ifdef TERA_DEBUG
   {
-    std::cout << "Begin Phase 1" << "\n";
+    stdprint << "Begin Phase 1" << "\n";
   }
 #endif // DEBUG
 
@@ -299,7 +299,7 @@ void G1FullCollector::phase1_mark_live_objects() {
   if (EnableTeraHeap && !Universe::teraHeap()->h2_is_empty()) {
     #ifdef TERA_DEBUG
     {
-      std::cout << "Scan H2 cards\n";
+      stdprint << "Scan H2 cards\n";
     }
     #endif // DEBUG
 
@@ -308,7 +308,7 @@ void G1FullCollector::phase1_mark_live_objects() {
 
     #ifdef TERA_DEBUG
     {
-      std::cout << "Finished H2 cards\n";
+      stdprint << "Finished H2 cards\n";
     }
     #endif // DEBUG
   }
@@ -352,7 +352,7 @@ void G1FullCollector::phase1_mark_live_objects() {
 
 #ifdef TERA_DEBUG
   {
-    std::cout << "Finished Phase 1" << "\n";
+    stdprint << "Finished Phase 1" << "\n";
   }
 #endif // DEBUG
 }

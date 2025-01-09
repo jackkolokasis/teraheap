@@ -173,7 +173,7 @@ size_t G1FullGCPrepareTask::G1PrepareCompactLiveClosure::apply(oop object) {
 
   #ifdef TERA_DBG_PHASES
     {
-      std::cout << "### Phase 2 obj " << object << " will be moved to " << h2_address << "\n";
+      stdprint << "### Phase 2 obj " << object << " will be moved to " << h2_address << "\n";
     }
   #endif // DEBUG
 
@@ -229,7 +229,7 @@ void G1FullGCPrepareTask::G1CalculatePointersClosure::prepare_humongous_for_h2(H
 
 #ifdef TERA_DBG_PHASES
   {
-    std::cout << "### Phase 2 hum.obj " << obj << " will be moved to " << h2_address << "\n";
+    stdprint << "### Phase 2 hum.obj " << obj << " will be moved to " << h2_address << "\n";
   }
 #endif // DEBUG
 

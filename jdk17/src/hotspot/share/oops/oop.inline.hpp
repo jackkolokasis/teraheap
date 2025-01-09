@@ -60,10 +60,10 @@ markWord* oopDesc::mark_addr() const {
 void oopDesc::mark_move_h2(uint64_t rdd_id, uint64_t part_id) {   
 #ifdef TERA_DBG_PHASES
   {
-    std::cout << "### Phase 1 marking for H2 obj " << this <<
+    stdprint << "### Phase 1 marking for H2 obj " << this <<
                  " (" << rdd_id << "-" << part_id << ")" << "\n";
-    std::cout << this->klass()->internal_name() << "\n";
-    // std::cout << obj->print_string() << "\n";
+    stdprint << this->klass()->internal_name() << "\n";
+    // stdprint << obj->print_string() << "\n";
   }
 #endif // DEBUG
 

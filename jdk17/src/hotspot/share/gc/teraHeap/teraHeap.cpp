@@ -365,7 +365,7 @@ void TeraHeap::h2_push_backward_reference(void *p, oop o) {
 	MutexLocker x(tera_heap_lock);
 
 #ifdef TERA_DBG_PHASES
-  std::cout << "BACKREF: pushing reference " << p << "\n";
+  stdprint << "BACKREF: pushing reference " << p << "\n";
 #endif // TERA_DBG_PHASES
 
 	_tc_stack.push((oop *)p);
@@ -986,7 +986,7 @@ void TeraHeap::h2_move_obj(HeapWord *src, HeapWord *dst, size_t size) {
 
 #ifdef TERA_DBG_PHASES
   {
-    std::cout << "### Phase 4 Moved to H2 from " << src << " to " << dst << "\n";
+    stdprint << "### Phase 4 Moved to H2 from " << src << " to " << dst << "\n";
   }
 #endif // DEBUG
 }

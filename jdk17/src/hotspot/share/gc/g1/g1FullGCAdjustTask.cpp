@@ -118,7 +118,7 @@ void G1FullGCAdjustTask::work(uint worker_id) {
     while (obj != NULL) {
     #ifdef TERA_DBG_PHASES
       {
-        std::cout << "### Phase 3 Adjusting backrefs obj " << *obj << "\n";
+        stdprint << "### Phase 3 Adjusting backrefs obj " << *obj << "\n";
       }
     #endif // DEBUG
 

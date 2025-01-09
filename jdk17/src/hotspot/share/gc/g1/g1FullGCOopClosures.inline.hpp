@@ -112,7 +112,7 @@ template <class T> inline void G1AdjustClosure::adjust_pointer(T* p) {
 
 #ifdef TERA_DBG_PHASES
   if (EnableTeraHeap && (Universe::teraHeap()->is_in_h2(obj->forwardee()) || Universe::teraHeap()->is_in_h2(obj) )) {
-    std::cout << "### Phase 3 Adjusting obj (adj-ptr) to point from " << obj << " to " << obj->forwardee() << "\n";
+    stdprint << "### Phase 3 Adjusting obj (adj-ptr) to point from " << obj << " to " << obj->forwardee() << "\n";
   }
 #endif // DEBUG
 
