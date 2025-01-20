@@ -56,6 +56,12 @@ inline bool G1FullGCMarker::mark_object(oop obj) {
 
   // Marked by us, preserve if needed.
   markWord mark = obj->mark();
+  if (G1CollectedHeap::heap()->heap_region_containing(obj)->is_humongous() &&
+      obj->is_marked_move_h2() &&
+      obj->mark_must_be_preserved(mark) &&
+      !_collector->is_compacting(obj)) {
+    preserved_stack()->push(obj, mark);
+  }
   if (obj->mark_must_be_preserved(mark) &&
       // It is not necessary to preserve marks for objects in regions we do not
       // compact because we do not change their headers (i.e. forward them).

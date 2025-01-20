@@ -261,7 +261,11 @@ void G1FullCollector::before_marking_update_attribute_table(HeapRegion* hr) {
   } else if (hr->is_closed_archive()) {
     _region_attr_table.set_skip_marking(hr->hrm_index());
   } else if (hr->is_pinned()) {
-    _region_attr_table.set_skip_compacting(hr->hrm_index());
+    if (EnableTeraHeap && should_compact_humongous(hr))
+      // We should mark as compacting to preserve their marks.
+      _region_attr_table.set_compacting(hr->hrm_index());
+    else
+      _region_attr_table.set_skip_compacting(hr->hrm_index());
   } else {
     // Everything else should be compacted.
     _region_attr_table.set_compacting(hr->hrm_index());

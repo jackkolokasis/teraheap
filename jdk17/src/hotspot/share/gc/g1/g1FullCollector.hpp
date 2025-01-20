@@ -105,6 +105,8 @@ public:
 
   void before_marking_update_attribute_table(HeapRegion* hr);
 
+  inline bool should_compact_humongous(HeapRegion* hr) const;
+
   inline bool is_compacting(oop obj) const;
   inline bool is_skip_compacting(uint region_index) const;
   inline bool is_skip_marking(oop obj) const;

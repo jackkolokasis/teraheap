@@ -67,7 +67,7 @@ bool G1FullGCPrepareTask::G1CalculatePointersClosure::do_heap_region(HeapRegion*
       oop obj = cast_to_oop(hhr_start->bottom());
       if (!_bitmap->is_marked(obj)) {
         free_pinned_region<true>(hr);
-      } else if (EnableTeraHeap && obj->is_marked_move_h2() && obj->forwardee() == NULL) {
+      } else if (EnableTeraHeap && obj->is_marked_move_h2() && !Universe::teraHeap()->is_in_h2(obj->forwardee())) {
         prepare_humongous_for_h2(hhr_start, obj);
       }
     } else if (hr->is_open_archive()) {
@@ -167,7 +167,7 @@ G1FullGCPrepareTask::G1PrepareCompactLiveClosure::G1PrepareCompactLiveClosure(G1
 
 size_t G1FullGCPrepareTask::G1PrepareCompactLiveClosure::apply(oop object) {
   size_t size = object->size();
-  if (EnableTeraHeap && object->is_marked_move_h2()) {
+  if (EnableTeraHeap && object->is_marked_move_h2() && !object->is_forwarded()) {
     // Give address from H2 and store it in object header.
     HeapWord *h2_address = (HeapWord *) Universe::teraHeap()->h2_add_object(object, size);
 
@@ -221,7 +221,8 @@ void G1FullGCPrepareTask::G1CalculatePointersClosure::prepare_for_compaction(Hea
 void G1FullGCPrepareTask::G1CalculatePointersClosure::prepare_humongous_for_h2(HeapRegion *hr, oop obj) {
   MutexLocker x(tera_heap_humongous_lock);
   
-  if (obj->forwardee() != NULL) {
+  // Already forwarded to H2
+  if (Universe::teraHeap()->is_in_h2(obj->forwardee())) {
     return;
   }
 

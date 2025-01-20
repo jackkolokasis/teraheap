@@ -31,6 +31,14 @@
 #include "gc/teraHeap/teraHeap.hpp"
 #include "oops/oopsHierarchy.hpp"
 
+bool G1FullCollector::should_compact_humongous(HeapRegion* hr) const {
+  if (!EnableTeraHeap || !hr->is_humongous())
+    return false;
+
+  oop hum_obj = cast_to_oop(hr->humongous_start_region()->bottom());
+  return hum_obj->is_marked_move_h2();
+}
+
 bool G1FullCollector::is_compacting(oop obj) const {
   return _region_attr_table.is_compacting(cast_from_oop<HeapWord *>(obj));
 }
