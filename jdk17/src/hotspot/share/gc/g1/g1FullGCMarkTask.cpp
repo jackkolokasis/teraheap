@@ -57,8 +57,6 @@ void G1FullGCMarkTask::work(uint worker_id) {
                                       &code_closure);
   }
 
-  // TODO: need to remove
-  assert(G1CollectedHeap::heap()->th_card_table()->th_heap().start() != nullptr, "opsie");
   // Mark stack is populated, now process and drain it.
   marker->complete_marking(collector()->oop_queue_set(), collector()->array_queue_set(), &_terminator);
   marker->flush_mark_stats_cache();

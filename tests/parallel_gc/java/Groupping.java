@@ -70,20 +70,20 @@ public class Groupping
 		for (int i = 0; i < num_elements; i++)
 			list.add(new Integer(i));
 
-        gc();
+    gc();
 
-        for (int i = 0; i < num_elements; i++)
-            list.remove();
+    for (int i = 0; i < num_elements; i++)
+      list.remove();
 
-        gc();
+    gc();
 		LinkedList<String> list2 = new LinkedList<String>();
 		_UNSAFE.h2TagAndMoveRoot(list2, 1, 0);
         
-        for (int i = 0; i < num_elements_2; i++)
-            list2.add(new String("Hello World " + i));
+    for (int i = 0; i < num_elements_2; i++)
+      list2.add(new String("Hello World " + i));
 
-        gc();
-		calcHashCode(list2, num_elements);
+    gc();
+    calcHashCode(list2, num_elements);
 
 		gc();
 		calcHashCode(list2, num_elements);
