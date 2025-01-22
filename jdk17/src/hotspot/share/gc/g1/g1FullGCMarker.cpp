@@ -66,22 +66,6 @@ void G1FullGCMarker::complete_marking(OopQueueSet* oop_stacks,
                                       ObjArrayTaskQueueSet* array_stacks,
                                       TaskTerminator* terminator) {
 
-  // Drain backward references
-  if (EnableTeraHeap && _worker_id == 0 && !Universe::teraHeap()->h2_is_empty()) {
-    oop *obj = Universe::teraHeap()->h2_get_next_back_reference();
-
-    while (obj) {
-    #ifdef TERA_DBG_PHASES
-      {
-        std::cout << "### Phase 1 mark backward obj: " << *obj << "\n";
-        std::cout << (*obj)->klass()->internal_name() << "\n";
-      }
-    #endif // DEBUG
-      mark_and_push(obj);
-      obj = Universe::teraHeap()->h2_get_next_back_reference();
-    }
-  }
-
   do {
     drain_stack();
     ObjArrayTask steal_array;

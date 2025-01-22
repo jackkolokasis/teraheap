@@ -47,6 +47,23 @@ void G1FullGCMarkTask::work(uint worker_id) {
   G1FullGCMarker* marker = collector()->marker(worker_id);
   MarkingCodeBlobClosure code_closure(marker->mark_closure(), !CodeBlobToOopClosure::FixRelocations);
 
+  // Drain backward references
+  if (EnableTeraHeap && worker_id == 0 && !Universe::teraHeap()->h2_is_empty()) {
+    oop *obj = Universe::teraHeap()->h2_get_next_back_reference();
+
+    while (obj) {
+
+#ifdef TERA_DBG_PHASES
+      {
+        stdprint << "### Phase 1 mark backward obj: " << *obj << "\n";
+        stdprint << (*obj)->klass()->internal_name() << "\n";
+      }
+#endif // DEBUG
+
+      obj = Universe::teraHeap()->h2_get_next_back_reference();
+    }
+  }
+
   if (ClassUnloading) {
     _root_processor.process_strong_roots(marker->mark_closure(),
                                          marker->cld_closure(),
