@@ -60,6 +60,12 @@ void G1FullGCMarkTask::work(uint worker_id) {
       }
 #endif // DEBUG
 
+      // Mark backward references to transfer them to H2
+      if ( !(*obj)->is_marked_move_h2() && !Universe::teraHeap()->is_metadata(*obj) ) {
+        (*obj)->mark_move_h2(Universe::teraHeap()->h2_get_region_groupId(obj),
+                             Universe::teraHeap()->h2_get_region_partId(obj));
+      }
+
       obj = Universe::teraHeap()->h2_get_next_back_reference();
     }
   }
