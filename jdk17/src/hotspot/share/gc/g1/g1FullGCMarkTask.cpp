@@ -66,6 +66,9 @@ void G1FullGCMarkTask::work(uint worker_id) {
                              Universe::teraHeap()->h2_get_region_partId(obj));
       }
 
+      // Mark object as live and add it to the stack.
+      marker->mark_closure()->do_oop(obj);
+
       obj = Universe::teraHeap()->h2_get_next_back_reference();
     }
   }
