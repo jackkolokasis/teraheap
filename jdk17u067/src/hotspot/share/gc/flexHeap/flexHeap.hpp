@@ -66,7 +66,7 @@ private:
 #ifdef TERA_CONTROLLER
   bool controller_resize_request;     //< Cotroller request for resize
 
-  long new_mem_budget;            //< Current DRAM Budget
+  unsigned long int new_mem_budget;            //< Current DRAM Budget
 #endif
   
   // double gc_time_accum_ms = 0;
@@ -210,7 +210,7 @@ public:
   }
 
 #ifdef TERA_CONTROLLER
-  bool set_controller_resize_request(long mem_budget) {
+  void set_controller_resize_request(unsigned long int mem_budget) {
     controller_resize_request = true;
     new_mem_budget = mem_budget;
   }

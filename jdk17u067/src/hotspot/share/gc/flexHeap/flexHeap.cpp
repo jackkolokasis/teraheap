@@ -43,16 +43,24 @@ void FlexHeap::dram_repartition(bool *need_full_gc) {
 
 #ifdef TERA_CONTROLLER
   if (controller_resize_request) {
-    if (new_mem_budget > FlexDRAMLimit) {
-      FlexDRAMLimit = new_mem_budget;
-    }
+    bool grow = (new_mem_budget > FlexDRAMLimit);
 
-    if (new_mem_budget < FlexDRAMLimit) {
-      FlexDRAMLimit = new_mem_budget;
-      action_shrink_heap(need_full_gc);
-      prev_action = cur_action;
-      reset_counters();
-    }
+    // Update total DRAM budget
+    FlexDRAMLimit = new_mem_budget;
+
+    grow ? action_grow_heap(need_full_gc) : action_shrink_heap(need_full_gc);
+
+    // Reset the counters
+    // Currently, we do not change the state in the state machine.
+    // This could be problematic, so we'll observe initial results
+    // and revisit if necessary.
+    // TODO: Re-evaluate whether we need a state change here in future
+    // iterations.
+    new_mem_budget = 0;
+    prev_action = cur_action;
+    controller_resize_request = false;
+    reset_counters();
+    return;
   }
 #endif
 

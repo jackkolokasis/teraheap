@@ -157,6 +157,6 @@
                                    //objects to H2. Until next GC wait
                                    //and do not take new decissions.
 
-#define TERA_CONTROLLER
+// #define TERA_CONTROLLER
 
 #endif  // SHARE_MEMORY_SHAREDDEFINES_H

@@ -137,7 +137,7 @@ function build_jvm_image() {
   make CONF=linux-$TARGET_PLATFORM-server-$image_variant clean
   make CONF=linux-$TARGET_PLATFORM-server-$image_variant dist-clean
 
-  bash ./configure \
+  CC=${CC} CXX=${CXX} bash ./configure \
     --with-debug-level=$debug_level \
     --with-native-debug-symbols=$debug_sumbols \
     --disable-warnings-as-errors \
