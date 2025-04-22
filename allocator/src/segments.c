@@ -340,6 +340,9 @@ void print_statistics(){
             }
         }
     }
+
+    print_groups();
+
     fprintf(stderr, "Total Wasted Space: %zu MBytes\n", wasted_space / (1024 * 1024));
     fprintf(stderr, "Total regions: %zu\n", total_regions);
     if (total_regions)
