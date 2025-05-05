@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-<<<<<<< HEAD
 # Declare an associative array used for error handling
 declare -A ERRORS
 
@@ -15,6 +14,7 @@ MODE=""
 PARALLEL_GC_THREADS=()
 STRIPE_SIZE=32768
 jvm_build=""
+GC=""
 cpu_arch=$(uname -p)
 WRITE_POLICY="AsyncWritePolicy"
 FLEXHEAP=false
@@ -46,23 +46,6 @@ export_env_vars() {
   export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$CPLUS_INCLUDE_PATH
 }
 
-clear_env() {
-  echo "Clearing env..."
-  local proj=$(pwd)
-  
-  echo "Clear H2 file..."
-  cd /mnt/fmap
-  rm -f h2-100.heap
-  fallocate -l 100G h2-100.heap
-
-  echo "Droping Caches..."
-  sudo sync
-  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
-
-  echo "Done!"
-  cd "$proj"
-}
-
 # Run tests using only interpreter mode
 function interpreter_mode() {
   local class_file=$1
@@ -72,7 +55,7 @@ function interpreter_mode() {
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly -XX:+PrintInterpreter -XX:+PrintNMethods \
     -Djava.compiler=NONE \
     -XX:+ShowMessageBoxOnError \
-    -XX:+UseParallelGC \
+    $(get_garbage_collector) \
     -XX:ParallelGCThreads=${num_gc_thread} \
     $(get_teraheap_flag) \
     -XX:TeraHeapSize=${TERACACHE_SIZE} \
@@ -101,7 +84,7 @@ function c1_mode() {
     -XX:+PrintInterpreter \
     -XX:+PrintNMethods -XX:+PrintCompilation \
     -XX:+ShowMessageBoxOnError -XX:+LogCompilation \
-    -XX:TieredStopAtLevel=3 -XX:+UseParallelGC \
+    -XX:TieredStopAtLevel=3 $(get_garbage_collector) \
     -XX:ParallelGCThreads=${num_gc_thread} \
     -XX:-UseParallelOldGC \
     $(get_teraheap_flag) \
@@ -129,7 +112,7 @@ function c2_mode() {
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly \
     -XX:+PrintNMethods -XX:+PrintCompilation \
     -XX:+ShowMessageBoxOnError -XX:+LogCompilation \
-    -XX:+UseParallelGC \
+    $(get_garbage_collector) \
     -XX:ParallelGCThreads=${num_gc_thread} \
     -XX:-UseParallelOldGC \
     $(get_teraheap_flag) \
@@ -155,7 +138,7 @@ function run_tests_msg_box() {
   ${JAVA} \
     -server \
     -XX:+ShowMessageBoxOnError \
-    -XX:+UseParallelGC \
+    $(get_garbage_collector) \
     -XX:ParallelGCThreads=${num_gc_thread} \
     $(get_teraheap_flag) \ 
   -XX:TeraHeapSize=${TERACACHE_SIZE} \
@@ -179,7 +162,7 @@ function run_tests() {
   local num_gc_thread=$2
 
   ${JAVA} \
-    -XX:+UseParallelGC \
+    $(get_garbage_collector) \
     -XX:+ShowMessageBoxOnError \
     -XX:ParallelGCThreads=${num_gc_thread} \
     $(get_teraheap_flag) \
@@ -206,7 +189,7 @@ function run_tests_debug() {
   gdb --args ${JAVA} \
     -server \
     -XX:+ShowMessageBoxOnError \
-    -XX:+UseParallelGC \
+    $(get_garbage_collector) \
     -XX:ParallelGCThreads=${num_gc_thread} \
     $(get_teraheap_flag) \
     -XX:TeraHeapSize=${TERACACHE_SIZE} \
@@ -244,6 +227,23 @@ function get_teraheap_flag() {
   echo "-XX:+EnableTeraHeap"
 }
 
+function get_garbage_collector() { 
+  if [[ ! $GC =~ ^[0-9]+$ ]]; then
+    echo "Invalid garbage collector; Please provide 0:ParallelScavenge, 1:G1GC"
+    exit ${ERRORS[NOT_AN_INTEGER]}
+  elif [[ $GC -lt 0 || $GC -gt 1 ]]; then
+    echo "Invalid garbage collector; Please provide 0:ParallelScavenge, 1:G1GC"
+    exit ${ERRORS[OUT_OF_RANGE]}
+  fi
+
+  if [[ "$GC" -eq 0 ]]; then
+    echo "-XX:+UseParallelGC"
+  elif [[ "$GC" -eq 1 ]]; then
+    echo "-XX:+UseG1GC" 
+  fi
+
+}
+
 function get_h2_allocator_mode() {
   if [[ ! $H2_ALLOCATOR_MODE =~ ^[0-9]+$ ]]; then
     #echo "H2_ALLOCATOR_MODE:$H2_ALLOCATOR_MODE is not an integer."
@@ -273,10 +273,11 @@ usage() {
   echo -n "      $0 [option ...] [-h]"
   echo
   echo "Options:"
-  echo "      -p, --point    <mount_point>        The mount point used for the H2 file(eg. /mnt/fmap/)"
-  echo "      -j, --jvm      <jvm_build>          The jvm build([release|r], [optimized|o], [fastdebug|f], Default: release)"
-  echo "      -m, --mode     <execution_mode>     The jvm execution mode(0: Default, 1: Interpreter, 2: C1, 3: C2, 4: gdb, 5: ShowMessageBoxOnError)"
-  echo "      -t, --threads  <threads>            The number of GC threads (2, 4, 8, 16, 32)"
+  echo "      -p, --point              <mount_point>        The mount point used for the H2 file(eg. /mnt/fmap/)"
+  echo "      -j, --jvm                <jvm_build>          The jvm build([release|r], [optimized|o], [fastdebug|f], Default: release)"
+  echo "      -c, --collector          <collector>          The garbage collector to use(0: ParallelScavenge, 1: G1GC)"
+  echo "      -m, --mode               <execution_mode>     The jvm execution mode(0: Default, 1: Interpreter, 2: C1, 3: C2, 4: gdb, 5: ShowMessageBoxOnError)"
+  echo "      -t, --threads            <threads>            The number of GC threads (2, 4, 8, 16, 32)"
   echo "      -w, --write-to-t2-policy <policy>   The available policies are: 'AsyncWritePolicy', 'SyncWritePolicy', 'FmapWritePolicy', 'DefaultWritePolicy'"
   echo "      -a, --h2-allocator <mode>           The available modes are: [0:Serial, 1:Parallel_H2PreCompact, 2:Paralell_H2Compact, 3:Parallel_H2PreCompact + Parallel_H2Compact]"
   echo "      -f, --flexheap                      Enable flexheap"
@@ -348,8 +349,8 @@ print_msg() {
 }
 
 function parse_script_arguments() {
-  local OPTIONS=p:j:m:t:w:a:fh
-  local LONGOPTIONS=point:,jvm:,mode:,threads:,write-to-h2-policy:,h2-allocator:,flexheap,help
+  local OPTIONS=p:j:c:m:t:w:a:fh
+  local LONGOPTIONS=point:,jvm:,collector:,mode:,threads:,write-to-h2-policy:,h2-allocator:,flexheap,help
 
   # Use getopt to parse the options
   local PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
@@ -374,6 +375,10 @@ function parse_script_arguments() {
       jvm_build="$2"
       shift 2
       ;;
+    -c | --collector)
+      GC="$2"
+      shift 2
+      ;; 
     -m | --mode)
       MODE="$2"
       shift 2

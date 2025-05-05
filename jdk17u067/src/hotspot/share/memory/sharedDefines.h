@@ -51,7 +51,7 @@
 
 #define TERA_INTERPRETER	        //< Enable Interpreter to support TeraHeap
 //#define TERA_PARALLEL_H2_SUMMARY_PHASE  // Enable parallel execution of summary_phase's precompaction for H2 
-//#define TERA_PARALLEL_H2_COMPACT        // Enable parallel execution of H2_COMPACT 
+#define TERA_PARALLEL_H2_COMPACT        // Enable parallel execution of H2_COMPACT 
 
 #define TERA_C1				            //< Enable C1 to support TeraHeap
 

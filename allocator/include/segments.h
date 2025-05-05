@@ -50,7 +50,7 @@ struct region{
     char *last_allocated_end;
     char *last_allocated_start;
     char *first_allocated_start;
-    struct tera_group *dependency_list;
+    struct group *dependency_list;
 #if ANONYMOUS
   struct offset *offset_list;
   size_t size_mapped; 

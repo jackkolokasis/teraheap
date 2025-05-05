@@ -259,22 +259,11 @@ void init_regions(uint32_t gc_threads, const char *h2_write_policy){
     }
 #endif
 #if 0
-=======
-#if ANONYMOUS
-    region_array[i].size_mapped               = 0;
-    region_array[i].offset_list               = NULL;
-#endif
-    region_array[i].rdd_id                    = MAX_PARTITIONS * MAX_RDD_ID;
-    region_array[i].part_id                   = MAX_PARTITIONS * MAX_RDD_ID;
-#if PR_BUFFER
-    region_array[i].pr_buffer                 = malloc(sizeof(struct pr_buffer));
->>>>>>> melidonis/java17_g1_teraheap
     region_array[i].pr_buffer->buffer         = NULL;
     region_array[i].pr_buffer->size           = 0;
     region_array[i].pr_buffer->alloc_ptr      = NULL;
     region_array[i].pr_buffer->first_obj_addr = NULL;
 #endif
-<<<<<<< HEAD
 
 #endif //#if PR_BUFFER
   }
@@ -502,14 +491,14 @@ void check_for_group(char *obj){
     }
     if (seg1 == seg2)
         return;
-    struct tera_group *ptr = region_array[seg1].dependency_list;
+    struct group *ptr = region_array[seg1].dependency_list;
     while (ptr != NULL){
         if (ptr->region == &region_array[seg2])
             return;
         ptr = ptr->next;
     }
 
-    struct tera_group *new = malloc(sizeof(struct tera_group));
+    struct group *new = malloc(sizeof(struct group));
 #if STATISTICS
     total_deps++;
 #endif
@@ -1165,10 +1154,5 @@ bool object_starts_from_region(char *obj) {
   return (region_array[seg].first_allocated_start != region_array[seg].start_address) ? false : true;
 }
 
-bool object_starts_from_region(char *obj) {
-  uint64_t seg = (obj - region_array[0].start_address) / ((uint64_t)REGION_SIZE);
-  assertf(seg >= 0 && seg < REGION_ARRAY_SIZE,
-          "Segment index is out of range %lu", seg); 
-  return (region_array[seg].first_allocated_start != region_array[seg].start_address) ? false : true;
-}
+
 #endif
