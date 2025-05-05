@@ -11,13 +11,11 @@
 #
 ####################################################
 
-JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../../jdk17
-# JAVA_COMP=$(JAVA_REPO)/build/base-linux/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
-# JAVA_COMP=$(JAVA_REPO)/build/linux-x86_64-server-slowdebug/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath bin/
-JAVA_COMP=$(JAVA_REPO)/build/linux-x86_64-server-release/jdk/bin/javac -Xlint:deprecation -classpath bin/
+cpu_arch=$(shell uname -p)
 
-
-JAVAC=$(JAVA_COMP) -d ./bin
+JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))/../../../jdk17u067
+JAVAC=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac
+PROJECT_DIR := $(shell pwd)/../..
 
 GDB=gdb
 
@@ -29,8 +27,10 @@ all: $(TARGET)
 	$(JAVAC) $<
 
 clean:
-	rm -rf out
+	rm core.*
+	rm hs_err_pid*
+	rm -rf err out
 	rm -f hotspot_pid*
 
 distclean: clean
-	rm -rf bin
+	rm -rf *.class

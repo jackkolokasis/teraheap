@@ -29,7 +29,10 @@ EXEC=("Array"
   "Groupping"
   "MultiHashMap"
   "Test_WeakHashMap" "ClassInstance")
-#EXEC=("Array")
+# Java files should be under: ${TESTD}/${EXEC_DIR_NAME}
+TESTD=""
+EXEC_DIR_NAME="java"
+
 # Export Enviroment Variables
 export_env_vars() {
   PROJECT_DIR="$(pwd)/../.."
@@ -70,15 +73,15 @@ function interpreter_mode() {
     $(get_h2_allocator_mode) \
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
-    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out
-
+    -XX:ErrorFile="${class_file}"_hs_err.log \
+    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out  
 }
 
 # Run tests using only C1 compiler
 function c1_mode() {
   local class_file=$1
   local num_gc_thread=$2
-
+  
   ${JAVA} \
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly \
     -XX:+PrintInterpreter \
@@ -98,15 +101,15 @@ function c1_mode() {
     $(get_h2_allocator_mode) \
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
-    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out
-
+    -XX:ErrorFile="${class_file}"_hs_err.log \
+    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out  
 }
 
 # Run tests using C2 compiler
 function c2_mode() {
   local class_file=$1
   local num_gc_thread=$2
-
+  
   ${JAVA} \
     -server \
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly \
@@ -127,7 +130,8 @@ function c2_mode() {
     $(get_h2_allocator_mode) \
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
-    -Xlogtc:llarge_teraCache.txt "${class_file}" >err 2>&1 >run_tests.out
+    -XX:ErrorFile="${class_file}"_hs_err.log \
+    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out  
 }
 
 # Run tests using all compilers
@@ -153,13 +157,14 @@ function run_tests_msg_box() {
     $(get_h2_allocator_mode) \
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
-    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out
+    -XX:ErrorFile="${class_file}"_hs_err.log \
+    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out   
 }
 
 # Run tests using all compilers
 function run_tests() {
   local class_file=$1
-  local num_gc_thread=$2
+  local num_gc_thread=$2 
 
   ${JAVA} \
     $(get_garbage_collector) \
@@ -178,7 +183,8 @@ function run_tests() {
     $(get_h2_allocator_mode) \
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
-    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out
+    -XX:ErrorFile="${class_file}"_hs_err.log \
+    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out   
 }
 
 # Run tests using gdb
@@ -204,7 +210,16 @@ function run_tests_debug() {
     $(get_h2_allocator_mode) \
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
-    -Xlogth:llarge_teraCache.txt "${class_file}"
+    -XX:ErrorFile="${class_file}"_hs_err.log \
+    -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out   
+}
+
+function check_tests_directory(){
+  if [[ "$TESTD" != "g1_evacuations" && "$TESTD" != "g1_full_gc" && "$TESTD" != "parallel_gc" ]]; then
+    echo "Error: Provide one of the following directories are 'g1_evacuations', 'g1_full_gc', 'parallel_gc'"
+    usage
+    exit 1
+  fi
 }
 
 function get_h2_write_policy(){
@@ -276,6 +291,7 @@ usage() {
   echo "      -p, --point              <mount_point>        The mount point used for the H2 file(eg. /mnt/fmap/)"
   echo "      -j, --jvm                <jvm_build>          The jvm build([release|r], [optimized|o], [fastdebug|f], Default: release)"
   echo "      -c, --collector          <collector>          The garbage collector to use(0: ParallelScavenge, 1: G1GC)"
+  echo "      -d, --tests-directory    <directory name>     The directory with the java tests."
   echo "      -m, --mode               <execution_mode>     The jvm execution mode(0: Default, 1: Interpreter, 2: C1, 3: C2, 4: gdb, 5: ShowMessageBoxOnError)"
   echo "      -t, --threads            <threads>            The number of GC threads (2, 4, 8, 16, 32)"
   echo "      -w, --write-to-t2-policy <policy>   The available policies are: 'AsyncWritePolicy', 'SyncWritePolicy', 'FmapWritePolicy', 'DefaultWritePolicy'"
@@ -349,8 +365,8 @@ print_msg() {
 }
 
 function parse_script_arguments() {
-  local OPTIONS=p:j:c:m:t:w:a:fh
-  local LONGOPTIONS=point:,jvm:,collector:,mode:,threads:,write-to-h2-policy:,h2-allocator:,flexheap,help
+  local OPTIONS=p:j:c:d:m:t:w:a:fh
+  local LONGOPTIONS=point:,jvm:,collector:tests-directory:,,mode:,threads:,write-to-h2-policy:,h2-allocator:,flexheap,help
 
   # Use getopt to parse the options
   local PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
@@ -378,7 +394,11 @@ function parse_script_arguments() {
     -c | --collector)
       GC="$2"
       shift 2
-      ;; 
+      ;;
+    -d | --tests-directory)
+      TESTD="$2"
+      shift 2
+      ;;
     -m | --mode)
       MODE="$2"
       shift 2
@@ -419,9 +439,10 @@ parse_script_arguments "$@"
 check_args
 check_h2_write_policy
 check_jvm_build
+check_tests_directory
 
-cd java || exit
-
+#cd java || exit
+cd "${TESTD}/${EXEC_DIR_NAME}" || exit
 for gcThread in "${PARALLEL_GC_THREADS[@]}"; do
   print_msg "$gcThread"
 
