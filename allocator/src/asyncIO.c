@@ -116,6 +116,7 @@ static int find_slot(uint64_t worker_id) {
 static int find_slot() {
 	static int i = 0;
 
+
 	for (; i < MAX_REQS; i++) {
 		if (request[i].state == 0)
 			return i;

@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #if defined (__ia64__) || defined (__x86_64__) || defined (__aarch64__)
+
 #define INT_PTR unsigned long
 
 #include <inttypes.h>

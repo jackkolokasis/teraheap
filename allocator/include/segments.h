@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <threads.h>
+
+#define ANONYMOUS 0
 #define PR_BUFFER 1						
 #define PR_BUFFER_SIZE (2*1024LU*1024) /* Promotion buffer size */
 //#define H2_COMPACT_STATISTICS 1	// Enable allocator to print statistics for H2 compact
@@ -32,7 +34,7 @@ struct pr_buffer {
 #endif
 
 /*
- * The struct for group array
+ * The struct for tera_group array
  */
 struct group{
     struct region *region;
@@ -48,20 +50,22 @@ struct region{
     char *last_allocated_end;
     char *last_allocated_start;
     char *first_allocated_start;
-    struct group *dependency_list;
-
+    struct tera_group *dependency_list;
+#if ANONYMOUS
+  struct offset *offset_list;
+  size_t size_mapped; 
+#endif
 #if PR_BUFFER
     //struct pr_buffer *pr_buffer;
     struct pr_buffer **pr_buffers;//perpap
 #endif
-
     uint32_t rdd_id;
     uint32_t part_id;
     int8_t used;
 };
 
 /*
- * Initialize region array, group array and their fields
+ * Initialize region array, tera_group array and their fields
  */
 void init_regions(uint32_t gc_threads, const char *h2_write_policy);//perpap
 
@@ -89,13 +93,13 @@ int new_group();
 
 /*
  * Merges two groups of regions that already exist
- * Arguments: group1: the id of the first group
- * group2:the id of the second group
+ * Arguments: group1: the id of the first tera_group
+ * group2:the id of the second tera_group
  */
 void merge_groups(int group1, int group2);
 
 /*
- * Connects two regions in a group
+ * Connects two regions in a tera_group
  * Arguments: obj1: the object that references the other
  * obj2: the object that is referenced (order does not matter)
  */
@@ -112,8 +116,8 @@ void print_groups();
 void reset_used();
 
 /*
- * Marks the region that contains this obj as used and increases group
- * counter (if it belongs to a group)
+ * Marks the region that contains this obj as used and increases tera_group
+ * counter (if it belongs to a tera_group)
  * Arguments: obj:the object that is alive
  */
 void mark_used(char *obj);
@@ -171,7 +175,7 @@ void enable_region_groups(char *obj);
 void disable_region_groups(void);
 
 /*
- * function that connects two regions in a group
+ * function that connects two regions in a tera_group
  * arguments: obj: the object that must be checked to be groupped with the region_enabled
  */
 void check_for_group(char *obj);
@@ -196,7 +200,7 @@ char *get_first_object(char *addr);
 char* get_region_start_addr(char *obj, uint64_t rdd_id, uint64_t part_id);
 
 /*
- * Get object 'groupId' (RDD Id). Each object is allocated based on a group Id
+ * Get object 'groupId' (RDD Id). Each object is allocated based on a tera_group Id
  * and the partition Id that locates in teraflag.
  *
  * @obj: address of the object
@@ -206,7 +210,7 @@ char* get_region_start_addr(char *obj, uint64_t rdd_id, uint64_t part_id);
 uint64_t get_obj_group_id(char *obj);
 
 /*
- * Get object 'groupId'. Each object is allocated based on a group Id
+ * Get object 'groupId'. Each object is allocated based on a tera_group Id
  * and the partition Id that locates in teraflag.
  *
  * obj: address of the object
@@ -216,12 +220,12 @@ uint64_t get_obj_group_id(char *obj);
 uint64_t get_obj_part_id(char *obj);
 
 /*
- * Check if these two objects belong to the same group
+ * Check if these two objects belong to the same tera_group
  *
  * obj1: address of the object
  * obj2: address of the object
  *
- * returns: 1 if objects are in the same group, 0 otherwise
+ * returns: 1 if objects are in the same tera_group, 0 otherwise
  */
 int is_in_the_same_group(char *obj1, char *obj2);
 

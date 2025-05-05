@@ -60,6 +60,7 @@ OPTIMZEFLAG = -O3
 LDFLAGS = 
 CFLAGS = $(BINFLAG) $(WALLFLAG) $(OPTIMIZEFLAG) 
 
+
 ## Commands
 RM = rm -fr
 AR = ar -r

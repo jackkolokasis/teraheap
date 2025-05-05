@@ -71,18 +71,18 @@ int main(int argc, char **argv) {
 
     //region 0 and region 1 grouped
     references(obj1, obj2);
-    //region 2 added to group
+    //region 2 added to tera_group
     references(obj3, obj4);
 
     print_groups();
 
-    //nothing should be done, obj4 and obj5 are in the same group
+    //nothing should be done, obj4 and obj5 are in the same tera_group
     references(obj4, obj5);
     print_groups();
-    //region 3 added to group
+    //region 3 added to tera_group
     references(obj7, obj6);
     print_groups();
-    //new group with region 4 and 5
+    //new tera_group with region 4 and 5
     references(obj8, obj9);
     print_groups();
 	

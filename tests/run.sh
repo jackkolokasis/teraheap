@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+<<<<<<< HEAD
 # Declare an associative array used for error handling
 declare -A ERRORS
 
@@ -32,7 +33,6 @@ EXEC=("Array"
 # Export Enviroment Variables
 export_env_vars() {
   PROJECT_DIR="$(pwd)/../.."
-
   export LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LIBRARY_PATH
   export LD_LIBRARY_PATH=${PROJECT_DIR}/allocator/lib/:$LD_LIBRARY_PATH
   export PATH=${PROJECT_DIR}/allocator/include/:$PATH
@@ -44,6 +44,23 @@ export_env_vars() {
   export PATH=${PROJECT_DIR}/tera_malloc/include/:$PATH
   export C_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$C_INCLUDE_PATH
   export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$CPLUS_INCLUDE_PATH
+}
+
+clear_env() {
+  echo "Clearing env..."
+  local proj=$(pwd)
+  
+  echo "Clear H2 file..."
+  cd /mnt/fmap
+  rm -f h2-100.heap
+  fallocate -l 100G h2-100.heap
+
+  echo "Droping Caches..."
+  sudo sync
+  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+
+  echo "Done!"
+  cd "$proj"
 }
 
 # Run tests using only interpreter mode
@@ -71,6 +88,7 @@ function interpreter_mode() {
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
     -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out
+
 }
 
 # Run tests using only C1 compiler
@@ -98,6 +116,7 @@ function c1_mode() {
     $(get_h2_write_policy) \
     -XX:H2FileSize=1288490188800 \
     -Xlogth:llarge_teraCache.txt "${class_file}" >err 2>&1 >out
+
 }
 
 # Run tests using C2 compiler
@@ -454,3 +473,4 @@ for gcThread in "${PARALLEL_GC_THREADS[@]}"; do
 done
 
 cd - >/dev/null || exit
+

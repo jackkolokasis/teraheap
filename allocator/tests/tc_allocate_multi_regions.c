@@ -14,6 +14,7 @@
 ***************************************************/
 #include "tc_heap.h"
 
+
 #define SIZE_30MB (3932160)
 #define SIZE_5MB (655360)
 #define SIZE_1MB (131072)
@@ -81,5 +82,6 @@ int main(int argc, char **argv) {
   printf("--------------------------------------\n");
 	printf("TC_Allocate_Multi_Regions:\t\t\t\033[1;32m[PASS]\033[0m\n");
 	printf("--------------------------------------\n");
+
   return 0;
 }

@@ -224,6 +224,7 @@ function run_clean_make() {
     fi
     make CONF=linux-$TARGET_PLATFORM-normal-server-$variant clean && make CONF=linux-$TARGET_PLATFORM-normal-server-$variant dist-clean && make CONF=linux-$TARGET_PLATFORM-normal-server-$variant images
   fi
+
 }
 
 function export_env_vars() {
