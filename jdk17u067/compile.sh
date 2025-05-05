@@ -147,7 +147,7 @@ function build_jvm_image() {
     --with-extra-cflags="-march=${microarchitecture} -I${PROJECT_DIR}/allocator/include -I${PROJECT_DIR}/tera_malloc/include" \
     --with-extra-cxxflags="-march=${microarchitecture} -I${PROJECT_DIR}/allocator/include -I${PROJECT_DIR}/tera_malloc/include"
 
-  intercept-build make CONF=linux-$TARGET_PLATFORM-server-$image_variant
+  intercept-build make CONF=linux-$TARGET_PLATFORM-server-$image_variant images
   cd ../
   compdb -p jdk17u067 list >compile_commands_$image_variant.json
   mv compile_commands_$image_variant.json jdk17u067
