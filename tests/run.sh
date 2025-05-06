@@ -520,7 +520,7 @@ for gcThread in "${PARALLEL_GC_THREADS[@]}"; do
   for exec_file in "${EXEC[@]}"; do
     if [ "${exec_file}" == "ClassInstance" ]; then
       XMS=2
-    elif [ "${exec_file}" == "Array_List" ]; then
+    elif [[ "${exec_file}" == "Array_List" || "${exec_file}" == "Groupping" || "${exec_file}" == "Array_List_String" ]]; then
       XMS=64
     elif [[ "${exec_file}" == "HashMap" || "${exec_file}" == "Array_List_String" ]]; then
       XMS=3

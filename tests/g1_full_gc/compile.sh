@@ -19,6 +19,6 @@ export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$CPLUS_INCLUDE_PAT
 
 # Or compile all of them:
 make -C java
-make -C phases
+#make -C phases
 
 
