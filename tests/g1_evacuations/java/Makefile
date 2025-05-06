@@ -10,13 +10,13 @@
 # Makefile for test files
 #
 ####################################################
+cpu_arch=$(shell uname -p)
 
-JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))../../../jdk17
-# JAVA_COMP=$(JAVA_REPO)/build/base-linux/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
-JAVA_COMP=$(JAVA_REPO)/build/linux-x86_64-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
-# JAVA_COMP=$(JAVA_REPO)/build/linux-x86_64-server-slowdebug/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
+JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))/../../../jdk17u067
+#JAVAC=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath
+#PROJECT_DIR := $(shell pwd)/../..
 
-
+JAVA_COMP=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
 JAVAC=$(JAVA_COMP) -d ./bin
 
 GDB=gdb

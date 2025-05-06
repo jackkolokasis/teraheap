@@ -21,7 +21,8 @@ FLEXHEAP=false
 FLEXHEAP_DEVICE="nvme0n1p1"
 FLEXHEAP_MOUNT_POINT="/spare2/fmap/"
 H2_ALLOCATOR_MODE=0 #0:Serial, 1:Parallel_H2PreCompact, 2:Paralell_H2Compact, 3:Parallel_H2PreCompact + Parallel_H2Compact
-EXEC=("Array" 
+
+EXEC_JAVA=("Array" 
 	"Array_List" "Array_List_Int" 
 	"List_Large" "MultiList"
   "Simple_Lambda" "Extend_Lambda" "Test_Reflection" "Test_Reference"
@@ -29,9 +30,15 @@ EXEC=("Array"
   "Groupping"
   "MultiHashMap"
   "Test_WeakHashMap" "ClassInstance")
+
+EXEC_PHASES=("Phase1_MarkOneObject" "Phase1_MarkSubObject" \
+  "Phase2_GiveAddressesFromH2" "Phase3_UpdateReferences" \
+  "SimpleOneObj" "SimpleOneBackward")
+
 # Java files should be under: ${TESTD}/${EXEC_DIR_NAME}
 TESTD=""
 EXEC_DIR_NAME="java"
+X_FLAGS=""
 
 # Export Enviroment Variables
 export_env_vars() {
@@ -54,7 +61,7 @@ function interpreter_mode() {
   local class_file=$1
   local num_gc_thread=$2
 
-  ${JAVA} -server \
+  ${JAVA} ${X_FLAGS} -server \
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly -XX:+PrintInterpreter -XX:+PrintNMethods \
     -Djava.compiler=NONE \
     -XX:+ShowMessageBoxOnError \
@@ -64,6 +71,7 @@ function interpreter_mode() {
     -XX:TeraHeapSize=${TERACACHE_SIZE} \
     -Xmx${MAX}g \
     -Xms${XMS}g \
+    -XX:-ClassUnloading \
     -XX:-UseCompressedOops \
     -XX:-UseCompressedClassPointers \
     -XX:+TeraHeapStatistics \
@@ -82,7 +90,7 @@ function c1_mode() {
   local class_file=$1
   local num_gc_thread=$2
   
-  ${JAVA} \
+  ${JAVA} ${X_FLAGS} \
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly \
     -XX:+PrintInterpreter \
     -XX:+PrintNMethods -XX:+PrintCompilation \
@@ -94,7 +102,9 @@ function c1_mode() {
     -XX:TeraHeapSize=${TERACACHE_SIZE} \
     -Xmx${MAX}g \
     -Xms${XMS}g \
+    -XX:-ClassUnloading \
     -XX:-UseCompressedOops \
+    -XX:-UseCompressedClassPointers \
     -XX:+TeraHeapStatistics \
     $(get_teraheap_mount_point) \
     $(get_flexheap_device) \
@@ -110,7 +120,7 @@ function c2_mode() {
   local class_file=$1
   local num_gc_thread=$2
   
-  ${JAVA} \
+  ${JAVA} ${X_FLAGS} \
     -server \
     -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly \
     -XX:+PrintNMethods -XX:+PrintCompilation \
@@ -123,7 +133,9 @@ function c2_mode() {
     -Xmx${MAX}g \
     -Xms${XMS}g \
     -XX:TeraCacheThreshold=0 \
+    -XX:-ClassUnloading \
     -XX:-UseCompressedOops \
+    -XX:-UseCompressedClassPointers \
     -XX:+TeraCacheStatistics \
     $(get_teraheap_mount_point) \
     $(get_flexheap_device) \
@@ -139,7 +151,7 @@ function run_tests_msg_box() {
   local class_file=$1
   local num_gc_thread=$2
 
-  ${JAVA} \
+  ${JAVA} ${X_FLAGS} \
     -server \
     -XX:+ShowMessageBoxOnError \
     $(get_garbage_collector) \
@@ -148,6 +160,7 @@ function run_tests_msg_box() {
   -XX:TeraHeapSize=${TERACACHE_SIZE} \
     -Xmx${MAX}g \
     -Xms${XMS}g \
+    -XX:-ClassUnloading \
     -XX:-UseCompressedOops \
     -XX:-UseCompressedClassPointers \
     -XX:+TeraHeapStatistics \
@@ -166,7 +179,7 @@ function run_tests() {
   local class_file=$1
   local num_gc_thread=$2 
 
-  ${JAVA} \
+  ${JAVA} ${X_FLAGS} \
     $(get_garbage_collector) \
     -XX:+ShowMessageBoxOnError \
     -XX:ParallelGCThreads=${num_gc_thread} \
@@ -174,6 +187,7 @@ function run_tests() {
     -XX:TeraHeapSize=${TERACACHE_SIZE} \
     -Xmx${MAX}g \
     -Xms${XMS}g \
+    -XX:-ClassUnloading \
     -XX:-UseCompressedOops \
     -XX:-UseCompressedClassPointers \
     -XX:+TeraHeapStatistics \
@@ -192,7 +206,7 @@ function run_tests_debug() {
   local class_file=$1
   local num_gc_thread=$2
 
-  gdb --args ${JAVA} \
+  gdb --args ${JAVA} ${X_FLAGS} \
     -server \
     -XX:+ShowMessageBoxOnError \
     $(get_garbage_collector) \
@@ -201,6 +215,7 @@ function run_tests_debug() {
     -XX:TeraHeapSize=${TERACACHE_SIZE} \
     -Xmx${MAX}g \
     -Xms${XMS}g \
+    -XX:-ClassUnloading \
     -XX:-UseCompressedOops \
     -XX:-UseCompressedClassPointers \
     -XX:+TeraHeapStatistics \
@@ -216,7 +231,7 @@ function run_tests_debug() {
 
 function check_tests_directory(){
   if [[ "$TESTD" != "g1_evacuations" && "$TESTD" != "g1_full_gc" && "$TESTD" != "parallel_gc" ]]; then
-    echo "Error: Provide one of the following directories are 'g1_evacuations', 'g1_full_gc', 'parallel_gc'"
+    echo "Error: Provide one of the following directories 'g1_evacuations', 'g1_full_gc', 'parallel_gc'"
     usage
     exit 1
   fi
@@ -291,7 +306,7 @@ usage() {
   echo "      -p, --point              <mount_point>        The mount point used for the H2 file(eg. /mnt/fmap/)"
   echo "      -j, --jvm                <jvm_build>          The jvm build([release|r], [optimized|o], [fastdebug|f], Default: release)"
   echo "      -c, --collector          <collector>          The garbage collector to use(0: ParallelScavenge, 1: G1GC)"
-  echo "      -d, --tests-directory    <directory name>     The directory with the java tests."
+  echo "      -d, --tests-directory    <directory name>     The directory with the java tests(0: g1_evacuations, 1: g1_full_gc, 2: parallel_gc)."
   echo "      -m, --mode               <execution_mode>     The jvm execution mode(0: Default, 1: Interpreter, 2: C1, 3: C2, 4: gdb, 5: ShowMessageBoxOnError)"
   echo "      -t, --threads            <threads>            The number of GC threads (2, 4, 8, 16, 32)"
   echo "      -w, --write-to-t2-policy <policy>   The available policies are: 'AsyncWritePolicy', 'SyncWritePolicy', 'FmapWritePolicy', 'DefaultWritePolicy'"
@@ -354,10 +369,23 @@ print_msg() {
     ;;
   esac
 
+  case "$TESTD" in
+    g1_evacuations)
+      gc_name="G1 Evacuations"
+      ;;
+    g1_full_gc)
+      gc_name="G1 Full GC"
+      ;;
+    parallel_gc)
+      gc_name="Parallel Scavenge"
+      ;;
+  esac
+  
   echo "___________________________________"
   echo
-  echo "         Run JAVA Tests"
+  echo "         Run ${EXEC_DIR_NAME} Tests"
   echo
+  echo "GC:         ${gc_name}"
   echo "Mode:       ${mode_value}"
   echo "GC Threads: ${gcThread}"
   echo "___________________________________"
@@ -366,7 +394,7 @@ print_msg() {
 
 function parse_script_arguments() {
   local OPTIONS=p:j:c:d:m:t:w:a:fh
-  local LONGOPTIONS=point:,jvm:,collector:tests-directory:,,mode:,threads:,write-to-h2-policy:,h2-allocator:,flexheap,help
+  local LONGOPTIONS=point:,jvm:,collector:,tests-directory:,mode:,threads:,write-to-h2-policy:,h2-allocator:,flexheap,help
 
   # Use getopt to parse the options
   local PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
@@ -436,11 +464,54 @@ function parse_script_arguments() {
 }
 
 parse_script_arguments "$@"
+
+# Checking arguments
 check_args
 check_h2_write_policy
 check_jvm_build
 check_tests_directory
 
+########################################################################
+# Additional Test files not used in every case
+
+if [ "${TESTD}" == "g1_evacuations" ]
+then
+  EXEC_JAVA+=("Array_mine" "Array_List_String")
+elif [ "${TESTD}" == "g1_full_gc" ]
+then
+  EXEC_JAVA+=("Array_List_String")
+fi
+
+# Setup exec files
+if [ "${EXEC_DIR_NAME}" == "java" ]
+then
+  EXEC=(${EXEC_JAVA[@]})
+else
+  EXEC=(${EXEC_PHASES[@]})
+fi
+
+# NOTE: you can overwrite EXEC here to run specific tests
+# Attention: if you overwrite EXEC make sure you have the
+# correct flags.
+# EXEC=("Array")
+
+# Add extra flags
+if [ "$EXEC_DIR_NAME" == "phases" ]
+then
+  X_FLAGS="-XX:G1HeapWastePercent=0 $X_FLAGS"
+elif [ "$TESTD" == "g1_evacuations" ]
+then
+  X_FLAGS="-Xbootclasspath/a:./g1_evacuations/Whitebox/wb.jar \
+    -XX:+UnlockDiagnosticVMOptions \
+    -XX:+WhiteBoxAPI \
+    -XX:InitialTenuringThreshold=5 -XX:MaxTenuringThreshold=7 \
+    -XX:MaxGCPauseMillis=30000 \
+    -XX:G1MixedGCCountTarget=4 $X_FLAGS"
+fi
+
+########################################################################
+
+# Run tests
 #cd java || exit
 cd "${TESTD}/${EXEC_DIR_NAME}" || exit
 for gcThread in "${PARALLEL_GC_THREADS[@]}"; do
@@ -451,6 +522,8 @@ for gcThread in "${PARALLEL_GC_THREADS[@]}"; do
       XMS=2
     elif [ "${exec_file}" == "Array_List" ]; then
       XMS=64
+    elif [[ "${exec_file}" == "HashMap" || "${exec_file}" == "Array_List_String" ]]; then
+      XMS=3
     else
       XMS=1
     fi
