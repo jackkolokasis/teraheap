@@ -17,6 +17,7 @@ export CPLUS_INCLUDE_PATH=${PROJECT_DIR}/tera_malloc/include/:$CPLUS_INCLUDE_PAT
 cd Whitebox
 javac -sourcepath . -d . jdk/test/**/**.java
 jar cf ./wb.jar .
+#mv wb.jar ../java
 find . -type f -name '*.class' -delete
 cd ..
 

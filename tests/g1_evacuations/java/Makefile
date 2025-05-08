@@ -16,9 +16,10 @@ JAVA_REPO := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))/../../../jdk17u067
 #JAVAC=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath
 #PROJECT_DIR := $(shell pwd)/../..
 
-JAVA_COMP=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
-JAVAC=$(JAVA_COMP) -d ./bin
-
+#JAVA_COMP=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -classpath ./bin/
+#JAVAC=$(JAVA_COMP) -d ./bin
+JAVA_COMP=$(JAVA_REPO)/build/linux-$(cpu_arch)-server-release/jdk/bin/javac -Xlint:deprecation -sourcepath ../Whitebox/wb.jar -cp .:../Whitebox/wb.jar
+JAVAC=$(JAVA_COMP) -d .
 GDB=gdb
 
 TARGET=GC.class Array.class Array_List.class Array_List_Int.class \
@@ -38,4 +39,4 @@ clean:
 	rm hotspot_pid*
 
 distclean: clean
-	rm -rf bin
+	rm -rf *.class
