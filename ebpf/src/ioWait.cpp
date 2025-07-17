@@ -83,19 +83,36 @@ double ebpf_disable_tracking() {
   return total_wait_ms;
 }
 
+// Helper to clear all entries in a BPF hash map
+void clear_bpf_hash_map(int fd) {
+  uint32_t key = 0, next_key = 0;
+  while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+    bpf_map_delete_elem(fd, &next_key);
+    key = next_key;
+  }
+}
 
 void ebpf_stop() {
+  fprintf(stderr, "Clear and close EBPF\n");
+  // Clear and close mutators map
   if (mutators_fd >= 0) {
+    clear_bpf_hash_map(mutators_fd);
     close(mutators_fd);
     mutators_fd = -1;
   }
 
+  // Reset and close enabled map (array)
   if (enabled_fd >= 0) {
+    uint32_t key = 0;
+    uint32_t value = 0;
+    bpf_map_update_elem(enabled_fd, &key, &value, BPF_ANY);
     close(enabled_fd);
     enabled_fd = -1;
   }
-  
+
+  // Clear and close iowait map
   if (iowait_fd >= 0) {
+    clear_bpf_hash_map(iowait_fd);
     close(iowait_fd);
     iowait_fd = -1;
   }
